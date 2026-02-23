@@ -1,7 +1,7 @@
 # システム設計ドキュメント
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 0.4 (WYSIWYGモード設計確定)
+> バージョン: 0.5 (Markdown↔TipTap変換設計を追加)
 > 更新日: 2026-02-23
 
 ---
@@ -150,6 +150,9 @@ Tauri 2.0（Rust）
 Markdown・HTML 両ファイルを内部では **hast（Hypertext AST）互換のAST** として保持する。
 これにより、MD/HTML どちらの形式でも同じエディタコアで操作できる。
 
+> **Markdown ↔ TipTap 変換の詳細設計**（スキーママッピング・SoTアーキテクチャ・生HTML保持・ラウンドトリップテスト・GFM拡張対応）は
+> 👉 **[docs/markdown-tiptap-conversion.md](./markdown-tiptap-conversion.md)** を参照。
+
 ```typescript
 // 統合ドキュメントの内部表現（hast互換）
 interface Document {
@@ -278,6 +281,18 @@ interface BlockNodeView {
 - カスタムNodeViewによる任意レンダリングも可能（Typora式WYSIWYG実装に必要）
 - TypeScript ネイティブでReactとの統合が良好
 
+### 2.2.1 Source-of-Truth 戦略（ハイブリッド採用）
+
+| フェーズ | SoT | 概要 |
+|---------|-----|------|
+| **読み込み時** | ファイル | `.md` → mdast → TipTap JSON（一方向・完全忠実） |
+| **編集中** | TipTap JSON | ユーザー操作は TipTap 内部で完結 |
+| **保存時** | → ファイルへ | TipTap JSON → mdast → `.md`（remark-stringify で正規化） |
+| **外部変更検知** | ファイルウォッチャー | 変更を検知したらダイアログで再読込を促す |
+
+完全な File-as-SoT への移行は、ラウンドトリップテストが全フィクスチャでパスした後に検討する。
+詳細: [markdown-tiptap-conversion.md §3](./markdown-tiptap-conversion.md#3-source-of-truth-アーキテクチャ比較と採用方針)
+
 ### 2.3 AI最適化モジュール
 
 AIコピー機能は、エディタコアとUIの間に位置する独立したモジュールとして実装する。
@@ -341,6 +356,8 @@ src/
 │   │   ├── serializer.ts          # 内部AST → Markdown
 │   │   └── html-serializer.ts     # 内部AST → HTML          ★新規
 │   ├── converter/
+│   │   ├── mdast-to-tiptap.ts     # mdast → TipTap JSON 変換 ★新規
+│   │   ├── tiptap-to-mdast.ts     # TipTap JSON → mdast 変換 ★新規
 │   │   ├── md-to-html.ts          # MD変換パイプライン       ★新規
 │   │   └── html-to-md.ts          # HTML→MD変換パイプライン  ★新規
 │   ├── commands/
@@ -363,7 +380,9 @@ src/
 │   │   │   ├── code-block-view.ts # コードブロックビュー
 │   │   │   ├── math-view.ts       # 数式ビュー（KaTeX）
 │   │   │   ├── image-view.ts      # 画像ビュー
-│   │   │   └── div-view.ts        # divブロックビュー        ★新規
+│   │   │   ├── div-view.ts        # divブロックビュー        ★新規
+│   │   ├── raw-html-block.ts  # 生HTMLブロック保持       ★新規
+│   │   └── raw-html-inline.ts # 生HTMLインライン保持     ★新規
 │   │   └── plugins/
 │   │       ├── input-rules.ts     # 入力ルール（`# `→H1等）
 │   │       ├── key-bindings.ts    # キーバインディング
@@ -720,21 +739,26 @@ const EditorModeExtension = Extension.create({
 #### 未解決の設計課題
 
 1. ✅ **WYSIWYGのモード**: Typora式をデフォルトとし、常にWYSIWYG・常にソース・サイドバイサイドの4モード切り替えに確定
-2. **大きなファイルの仮想化**: 数万行のファイルでの仮想スクロール対応
-3. **コンフリクト解決**: 外部エディタで変更されたファイルの扱い
-4. **マルチファイル検索**: フォルダ内ファイル横断検索の実装方法
-5. **画像ストレージ**: ローカルパス管理・コピー先フォルダの設計
-6. **プラグインサンドボックス**: プラグインの安全な実行環境
-7. **CSS編集の範囲**: HTMLファイル編集時の`<style>`タグ内CSSの扱い
-8. **相対パス解決**: HTML編集時の画像・CSS・JSの相対パス解決
-9. **HTML→MD変換ロス**: 変換時の情報ロス（スタイル・構造）をどこまで許容するか
-10. **JavaScript の取り扱い**: `<script>` タグを含むHTMLの安全な扱い方
-11. **AI言語推定の精度**: 無タグコードブロックの言語ヒューリスティックの品質
-12. **カスタムテンプレート保存**: ユーザー定義テンプレートのローカル永続化設計
-13. **AIプロバイダ連携（将来）**: OpenAI / Anthropic APIをエディタ内から直接呼び出す設計
-14. **モバイルUI設計**: タッチ操作・画面サイズに対応したUI変更の範囲
-15. **Windows WebView2の最低要件**: Windows 10の最低バージョン（WebView2対応版）の決定
-16. **配布・アップデート方法**: インストーラ形式・自動アップデート（Tauri updater）の設計
+2. ✅ **MD↔TipTap 変換スキーママッピング**: mdast ↔ TipTap ノード対応表を確定。[markdown-tiptap-conversion.md §2](./markdown-tiptap-conversion.md#2-mdast--tiptap-スキーマ-マッピング) 参照
+3. ✅ **Source-of-Truth アーキテクチャ**: ハイブリッド戦略を採用確定（編集中は TipTap JSON が SoT、保存時にファイルへシリアライズ）。[markdown-tiptap-conversion.md §3](./markdown-tiptap-conversion.md#3-source-of-truth-アーキテクチャ比較と採用方針) 参照
+4. ✅ **生HTMLの保持**: `rawHtmlBlock` / `rawHtmlInline` カスタムノードで不透明保持する方針に確定。[markdown-tiptap-conversion.md §4](./markdown-tiptap-conversion.md#4-生html-の表現保持戦略) 参照
+5. ✅ **ラウンドトリップテスト方針**: Vitest + フィクスチャファイル34本の戦略を確定。[markdown-tiptap-conversion.md §5](./markdown-tiptap-conversion.md#5-ラウンドトリップテスト実装方針) 参照
+6. ✅ **GFM拡張の変換課題**: テーブルalign・タスクリスト3値・脚注の格納戦略・タイト/ルーズリストを確定。[markdown-tiptap-conversion.md §6](./markdown-tiptap-conversion.md#6-gfm拡張の変換課題と対策) 参照
+7. **コンフリクト解決**: 外部エディタで変更されたファイルの扱い（ファイルウォッチャー＋再読込ダイアログの方針は確定）
+8. **大きなファイルの仮想化**: 数万行のファイルでの仮想スクロール対応
+9. **マルチファイル検索**: フォルダ内ファイル横断検索の実装方法
+10. **画像ストレージ**: ローカルパス管理・コピー先フォルダの設計
+11. **プラグインサンドボックス**: プラグインの安全な実行環境
+12. **CSS編集の範囲**: HTMLファイル編集時の`<style>`タグ内CSSの扱い
+13. **相対パス解決**: HTML編集時の画像・CSS・JSの相対パス解決
+14. **HTML→MD変換ロス**: 変換時の情報ロス（スタイル・構造）をどこまで許容するか
+15. **JavaScript の取り扱い**: `<script>` タグを含むHTMLの安全な扱い方
+16. **AI言語推定の精度**: 無タグコードブロックの言語ヒューリスティックの品質
+17. **カスタムテンプレート保存**: ユーザー定義テンプレートのローカル永続化設計
+18. **AIプロバイダ連携（将来）**: OpenAI / Anthropic APIをエディタ内から直接呼び出す設計
+19. **モバイルUI設計**: タッチ操作・画面サイズに対応したUI変更の範囲
+20. **Windows WebView2の最低要件**: Windows 10の最低バージョン（WebView2対応版）の決定
+21. **配布・アップデート方法**: インストーラ形式・自動アップデート（Tauri updater）の設計
 
 ---
 

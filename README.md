@@ -130,6 +130,7 @@
 - [docs/html-editor-analysis.md](./docs/html-editor-analysis.md) - HTML編集機能設計
 - [docs/ai-features.md](./docs/ai-features.md) - AI連携機能設計
 - [docs/system-design.md](./docs/system-design.md) - システム設計
+- [docs/markdown-tiptap-conversion.md](./docs/markdown-tiptap-conversion.md) - Markdown↔TipTap 双方向変換設計
 - [docs/roadmap.md](./docs/roadmap.md) - 開発ロードマップ
 
 ---
