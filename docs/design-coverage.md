@@ -139,9 +139,10 @@
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| Markdown → HTML エクスポート（パイプライン）| 🔶 | [system-design.md](./system-design.md) §4、[roadmap.md](./roadmap.md) Phase 4 |
-| HTML テーマ CSS | 🔶 | [roadmap.md](./roadmap.md) Phase 4 |
-| PDF エクスポート | 🔶 | [roadmap.md](./roadmap.md) Phase 7（一行のみ）|
+| Markdown → HTML エクスポート（パイプライン）| ✅ | [export-design.md](./export-design.md) §2 ← **新規** |
+| HTML テーマ CSS | ✅ | [export-design.md](./export-design.md) §5、[theme-design.md](./theme-design.md) ← **新規** |
+| PDF エクスポート | ✅ | [export-design.md](./export-design.md) §3 ← **新規** |
+| エクスポートオプション UI（ダイアログ設計）| ✅ | [export-design.md](./export-design.md) §4 ← **新規** |
 
 ---
 
@@ -156,6 +157,18 @@
 
 ---
 
+## 13a. テーマシステム
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| CSS Custom Properties 変数体系（全層共通） | ✅ | [theme-design.md](./theme-design.md) §2 ← **新規** |
+| テーマの 3 層構造（UI / プレビュー / エクスポート）| ✅ | [theme-design.md](./theme-design.md) §3 ← **新規** |
+| ライト/ダークモード・システムテーマ追従 | ✅ | [theme-design.md](./theme-design.md) §4 ← **新規** |
+| ユーザー定義テーマ（JSON カスタムテーマ）| ✅ | [theme-design.md](./theme-design.md) §5 ← **新規** |
+| コードハイライトテーマの自動切り替え | ✅ | [theme-design.md](./theme-design.md) §4.3 ← **新規** |
+
+---
+
 ## 13. クロスプラットフォーム
 
 | 項目 | 状態 | 参照ドキュメント |
@@ -167,7 +180,44 @@
 
 ---
 
-## 14. 未検討項目（新規設計ドキュメント対象）
+## 14. 検索・置換
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| 単一ファイル内検索・置換 UX（検索バー・ハイライト・置換）| ✅ | [search-design.md](./search-design.md) §2 ← **新規** |
+| ワークスペース横断全文検索 UX（結果 UI・クリックジャンプ）| ✅ | [search-design.md](./search-design.md) §3 ← **新規** |
+| 検索オプション（正規表現・大文字小文字・単語単位）| ✅ | [search-design.md](./search-design.md) §5 ← **新規** |
+| 全文検索のパフォーマンス（ripgrep バックエンド）| ✅ | [performance-design.md](./performance-design.md) §6 |
+
+---
+
+## 15. プラグインシステム
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| プラグイン API 型定義（拡張ポイント・権限モデル）| ✅ | [plugin-api-design.md](./plugin-api-design.md) §2・§3 ← **新規** |
+| サンドボックス設計（iframe + postMessage）| ✅ | [plugin-api-design.md](./plugin-api-design.md) §4 ← **新規** |
+| ビルトインプラグイン（Mermaid・KaTeX・画像）| ✅ | [plugin-api-design.md](./plugin-api-design.md) §5 ← **新規** |
+| プラグインライフサイクル・クリーンアップ | ✅ | [plugin-api-design.md](./plugin-api-design.md) §6 ← **新規** |
+| プラグインの配布・インストール | ✅ | [plugin-api-design.md](./plugin-api-design.md) §7 ← **新規** |
+
+---
+
+## 16. アクセシビリティ（a11y）
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| エディタ本体の ARIA ロール設計（toolbar / textbox 等）| ✅ | [accessibility-design.md](./accessibility-design.md) §2 ← **新規** |
+| カスタム NodeView の ARIA（見出し・テーブル・数式・画像）| ✅ | [accessibility-design.md](./accessibility-design.md) §3 ← **新規** |
+| キーボードのみの操作フロー・roving tabindex | ✅ | [accessibility-design.md](./accessibility-design.md) §4 ← **新規** |
+| フォーカス管理（フォーカストラップ・スキップナビゲーション）| ✅ | [accessibility-design.md](./accessibility-design.md) §5 ← **新規** |
+| ライブリージョン（状態変化のアナウンス）| ✅ | [accessibility-design.md](./accessibility-design.md) §6 ← **新規** |
+| カラーコントラスト設計（WCAG 2.1 AA）| ✅ | [accessibility-design.md](./accessibility-design.md) §7 ← **新規** |
+| a11y テスト戦略（axe-core・NVDA・VoiceOver）| ✅ | [accessibility-design.md](./accessibility-design.md) §8 ← **新規** |
+
+---
+
+## 17. 未検討項目（新規設計ドキュメント対象）
 
 以下は本セッションで新たに設計ドキュメントを作成した項目。
 
@@ -178,16 +228,19 @@
 | 配布・自動アップデート（tauri-plugin-updater・コード署名）| ✅ | [distribution-design.md](./distribution-design.md) ← **新規** |
 | フォルダ/ワークスペース管理（ファイルツリー・外部変更検知）| ✅ | [workspace-design.md](./workspace-design.md) ← **新規** |
 | エラーハンドリング・診断ログ（tauri-plugin-log・Error Boundary）| ✅ | [error-handling-design.md](./error-handling-design.md) ← **新規** |
+| エクスポート（HTML/PDF パイプライン・オプション UI）| ✅ | [export-design.md](./export-design.md) ← **新規** |
+| テーマシステム（CSS変数体系・ライト/ダーク・カスタムテーマ）| ✅ | [theme-design.md](./theme-design.md) ← **新規** |
+| 検索・置換 UX（ファイル内検索・ワークスペース横断）| ✅ | [search-design.md](./search-design.md) ← **新規** |
+| プラグイン API（型定義・サンドボックス・ライフサイクル）| ✅ | [plugin-api-design.md](./plugin-api-design.md) ← **新規** |
+| アクセシビリティ（ARIA・キーボード・コントラスト・テスト）| ✅ | [accessibility-design.md](./accessibility-design.md) ← **新規** |
 
 ---
 
-## 15. 今後さらに検討が必要な項目（設計文書なし）
+## 18. 今後さらに検討が必要な項目（設計文書なし）
 
 | 項目 | 優先度 | 備考 |
 |------|--------|------|
-| アクセシビリティ（a11y）設計 | 中 | ProseMirror の ARIA 属性、スクリーンリーダー対応 |
 | 国際化（i18n）設計 | 低 | UI テキストの多言語対応 |
-| プラグイン API 詳細設計 | 低 | 型定義は src/plugins/ にあり |
-| PDF エクスポートの詳細設計 | 低 | Phase 7 |
 | Git 統合 | 低 | Typora 分析で差別化候補として言及 |
+| AI プロバイダ直接連携の詳細設計 | 低 | OpenAI / Anthropic API を直接呼び出す UX・API キー管理 |
 | コラボレーション（リアルタイム共同編集）| 低 | 個人開発フェーズでは対象外 |
