@@ -1,8 +1,8 @@
 # システム設計ドキュメント
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 0.6 (ウィンドウ・タブ・セッション管理設計を追加)
-> 更新日: 2026-02-23
+> バージョン: 0.7 (NodeView基底設計・ファイルサイズ閾値・セキュリティ設計を追加)
+> 更新日: 2026-02-24
 
 ---
 
@@ -274,6 +274,148 @@ interface BlockNodeView {
   // 常にWYSIWYGモード時: deselectNodeを常時適用（selectNodeは無効化）
 }
 ```
+
+#### 全ブロック共通 NodeView 基底設計（確定）
+
+**統一パターン**: 「モード変更 = TipTap Extension ストレージを更新 → 全 NodeView が `useEditorMode()` フックで購読して表示を切り替える」
+
+このパターンを実装の前提として固定することで、NodeView の追加・変更時に個別のモード処理を書き直すコストを削減する。
+
+```typescript
+// src/renderer/wysiwyg/extensions/editor-mode.ts
+
+import { Extension } from '@tiptap/core';
+
+export type EditorMode = 'typora' | 'wysiwyg' | 'source' | 'split';
+
+/**
+ * エディタモードを管理する TipTap Extension。
+ * storage.mode が単一の真実源（SoT）となる。
+ */
+export const EditorModeExtension = Extension.create({
+  name: 'editorMode',
+
+  addStorage() {
+    return { mode: 'typora' as EditorMode };
+  },
+
+  addCommands() {
+    return {
+      setEditorMode: (mode: EditorMode) => ({ editor }) => {
+        editor.storage.editorMode.mode = mode;
+        // meta を持つ空トランザクションを発行して全 NodeView を再描画させる
+        editor.view.dispatch(
+          editor.view.state.tr.setMeta('editorModeChanged', mode)
+        );
+        return true;
+      },
+    };
+  },
+});
+```
+
+```typescript
+// src/renderer/wysiwyg/hooks/useEditorMode.ts
+
+import { Editor } from '@tiptap/core';
+import { useState, useEffect } from 'react';
+import { EditorMode } from '../extensions/editor-mode';
+
+/**
+ * 全 NodeView コンポーネントが呼び出す共通フック。
+ * モードが変わると自動的に再レンダリングされる。
+ */
+export function useEditorMode(editor: Editor): EditorMode {
+  const [mode, setMode] = useState<EditorMode>(
+    () => editor.storage.editorMode?.mode ?? 'typora'
+  );
+
+  useEffect(() => {
+    const handler = ({ transaction }: { transaction: Transaction }) => {
+      if (transaction.getMeta('editorModeChanged')) {
+        setMode(editor.storage.editorMode.mode);
+      }
+    };
+    editor.on('transaction', handler);
+    return () => { editor.off('transaction', handler); };
+  }, [editor]);
+
+  return mode;
+}
+```
+
+```tsx
+// 各 NodeView での使い方（例: HeadingNodeView）
+
+export function HeadingNodeView({ node, editor, ...props }: NodeViewProps) {
+  const mode = useEditorMode(editor);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // モードとフォーカス状態に基づいて表示を決定
+  const showSource =
+    mode === 'source' ||
+    (mode === 'typora' && isFocused);
+
+  if (showSource) {
+    return <SourceView node={node} {...props} />;
+  }
+  return <RenderedView node={node} level={node.attrs.level} />;
+}
+```
+
+**設計の利点**:
+- 各 NodeView は `useEditorMode()` を呼ぶだけ — モード管理ロジックを自前で持たない
+- `EditorModeExtension` を追加するだけで既存の全 NodeView がモード購読に対応する
+- React DevTools でモード状態を可視化しやすい
+- Vitest でモードごとのレンダリングをユニットテストしやすい
+
+#### ファイルサイズ閾値（確定）
+
+**仕様**: 以下のいずれかの条件を超えると、WYSIWYG モードを無効化しソースモード（CodeMirror）に自動切り替えする。
+
+| 指標 | 閾値（仮） | 根拠 |
+|------|-----------|------|
+| ファイルサイズ | **3MB 以上** | Markdown 3MB ≒ 約6万行。書籍1冊分相当でWYSIWYG編集の実用範囲外 |
+| ProseMirror ノード数 | **3,000 ノード以上** | NodeView の描画コストがフレームレートに影響し始める目安 |
+
+どちらか一方でも閾値を超えた場合に自動切り替えが発動する。
+
+```typescript
+// src/core/editor.ts
+
+const FILE_SIZE_THRESHOLD_BYTES = 3 * 1024 * 1024;  // 3MB
+const NODE_COUNT_THRESHOLD = 3_000;
+
+/**
+ * ファイルを開く際にWYSIWYGが有効かどうかを判定する。
+ * 閾値超過時はソースモードに固定し、UIでトースト通知を表示する。
+ */
+export function determineInitialMode(
+  fileContent: string,
+  userPreference: EditorMode
+): EditorMode {
+  // ファイルサイズチェック
+  const sizeBytes = new TextEncoder().encode(fileContent).length;
+  if (sizeBytes >= FILE_SIZE_THRESHOLD_BYTES) {
+    return 'source';
+  }
+
+  // ノード数チェック（パース後に確認）
+  const doc = markdownToTipTap(fileContent);
+  if (countNodes(doc) >= NODE_COUNT_THRESHOLD) {
+    return 'source';
+  }
+
+  return userPreference;
+}
+```
+
+**UX**:
+- 自動切り替え時はトースト通知「ファイルが大きいためソースモードで開きました（3MB 以上）」を表示する
+- ユーザーは手動で WYSIWYG に切り替え可能（ただし動作が遅くなる旨を警告）
+- 閾値はユーザー設定で変更可能にする（将来的に）
+
+> **注意**: 仮値であり、実装後のパフォーマンス計測（大きな .md ファイルでのフレームレート測定）を経て調整する。
 
 #### TipTap を採用する理由
 
@@ -766,20 +908,20 @@ const EditorModeExtension = Extension.create({
 10. ✅ **未保存変更の管理**: `onCloseRequested` + Zustand `isDirty` フラグの方針を確定。[window-tab-session-design.md §3](./window-tab-session-design.md#3-未保存変更の管理) 参照
 11. ✅ **最近使ったファイル履歴**: Tauriメニュー動的更新 + Windows `SHAddToRecentDocs` の方針を確定。[window-tab-session-design.md §4](./window-tab-session-design.md#4-最近使ったファイル履歴) 参照
 12. ✅ **ファイル関連付け・シングルインスタンス**: `tauri-plugin-single-instance` + `tauri.conf.json` の方針を確定。[window-tab-session-design.md §5](./window-tab-session-design.md#5-ファイル関連付けとシングルインスタンス制御) 参照
-13. **大きなファイルの仮想化**: 数万行のファイルでの仮想スクロール対応
+13. ✅ **大きなファイルの自動モード切り替え**: ファイルサイズ 3MB 以上 / ProseMirror ノード数 3,000 以上でソースモードに自動切り替えする仕様に確定。[system-design.md §2.2 ファイルサイズ閾値](#ファイルサイズ閾値確定) 参照
 14. **マルチファイル検索**: フォルダ内ファイル横断検索の実装方法
-15. **画像ストレージ**: ローカルパス管理・コピー先フォルダの設計
+15. ✅ **画像ストレージ**: ローカルパス管理・コピー先フォルダの設計を確定。[image-storage-design.md](./image-storage-design.md) 参照。モバイル対応も同ドキュメントに追記済み
 16. **プラグインサンドボックス**: プラグインの安全な実行環境
-12. **CSS編集の範囲**: HTMLファイル編集時の`<style>`タグ内CSSの扱い
-13. **相対パス解決**: HTML編集時の画像・CSS・JSの相対パス解決
-14. **HTML→MD変換ロス**: 変換時の情報ロス（スタイル・構造）をどこまで許容するか
-15. **JavaScript の取り扱い**: `<script>` タグを含むHTMLの安全な扱い方
-16. **AI言語推定の精度**: 無タグコードブロックの言語ヒューリスティックの品質
-17. **カスタムテンプレート保存**: ユーザー定義テンプレートのローカル永続化設計
-18. **AIプロバイダ連携（将来）**: OpenAI / Anthropic APIをエディタ内から直接呼び出す設計
-19. **モバイルUI設計**: タッチ操作・画面サイズに対応したUI変更の範囲
-20. **Windows WebView2の最低要件**: Windows 10の最低バージョン（WebView2対応版）の決定
-21. **配布・アップデート方法**: インストーラ形式・自動アップデート（Tauri updater）の設計
+17. **CSS編集の範囲**: HTMLファイル編集時の`<style>`タグ内CSSの扱い
+18. **相対パス解決**: HTML編集時の画像・CSS・JSの相対パス解決
+19. **HTML→MD変換ロス**: 変換時の情報ロス（スタイル・構造）をどこまで許容するか
+20. ✅ **JavaScript / HTML セキュリティ**: `<script>` タグを含むHTMLの安全な扱い方・HTMLプレビューのサニタイズ・Tauri fs スコープ制限を確定。[security-design.md](./security-design.md) 参照
+21. **AI言語推定の精度**: 無タグコードブロックの言語ヒューリスティックの品質
+22. **カスタムテンプレート保存**: ユーザー定義テンプレートのローカル永続化設計
+23. **AIプロバイダ連携（将来）**: OpenAI / Anthropic APIをエディタ内から直接呼び出す設計
+24. **モバイルUI設計**: タッチ操作・画面サイズに対応したUI変更の範囲
+25. **Windows WebView2の最低要件**: Windows 10の最低バージョン（WebView2対応版）の決定
+26. **配布・アップデート方法**: インストーラ形式・自動アップデート（Tauri updater）の設計
 
 ---
 

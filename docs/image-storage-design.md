@@ -280,7 +280,9 @@ export function ImageNodeView({ node, getCurrentFilePath }: Props) {
 }
 ```
 
-### 2.3 モバイル（Android/iOS）での注意点
+### 2.3 モバイル（Android/iOS）での画像表示・保存設計
+
+#### 2.3.1 asset:// プロトコルの挙動（全プラットフォーム共通）
 
 | プラットフォーム | プロトコル | 備考 |
 |----------------|-----------|------|
@@ -288,8 +290,193 @@ export function ImageNodeView({ node, getCurrentFilePath }: Props) {
 | Android | `https://asset.localhost/` | 同上（Tauri 2.0で統一） |
 | iOS (WKWebView) | `https://asset.localhost/` | 同上 |
 
-`convertFileSrc()` は全プラットフォームで正しいURLを返すため、
-**コード上でプラットフォーム分岐は不要**。
+`convertFileSrc()` は全プラットフォームで正しい URL を返すため、
+**コード上でプラットフォーム分岐は不要**。ImageNodeView の実装はデスクトップと同一で動作する。
+
+#### 2.3.2 Android の画像保存先とアクセス制限
+
+Android は **Scoped Storage**（Android 10 以降）により、アプリは任意のパスにファイルを書き込めない。
+
+| ストレージ種別 | Tauri でのアクセス | 用途 |
+|-------------|-----------------|------|
+| アプリ専用内部ストレージ (`$APP_DATA_DIR`) | **無制限** | アセット・設定・キャッシュ |
+| アプリ専用外部ストレージ | 許可不要でアクセス可 | 大容量アセット |
+| 共有ストレージ（Downloads, Pictures 等） | Storage Access Framework 経由 | ユーザーが「保存先」を選択する場合 |
+
+**Android での推奨保存戦略**:
+
+```typescript
+// src/file/imageStorage.ts（モバイル対応版）
+
+import { platform } from '@tauri-apps/plugin-os';
+
+export async function resolveImageSaveDir(
+  markdownFilePath: string,
+  settings: ImageStorageSettings
+): Promise<string> {
+  const currentPlatform = await platform();
+
+  // Android: .md ファイル自体がアプリ専用ストレージにある場合のみ
+  // 通常のサブフォルダ保存が可能
+  if (currentPlatform === 'android') {
+    // Android では $APP_DATA_DIR 配下のファイルを編集するユースケースが主になる
+    // （SAF 経由でのみ外部ファイルにアクセス可能）
+    const mdDir = await dirname(markdownFilePath);
+    switch (settings.saveMode) {
+      case 'subfolder':
+        return join(mdDir, settings.subfolderName);  // アプリ専用ストレージ内なら OK
+      default:
+        return mdDir;
+    }
+  }
+
+  // iOS / デスクトップは既存の解決ロジック
+  return resolveImageSaveDirDefault(markdownFilePath, settings);
+}
+```
+
+**Android での Markdown ファイルの開き方**:
+
+Android では、ユーザーが Files アプリ等から .md ファイルを選択して本アプリで開く場合、
+Tauri が **Storage Access Framework（SAF）** 経由でコンテンツ URI (`content://...`) を受け取る。
+
+```typescript
+// src/file/android-file-handler.ts
+
+import { platform } from '@tauri-apps/plugin-os';
+
+/**
+ * Android の SAF から受け取ったコンテンツ URI を処理する。
+ * Tauri 2.0 の mobile ビルドでは plugin-fs が SAF をラップしてくれるが、
+ * 保存先の画像フォルダが SAF スコープ外になり得ることに注意。
+ */
+export async function handleAndroidFileOpen(contentUri: string): Promise<void> {
+  // Tauri 2.0 の plugin-fs は SAF ラッパーを提供する予定（要バージョン確認）
+  // content URI の場合はアプリ専用ストレージにコピーして扱う方が確実
+}
+```
+
+> **実装上の制約**: Android での SAF 対応は Tauri 2.0 モバイルビルドの成熟度に依存する。
+> Phase 5（モバイル対応フェーズ）で詳細設計を行う。
+
+#### 2.3.3 iOS の画像保存先とアクセス制限
+
+iOS も**サンドボックス制限**が強く、アプリは自分の Documents ディレクトリ以外へ直接書き込めない。
+
+| アクセス先 | 方法 |
+|-----------|------|
+| アプリの Documents フォルダ | 無制限 |
+| iCloud Drive（Documents） | `UIFileSharingEnabled` 設定で公開可能 |
+| Files アプリで選択したファイル | Document Picker（UIDocumentPickerViewController）経由 |
+| Photos ライブラリ | `PHPhotoLibrary` API（Tauri プラグイン経由） |
+
+**iOS での画像ペースト時の動作**:
+
+```typescript
+// src/plugins/imageDropPaste.ts（iOS 考慮版）
+
+async function handleImageFile(
+  view: EditorView,
+  file: File,
+  markdownPath: string,
+  settings: ImageStorageSettings
+) {
+  const currentPlatform = await platform();
+
+  // iOS では markdownPath がアプリの Documents フォルダ内にある
+  // ペーストされた画像も同フォルダ内のサブフォルダに保存する
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  const absolutePath = await saveImageFile(
+    markdownPath, bytes, file.name, settings
+  );
+
+  // iCloud Drive と同期している場合、
+  // absolutePath は iCloud Drive 上のパスになる（透過的に処理される）
+
+  const mdDir = await dirname(markdownPath);
+  const relativePath = await relative(mdDir, absolutePath);
+
+  const { schema, tr, selection } = view.state;
+  const node = schema.nodes.image.create({ src: relativePath, alt: file.name });
+  view.dispatch(tr.replaceSelectionWith(node));
+}
+```
+
+**iCloud Drive 連携方針**:
+- `tauri.conf.json` の iOS 設定で `UIFileSharingEnabled: true` を有効化する
+- これにより、ユーザーの iCloud Drive / Files アプリからアプリの Documents フォルダが見える
+- Markdown ファイルと画像アセットが iCloud Drive で同期される（PC との共有が容易）
+
+#### 2.3.4 モバイル対応の画像ファイル形式
+
+モバイルデバイスからペーストされる画像は HEIF/HEVC 形式（iPhone のデフォルト）になることがある。
+Web（WebView）は HEIF を直接表示できない場合があるため、変換を検討する。
+
+| 形式 | デスクトップ | Android WebView | iOS WKWebView | 対応方針 |
+|------|------------|-----------------|--------------|---------|
+| PNG | ◎ | ◎ | ◎ | そのまま保存 |
+| JPEG | ◎ | ◎ | ◎ | そのまま保存 |
+| WebP | ◎ | ◎ | ◎（iOS 14+）| そのまま保存 |
+| HEIF | △ | △ | ◎ | **JPEG に変換して保存** |
+| GIF | ◎ | ◎ | ◎ | そのまま保存 |
+
+```typescript
+// src/file/imageStorage.ts に追加
+
+/**
+ * HEIF 形式の画像を JPEG に変換する。
+ * ブラウザの Canvas API を使った簡易変換（Rust 側でより高品質な変換も可能）。
+ */
+async function normalizeImageFormat(file: File): Promise<{ bytes: Uint8Array; name: string }> {
+  const heifTypes = ['image/heif', 'image/heic', 'image/heif-sequence'];
+
+  if (!heifTypes.includes(file.type)) {
+    const buffer = await file.arrayBuffer();
+    return { bytes: new Uint8Array(buffer), name: file.name };
+  }
+
+  // Canvas API で JPEG に変換
+  const bitmap = await createImageBitmap(file);
+  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(bitmap, 0, 0);
+  const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 });
+  const buffer = await blob.arrayBuffer();
+  const name = file.name.replace(/\.(heif|heic)$/i, '.jpg');
+  return { bytes: new Uint8Array(buffer), name };
+}
+```
+
+#### 2.3.5 モバイルでのタッチ操作対応（Phase 5 課題）
+
+画像の D&D はモバイルでは使えないため、以下の代替 UI を提供する：
+
+| 機能 | デスクトップ | モバイル代替 |
+|------|------------|------------|
+| 画像 D&D | ◎ | ✗ → 「写真を挿入」ボタン |
+| クリップボードペースト | ◎ | ◎ 長押しメニューからペースト |
+| カメラロールから選択 | ✗ | ◎ `input type="file" accept="image/*"` |
+
+```tsx
+// src/components/Editor/MobileImageInsert.tsx（Phase 5 で実装）
+
+export function MobileImageInsertButton({ editor }: { editor: Editor }) {
+  const handleSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // imageDropPaste と同じ処理を実行
+    await handleImageFile(editor.view, file, getCurrentFilePath(), getSettings());
+  };
+
+  return (
+    <label className="mobile-image-insert">
+      <input type="file" accept="image/*" onChange={handleSelect} hidden />
+      📷 写真を挿入
+    </label>
+  );
+}
 
 ---
 
