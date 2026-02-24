@@ -1,7 +1,7 @@
 # システム設計ドキュメント
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 0.7 (NodeView基底設計・ファイルサイズ閾値・セキュリティ設計を追加)
+> バージョン: 0.8 (Typora式カーソル位置計算・クロスプラットフォーム設計・パフォーマンス設計を追加)
 > 更新日: 2026-02-24
 
 ---
@@ -416,6 +416,137 @@ export function determineInitialMode(
 - 閾値はユーザー設定で変更可能にする（将来的に）
 
 > **注意**: 仮値であり、実装後のパフォーマンス計測（大きな .md ファイルでのフレームレート測定）を経て調整する。
+
+#### Typora式モード: クリック位置からのカーソルポジション計算（重要設計）
+
+Typora式モードでは「レンダリング済みDOM上のクリック → 対応する ProseMirror ノード位置へフォーカス」という変換が必要。これが実装上の最難関の一つ。
+
+```
+ユーザーが H1 の「World」という文字をクリック
+  └─ ブラウザの MouseEvent (clientX, clientY)
+       │
+       ▼
+  ProseMirrorの posAtCoords({ left, top }) API
+       │
+       ▼
+  ProseMirror ドキュメント内のポジション (pos: number)
+       │
+       ▼
+  対応するブロックノードの開始ポジションを特定
+       │
+       ▼
+  そのブロックノードの NodeView を「編集モード」に切り替え
+  + カーソルをクリック位置の文字オフセットに設定
+```
+
+```typescript
+// src/renderer/wysiwyg/plugins/typora-click-handler.ts
+
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { EditorView } from '@tiptap/pm/view';
+
+/**
+ * レンダリング済みブロック上のクリックを検知し、
+ * 対応する ProseMirror ノードをフォーカス状態に切り替える。
+ */
+export const typoraClickHandlerPlugin = new Plugin({
+  key: new PluginKey('typoraClickHandler'),
+
+  props: {
+    /**
+     * クリックイベントを受け取り、クリックされたブロックノードを特定する。
+     * return true = イベントを消費（NodeView が編集モードに切り替わる前処理）
+     * return false = ProseMirror のデフォルト動作に委ねる
+     */
+    handleClick(view: EditorView, pos: number, event: MouseEvent): boolean {
+      const { state } = view;
+      const $pos = state.doc.resolve(pos);
+
+      // クリック位置の最上位ブロックノードを取得
+      // depth=1 がルート直下のブロック（H1, paragraph, table 等）
+      const blockDepth = Math.max(1, $pos.depth > 0 ? 1 : 0);
+      const blockPos = $pos.before(blockDepth);
+      const blockNode = state.doc.nodeAt(blockPos);
+
+      if (!blockNode) return false;
+
+      // NodeView に対して「フォーカス」メタデータを送る
+      // 各 NodeView は useEditorMode() で editorModeChanged を購読しており、
+      // ここでは focusedBlockPos というメタを別途設定する
+      const tr = state.tr.setMeta('typoraFocusedBlockPos', blockPos);
+      view.dispatch(tr);
+
+      return false; // カーソル位置はProseMirrorに委ねる
+    },
+
+    /**
+     * キーボードナビゲーション（矢印キー）でブロック境界を越えるときの処理。
+     * ArrowUp/Down でブロックをまたぐ際に NodeView の切り替えを行う。
+     */
+    handleKeyDown(view: EditorView, event: KeyboardEvent): boolean {
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        return false;
+      }
+
+      // 現在のカーソル位置のブロックと、移動後のブロックを比較
+      // ブロックが変わる場合は NodeView の切り替えを発動
+      // （実装は ProseMirror の Selection 変化を transaction で追う方が確実）
+      return false;
+    },
+  },
+});
+```
+
+**フォーカス状態の NodeView での受け取り方**:
+
+```typescript
+// 各 NodeView（例: HeadingNodeView）での実装パターン
+export function HeadingNodeView({ node, editor, getPos }: NodeViewProps) {
+  const mode = useEditorMode(editor);
+  const [isFocused, setIsFocused] = useState(false);
+
+  // typoraFocusedBlockPos メタが自ノードを指していたらフォーカス
+  useEffect(() => {
+    const handler = ({ transaction }: { transaction: Transaction }) => {
+      const focusedPos = transaction.getMeta('typoraFocusedBlockPos');
+      if (focusedPos !== undefined) {
+        setIsFocused(focusedPos === getPos());
+      }
+    };
+    editor.on('transaction', handler);
+    return () => { editor.off('transaction', handler); };
+  }, [editor, getPos]);
+
+  const showSource = mode === 'source' || (mode === 'typora' && isFocused);
+
+  if (showSource) {
+    return <SourceView node={node} />;
+  }
+  return <RenderedView node={node} level={node.attrs.level} />;
+}
+```
+
+**インラインノードのフォーカス境界**:
+
+Typora式モードでは、太字・リンク等のインラインノードをクリックしても、フォーカスされるのは**含む段落ブロック全体**。インライン単位でのフォーカス切り替えは行わない。
+
+```
+ユーザーが **bold** テキストをクリック
+  └─ 含む paragraph ノードがフォーカス（ソース表示に切り替わる）
+  └─ カーソルは bold テキストの文字位置に設定される
+     （ProseMirror が posAtCoords で自動計算）
+```
+
+**テーブルノードのフォーカス**:
+
+テーブルは特別扱い。テーブル全体ではなく**クリックされたセル単位**でフォーカスが入る。
+
+```
+ユーザーがセルをクリック
+  └─ tableCell NodeView が編集モードに
+  └─ 他のセルはレンダリング状態を維持
+  └─ テーブル外に出ると全セルがレンダリング状態に戻る
+```
 
 #### TipTap を採用する理由
 
@@ -902,7 +1033,7 @@ const EditorModeExtension = Extension.create({
 4. ✅ **生HTMLの保持**: `rawHtmlBlock` / `rawHtmlInline` カスタムノードで不透明保持する方針に確定。[markdown-tiptap-conversion.md §4](./markdown-tiptap-conversion.md#4-生html-の表現保持戦略) 参照
 5. ✅ **ラウンドトリップテスト方針**: Vitest + フィクスチャファイル34本の戦略を確定。[markdown-tiptap-conversion.md §5](./markdown-tiptap-conversion.md#5-ラウンドトリップテスト実装方針) 参照
 6. ✅ **GFM拡張の変換課題**: テーブルalign・タスクリスト3値・脚注の格納戦略・タイト/ルーズリストを確定。[markdown-tiptap-conversion.md §6](./markdown-tiptap-conversion.md#6-gfm拡張の変換課題と対策) 参照
-7. **コンフリクト解決**: 外部エディタで変更されたファイルの扱い（ファイルウォッチャー＋再読込ダイアログの方針は確定）
+7. ✅ **コンフリクト解決**: 外部エディタで変更されたファイルの扱い（ファイルウォッチャー＋再読込ダイアログの方針は確定）
 8. ✅ **タブ vs 複数ウィンドウ**: アプリ内タブをベースに採用確定（WebviewWindowはPhase 5以降）。[window-tab-session-design.md §1](./window-tab-session-design.md#1-タブ-vs-複数ウィンドウ設計方針) 参照
 9. ✅ **セッション復元**: plugin-store を使ったタブ状態の保存・復元方針を確定。[window-tab-session-design.md §2](./window-tab-session-design.md#2-セッション復元) 参照
 10. ✅ **未保存変更の管理**: `onCloseRequested` + Zustand `isDirty` フラグの方針を確定。[window-tab-session-design.md §3](./window-tab-session-design.md#3-未保存変更の管理) 参照
@@ -919,9 +1050,15 @@ const EditorModeExtension = Extension.create({
 21. **AI言語推定の精度**: 無タグコードブロックの言語ヒューリスティックの品質
 22. **カスタムテンプレート保存**: ユーザー定義テンプレートのローカル永続化設計
 23. **AIプロバイダ連携（将来）**: OpenAI / Anthropic APIをエディタ内から直接呼び出す設計
-24. **モバイルUI設計**: タッチ操作・画面サイズに対応したUI変更の範囲
-25. **Windows WebView2の最低要件**: Windows 10の最低バージョン（WebView2対応版）の決定
+24. ✅ **モバイルUI設計**: タッチ操作・画面サイズに対応したUI変更の方針を確定。[cross-platform-design.md §5](./cross-platform-design.md#5-モバイル-ui-設計方針) 参照
+25. ✅ **Windows WebView2の最低要件**: Windows 10 1903 以降に確定。[cross-platform-design.md §6](./cross-platform-design.md#6-プラットフォーム固有機能の設計) 参照
 26. **配布・アップデート方法**: インストーラ形式・自動アップデート（Tauri updater）の設計
+27. ✅ **クロスプラットフォーム設計方針**: WebView差異・キーボードショートカット抽象化・ファイルシステムAPI差異を確定。[cross-platform-design.md](./cross-platform-design.md) 参照
+28. ✅ **パフォーマンス設計**: 仮想スクロール・インクリメンタルパース・バックグラウンド保存・全文検索の方針を確定。[performance-design.md](./performance-design.md) 参照
+29. ✅ **自動保存の詳細仕様**: ファイルサイズ別デバウンス・リトライ・並行保存防止を確定。[window-tab-session-design.md §9](./window-tab-session-design.md#9-自動保存の詳細仕様) 参照
+30. ✅ **クラッシュリカバリ設計**: チェックポイントベースのリカバリ方針を確定。[window-tab-session-design.md §10](./window-tab-session-design.md#10-クラッシュリカバリ設計) 参照
+31. ✅ **Typora式カーソル位置計算**: クリック位置から ProseMirror ノード位置への変換アルゴリズムを確定。[system-design.md §2.2 Typora式カーソル位置計算](#typora式モード-クリック位置からのカーソルポジション計算重要設計) 参照
+32. ✅ **変換サポートレベルマトリクス**: 各 Markdown 要素の変換保証レベル（A〜D）を確定。[markdown-tiptap-conversion.md §8](./markdown-tiptap-conversion.md#8-変換サポートレベルマトリクス) 参照
 
 ---
 
