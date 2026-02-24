@@ -131,6 +131,7 @@
 - [docs/ai-features.md](./docs/ai-features.md) - AI連携機能設計
 - [docs/system-design.md](./docs/system-design.md) - システム設計
 - [docs/markdown-tiptap-conversion.md](./docs/markdown-tiptap-conversion.md) - Markdown↔TipTap 双方向変換設計
+- [docs/tiptap-roundtrip-test-strategy.md](./docs/tiptap-roundtrip-test-strategy.md) - TipTap JSON詳細 & ラウンドトリップテスト戦略
 - [docs/roadmap.md](./docs/roadmap.md) - 開発ロードマップ
 
 ---
