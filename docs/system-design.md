@@ -446,6 +446,40 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { EditorView } from '@tiptap/pm/view';
 
 /**
+ * クリック位置から「フォーカスすべきブロック」の ProseMirror ポジションを返す。
+ *
+ * フォーカス規則:
+ *   - テーブルセル内: クリックされたセル（tableCell / tableHeader）をフォーカス
+ *   - それ以外: ルート直下の最上位ブロック（depth=1）をフォーカス
+ *
+ * @param view - EditorView
+ * @param pos  - posAtCoords() で得たドキュメント内ポジション
+ * @returns フォーカスすべきブロックの開始ポジション。特定できない場合は null
+ */
+function resolveFocusBlockPos(view: EditorView, pos: number): number | null {
+  const { state } = view;
+  const $pos = state.doc.resolve(pos);
+
+  // テーブルセル内かどうかを depth を上に辿って確認する
+  // （blockquote > table > tableRow > tableCell のような深いネストに対応）
+  for (let d = $pos.depth; d >= 1; d--) {
+    const nodeType = $pos.node(d).type.name;
+    if (nodeType === 'tableCell' || nodeType === 'tableHeader') {
+      // セル単位でフォーカス（テーブル全体ではなくセルをフォーカスするルール）
+      return $pos.before(d);
+    }
+  }
+
+  // テーブル以外: ルート直下のブロック（depth=1）をフォーカス
+  // depth=0 はルート doc ノード自体なので、depth >= 1 のときのみ有効
+  if ($pos.depth >= 1) {
+    return $pos.before(1);
+  }
+
+  return null;
+}
+
+/**
  * レンダリング済みブロック上のクリックを検知し、
  * 対応する ProseMirror ノードをフォーカス状態に切り替える。
  */
@@ -455,24 +489,16 @@ export const typoraClickHandlerPlugin = new Plugin({
   props: {
     /**
      * クリックイベントを受け取り、クリックされたブロックノードを特定する。
-     * return true = イベントを消費（NodeView が編集モードに切り替わる前処理）
-     * return false = ProseMirror のデフォルト動作に委ねる
+     * return false = ProseMirror のデフォルト動作に委ねる（カーソル位置は ProseMirror が設定）
      */
     handleClick(view: EditorView, pos: number, event: MouseEvent): boolean {
       const { state } = view;
-      const $pos = state.doc.resolve(pos);
-
-      // クリック位置の最上位ブロックノードを取得
-      // depth=1 がルート直下のブロック（H1, paragraph, table 等）
-      const blockDepth = Math.max(1, $pos.depth > 0 ? 1 : 0);
-      const blockPos = $pos.before(blockDepth);
-      const blockNode = state.doc.nodeAt(blockPos);
-
-      if (!blockNode) return false;
+      const blockPos = resolveFocusBlockPos(view, pos);
+      if (blockPos === null) return false;
 
       // NodeView に対して「フォーカス」メタデータを送る
-      // 各 NodeView は useEditorMode() で editorModeChanged を購読しており、
-      // ここでは focusedBlockPos というメタを別途設定する
+      // 各 NodeView は transaction の typoraFocusedBlockPos メタを購読して
+      // 自ノードが指定されていたら isFocused = true に切り替える
       const tr = state.tr.setMeta('typoraFocusedBlockPos', blockPos);
       view.dispatch(tr);
 
@@ -481,18 +507,47 @@ export const typoraClickHandlerPlugin = new Plugin({
 
     /**
      * キーボードナビゲーション（矢印キー）でブロック境界を越えるときの処理。
-     * ArrowUp/Down でブロックをまたぐ際に NodeView の切り替えを行う。
+     *
+     * ProseMirror はカーソル移動後に新しい Selection を確定するため、
+     * キーダウン時点では「移動後のポジション」が不確定。
+     * そのため、selection 変化を transaction で追う方式（onSelectionChange）で対応する。
+     * → Plugin の apply() で selectionSet を検知して typoraFocusedBlockPos を更新する。
      */
     handleKeyDown(view: EditorView, event: KeyboardEvent): boolean {
-      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-        return false;
-      }
-
-      // 現在のカーソル位置のブロックと、移動後のブロックを比較
-      // ブロックが変わる場合は NodeView の切り替えを発動
-      // （実装は ProseMirror の Selection 変化を transaction で追う方が確実）
-      return false;
+      return false; // ProseMirror のデフォルトカーソル移動に委ねる
     },
+  },
+
+  /**
+   * トランザクション適用後、セレクション変化を検知して typoraFocusedBlockPos を更新する。
+   * これにより矢印キー移動でブロックをまたいだ際も NodeView が正しく切り替わる。
+   */
+  appendTransaction(transactions, oldState, newState) {
+    const selectionChanged = transactions.some((tr) => tr.selectionSet);
+    if (!selectionChanged) return null;
+
+    const $pos = newState.selection.$head;
+    // 移動後のカーソルからフォーカスブロックを再計算
+    // （resolveFocusBlockPos はビューに依存するため、ここではインラインで計算）
+    let blockPos: number | null = null;
+
+    for (let d = $pos.depth; d >= 1; d--) {
+      const nodeType = $pos.node(d).type.name;
+      if (nodeType === 'tableCell' || nodeType === 'tableHeader') {
+        blockPos = $pos.before(d);
+        break;
+      }
+    }
+    if (blockPos === null && $pos.depth >= 1) {
+      blockPos = $pos.before(1);
+    }
+    if (blockPos === null) return null;
+
+    // 前回と同じブロックなら dispatch 不要（無限ループ防止）
+    const prevFocusedPos = transactions[transactions.length - 1]?.getMeta('typoraFocusedBlockPos');
+    if (prevFocusedPos === blockPos) return null;
+
+    return newState.tr.setMeta('typoraFocusedBlockPos', blockPos);
   },
 });
 ```
