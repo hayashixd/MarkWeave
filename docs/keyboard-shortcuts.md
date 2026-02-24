@@ -640,3 +640,154 @@ test('Ctrl+1 で H1 に変換される', () => {
 | **Phase 3** | ナビゲーション | `Ctrl+F/H/P`, アウトライン |
 | **Phase 3** | 表示モード | `Ctrl+Alt+1〜4` |
 | **将来** | ユーザー設定可能なキーバインド | `ShortcutConfig` の外部化 |
+
+---
+
+## 6. ショートカットカスタマイズ UX 設計
+
+### 6.1 設定 UI
+
+```
+設定 → キーボードショートカット
+
+┌─────────────────────────────────────────────────────────────────┐
+│  キーボードショートカット              [デフォルトに戻す] [検索] │
+├──────────────────────┬────────────────┬─────────────────────────┤
+│  コマンド             │ ショートカット  │                         │
+├──────────────────────┼────────────────┼─────────────────────────┤
+│  テキスト装飾                                                   │
+│  太字                 │ Ctrl+B         │ [変更]                  │
+│  斜体                 │ Ctrl+I         │ [変更]                  │
+│  取り消し線           │ Alt+Shift+5    │ [変更]                  │
+│  ハイライト           │ Ctrl+Shift+H   │ [変更]                  │
+├──────────────────────┼────────────────┼─────────────────────────┤
+│  ブロック操作                                                   │
+│  見出し H1            │ Ctrl+1         │ [変更]                  │
+│  コードブロック       │ Ctrl+Shift+K   │ [変更]                  │
+└──────────────────────┴────────────────┴─────────────────────────┘
+```
+
+### 6.2 ショートカット変更ダイアログ
+
+```
+┌────────────────────────────────────────┐
+│  「太字」のショートカットを変更         │
+├────────────────────────────────────────┤
+│                                        │
+│  新しいキーを押してください:            │
+│  ┌──────────────────────────────────┐  │
+│  │  Ctrl+B                          │  │
+│  └──────────────────────────────────┘  │
+│                                        │
+│  ⚠ Ctrl+B は他のコマンドで使用中はありません │
+│                                        │
+│  [キャンセル]  [クリア]  [保存]        │
+└────────────────────────────────────────┘
+```
+
+**競合検出:**
+```typescript
+function detectConflict(
+  newKey: string,
+  commandId: string,
+  allShortcuts: ShortcutConfig
+): string | null {
+  for (const [id, key] of Object.entries(allShortcuts)) {
+    if (id !== commandId && key === newKey) {
+      return id; // 競合するコマンド ID を返す
+    }
+  }
+  return null;
+}
+```
+
+競合がある場合:
+```
+⚠ Ctrl+B は「太字（上書き前）」に割り当てられています。
+  上書きしますか？
+```
+
+### 6.3 ショートカット設定の永続化
+
+```typescript
+// src/settings/shortcuts-store.ts
+import { Store } from '@tauri-apps/plugin-store';
+
+const store = new Store('settings.json');
+
+export async function loadShortcuts(): Promise<Partial<ShortcutConfig>> {
+  return await store.get<Partial<ShortcutConfig>>('keyboardShortcuts') ?? {};
+}
+
+export async function saveShortcut(
+  commandId: keyof ShortcutConfig,
+  key: string | null  // null でリセット（デフォルトを使用）
+): Promise<void> {
+  const current = await loadShortcuts();
+  if (key === null) {
+    delete current[commandId];
+  } else {
+    current[commandId] = key;
+  }
+  await store.set('keyboardShortcuts', current);
+  await store.save();
+}
+
+export async function resetAllShortcuts(): Promise<void> {
+  await store.delete('keyboardShortcuts');
+  await store.save();
+}
+```
+
+### 6.4 カスタムショートカットの TipTap への適用
+
+```typescript
+// src/editor/setup.ts
+import { DEFAULT_SHORTCUTS, ShortcutConfig } from '../types/shortcuts';
+import { loadShortcuts } from '../settings/shortcuts-store';
+
+async function buildShortcutConfig(): Promise<ShortcutConfig> {
+  const userOverrides = await loadShortcuts();
+  return { ...DEFAULT_SHORTCUTS, ...userOverrides };
+}
+
+// アプリ起動時 & 設定変更時に呼び出す
+export async function initEditor() {
+  const shortcuts = await buildShortcutConfig();
+
+  const editor = new Editor({
+    extensions: [
+      StarterKit,
+      MarkdownShortcuts.configure({ shortcuts }),
+      ContextualTab,
+    ],
+  });
+
+  return editor;
+}
+```
+
+### 6.5 ショートカット設定のエクスポート・インポート
+
+Phase 7 以降で検討:
+
+```typescript
+// JSON ファイルとしてエクスポート
+export async function exportShortcuts(): Promise<void> {
+  const shortcuts = await loadShortcuts();
+  const json = JSON.stringify(shortcuts, null, 2);
+  const path = await save({ filters: [{ name: 'JSON', extensions: ['json'] }] });
+  if (path) await writeTextFile(path, json);
+}
+
+// JSON ファイルからインポート
+export async function importShortcuts(): Promise<void> {
+  const path = await open({ filters: [{ name: 'JSON', extensions: ['json'] }] });
+  if (!path || Array.isArray(path)) return;
+  const json = await readTextFile(path as string);
+  const shortcuts = JSON.parse(json) as Partial<ShortcutConfig>;
+  // バリデーション後に保存
+  await store.set('keyboardShortcuts', shortcuts);
+  await store.save();
+}
+```

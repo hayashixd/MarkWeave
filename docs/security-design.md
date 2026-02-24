@@ -784,10 +784,108 @@ export async function callAiApi(request: AiRequest): Promise<AiResponse> {
 
 ---
 
+### 4.7 アップデート整合性検証
+
+Tauri の自動アップデート機能に加え、アップデートバイナリの整合性を多重検証する。
+
+#### 署名検証フロー
+
+```
+GitHub Releases からアップデートをダウンロード
+  │
+  ▼
+1. Tauri Updater が公開鍵で署名を検証（Ed25519）
+  │
+  ├─ 署名不一致 → アップデートを中止・ユーザーに警告
+  │
+  ▼
+2. SHA-256 チェックサムを独立して検証（latest.json の hash フィールド）
+  │
+  ├─ チェックサム不一致 → アップデートを中止
+  │
+  ▼
+3. アップデートを適用
+```
+
+```rust
+// Tauri Updater の署名検証設定
+// tauri.conf.json
+// {
+//   "tauri": {
+//     "updater": {
+//       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk...",
+//       "endpoints": ["https://github.com/[owner]/[repo]/releases/latest/download/latest.json"]
+//     }
+//   }
+// }
+
+// リリース時の署名（CI で実行）:
+// npx tauri signer sign -k private.key ./target/release/bundle/...
+```
+
+#### 公開鍵の管理
+
+- 秘密鍵: GitHub Secrets に保存（`TAURI_PRIVATE_KEY`）
+- 公開鍵: `tauri.conf.json` にハードコード（アプリと一緒に配布）
+- 公開鍵のローテーション: アプリバージョンアップ時に旧公開鍵との互換性を維持
+
+### 4.8 プラグイン・拡張のレビューポリシー
+
+> **Phase 1-6 では外部プラグインシステムは実装しない**。
+> Phase 7 以降でコミュニティプラグインを検討する場合のポリシー草案。
+
+#### プラグインの権限モデル（設計案）
+
+```typescript
+// プラグインマニフェスト
+interface PluginManifest {
+  name: string;
+  version: string;
+  permissions: PluginPermission[];
+  author: string;
+  repository?: string;
+}
+
+// 許可する権限の種類
+type PluginPermission =
+  | 'editor:read'        // エディタのテキスト内容を読み取る
+  | 'editor:write'       // エディタのテキストを変更する
+  | 'ui:statusbar'       // ステータスバーにアイテムを追加する
+  | 'ui:toolbar'         // ツールバーにボタンを追加する
+  | 'ui:panel'           // サイドパネルを追加する
+  // 以下は明示的な許可が必要（デフォルト拒否）
+  | 'fs:read'            // ファイルの読み取り（ワークスペース内のみ）
+  | 'fs:write'           // ファイルへの書き込み（ワークスペース内のみ）
+  | 'network:fetch'      // 外部 URL へのアクセス（許可リストのドメインのみ）
+  ;
+```
+
+#### プラグインのインストール時警告
+
+```
+┌──────────────────────────────────────────────────────┐
+│  プラグイン「my-plugin」をインストール               │
+├──────────────────────────────────────────────────────┤
+│  このプラグインは以下の権限を要求します:              │
+│                                                      │
+│  ⚠ editor:write — エディタのテキストを変更する      │
+│  ⚠ network:fetch — 外部 URL にアクセスする          │
+│      許可ドメイン: api.example.com                   │
+│                                                      │
+│  出典: https://github.com/author/my-plugin           │
+│  ライセンス: MIT                                     │
+│                                                      │
+│  [キャンセル]  [インストール]                        │
+└──────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 関連ドキュメント
 
 - [system-design.md](./system-design.md) — システム全体設計
 - [image-storage-design.md](./image-storage-design.md) — 画像管理設計（asset:// プロトコル含む）
+- [community-design.md](./community-design.md) — アップデート配布・署名設定
 
 ---
 
