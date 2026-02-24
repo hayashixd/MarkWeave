@@ -81,7 +81,7 @@ mdast
 | `emphasis` | `italic` mark | — | 同上 |
 | `delete` | `strike` mark | — | remark-gfm 必要 |
 | `inlineCode` | `code` mark | — | — |
-| `link` | `link` mark | `href`, `title` | `url`, `title` の属性名変換に注意 |
+| `link` | `link` mark | `href`, `title` | `url`→`href` の属性名変換に注意。TipTap Link 拡張がデフォルトで付与する `target`/`rel` は**必ず除去する**（下記参照） |
 | `image` | `image` ノード | `src`, `alt`, `title` | `url`→`src` に変換 |
 | `break` (hard break) | `hardBreak` | — | `\n` → `<br>` 相当 |
 | `html` (inline) | `rawHtmlInline` ★カスタム | `html` (生文字列) | **改変禁止** |
@@ -184,6 +184,84 @@ function wrapWithMark(mark: PMark, child: MdastNode): MdastNode {
 
 > **注意**: 隣接するテキストノードで同じマークが続く場合は、mdast 変換時にマージして一つの strong/emphasis ノードにまとめること。
 
+#### `***text***` vs `**_text_**` の出力アルゴリズム（最重要決定事項）
+
+bold と italic が共存するとき、TipTap→mdast の逆変換でどちらの記法を出力するかを明示的に決定する。
+
+**判定ルール: スパン一致検査**
+
+```typescript
+// src/core/converter/tiptap-to-mdast.ts
+
+/**
+ * 段落内のテキストノード列を mdast インライン列に変換する。
+ * bold+italic が同一スパンに収まる場合は *** を使用し、
+ * スパンがずれる場合は外側マーク優先の入れ子形式を使用する。
+ */
+function serializeInlineNodes(nodes: PMNode[]): MdastNode[] {
+  // Step 1: 各マーク種別のスパン（開始インデックス, 終了インデックス）を計算する
+  const boldSpan  = computeMarkSpan(nodes, 'bold');
+  const italicSpan = computeMarkSpan(nodes, 'italic');
+
+  // Step 2: bold と italic のスパンが完全一致 → *** を使用
+  if (
+    boldSpan !== null &&
+    italicSpan !== null &&
+    boldSpan.start === italicSpan.start &&
+    boldSpan.end   === italicSpan.end
+  ) {
+    // *** で囲んだノードとして返す（strong > emphasis の入れ子ではなく単一トークン）
+    return buildCombinedBoldItalic(nodes, boldSpan);
+  }
+
+  // Step 3: スパンが異なる → ProseMirror スキーマ順（bold が常に外側）で入れ子化
+  // ProseMirror は marks を schema 定義順にソートするため、
+  // bold mark は常に italic mark より前に来る（= bold が外側コンテキスト）
+  return buildMarkStackNodes(nodes);
+}
+
+/**
+ * 指定マーク種別が連続して付いているノード列のスパンを返す。
+ * 連続していない場合（飛び飛びに付いている場合）は null を返す。
+ */
+function computeMarkSpan(
+  nodes: PMNode[],
+  markType: string
+): { start: number; end: number } | null {
+  let start = -1;
+  let end   = -1;
+
+  for (let i = 0; i < nodes.length; i++) {
+    const hasMark = nodes[i].marks?.some(m => m.type.name === markType) ?? false;
+    if (hasMark && start === -1) start = i;
+    if (hasMark) end = i;
+    // 途中でマークが途切れてから再び現れる場合は「飛び飛び」→ null
+    if (!hasMark && start !== -1 && end !== -1 && i < nodes.length - 1) {
+      const hasLater = nodes.slice(i + 1).some(n =>
+        n.marks?.some(m => m.type.name === markType)
+      );
+      if (hasLater) return null;
+    }
+  }
+
+  return start === -1 ? null : { start, end };
+}
+```
+
+**出力パターン早見表**
+
+| TipTap テキストノード列 | 出力 Markdown | 理由 |
+|---|---|---|
+| `[bold+italic]` | `***text***` | スパン完全一致 |
+| `[bold] [bold+italic] [bold]` | `**outer _inner_ outer**` | bold がより広い → bold 外側 |
+| `[italic] [bold+italic] [italic]` | `*outer **inner** outer*` | italic がより広い → italic 外側 |
+| `[bold+italic] [italic]` | `***bi*** *i*` | スパン一致しない → 別々に出力 |
+| `[bold] [bold+italic]` | `**b _bi_**` ※ | bold 外側で italic を内側に入れ子 |
+
+※ このケースは `computeMarkSpan` が italic を `{start:1, end:1}`, bold を `{start:0, end:1}` と計算し、スパン不一致のため `buildMarkStackNodes()` に委譲する。
+
+**正規化の宣言**: `remark-stringify` に渡す直前の mdast では、bold+italic の完全一致スパンを常に `strong > emphasis > text`（`**_text_**`）ではなく `strong`（`***text***`）として表現する。これは remark-stringify が `strong` の `children` が `emphasis` 1つだけのとき `**_..._**` と出力するのを避けるためである。
+
 ---
 
 ## 3. Source-of-Truth アーキテクチャ比較と採用方針
@@ -271,6 +349,77 @@ export function setupFileWatcher(filePath: string, onExternalChange: () => void)
 - トースト通知「外部で変更されました。再読込しますか？」
 - 「再読込」→ ファイルを再パースして TipTap ドキュメントを更新（Undo 履歴はクリア）
 - 「無視」→ 次回保存時に TipTap の内容でファイルを上書き
+
+---
+
+## 3.5 TipTap Link 拡張の `target` / `rel` 属性の除去
+
+### 問題
+
+TipTap の `@tiptap/extension-link` はデフォルトで `target="_blank"` と `rel="noopener noreferrer nofollow"` をすべてのリンクに付与する。
+
+```json
+// editor.getJSON() で取得される Link mark の attrs（デフォルト設定時）
+{
+  "type": "link",
+  "attrs": {
+    "href": "https://example.com",
+    "title": null,
+    "target": "_blank",       ← Markdown に不要
+    "rel": "noopener noreferrer nofollow"  ← Markdown に不要
+  }
+}
+```
+
+この属性が `tiptapToMarkdown()` に漏れると、生成された mdast の `link` ノードに不正な属性が混入し、remark-stringify が予期しない出力を行う。また、ラウンドトリップ時に元の Markdown に存在しなかった情報が付加されてしまう。
+
+### 対策（2段構えで必ず両方実施する）
+
+#### 対策A: Link 拡張の設定で `target` / `rel` を付与しない
+
+```typescript
+// src/renderer/wysiwyg/extensions/index.ts
+
+import { Link } from '@tiptap/extension-link';
+
+export const CustomLink = Link.configure({
+  openOnClick: false,   // デスクトップアプリなので Click での外部遷移は不要
+  HTMLAttributes: {
+    target: null,       // ← target="_blank" を付与しない
+    rel: null,          // ← rel 属性を付与しない
+  },
+});
+```
+
+#### 対策B: シリアライザで `href` と `title` のみを使用する（防御的フィルタ）
+
+設定ミスや拡張バージョンアップで対策 A が無効化されるケースに備え、シリアライザ側でも明示的にホワイトリスト抽出を行う。
+
+```typescript
+// src/core/converter/tiptap-to-mdast.ts
+
+case 'link': {
+  // href と title のみを使用し、target / rel / その他の attrs は無視する
+  const href  = mark.attrs.href  as string ?? '';
+  const title = mark.attrs.title as string | null ?? null;
+
+  return {
+    type: 'link',
+    url: href,
+    title: title !== '' ? title : null,
+    children: [child],
+  };
+}
+```
+
+### ラウンドトリップへの影響
+
+| 入力 Markdown | TipTap attrs | 出力 Markdown | 判定 |
+|---|---|---|---|
+| `[text](https://example.com)` | `{href, target:null}` | `[text](https://example.com)` | ✅ 一致 |
+| `[text](https://example.com "title")` | `{href, title, target:null}` | `[text](https://example.com "title")` | ✅ 一致 |
+
+対策 A + B を両方実施すれば、`target` / `rel` がラウンドトリップを破壊することはない。
 
 ---
 
@@ -880,6 +1029,176 @@ case 'listItem':
 将来対応:
   🔲 Markdown 拡張ディレクティブ（`:::note` 等）
   🔲 GFM Footnote の完全な往復（現在は doc attrs 方式）
+```
+
+---
+
+## 9. IME Composition 中のシリアライズ制御
+
+### 9.1 問題の概要
+
+本エディタは日本語入力が主要ユースケースであり、IME（Input Method Editor）の composition イベントへの対応が不可欠である。
+
+IME 入力中（`compositionstart` ～ `compositionend` の間）は、以下の問題が発生する。
+
+| タイミング | 問題 |
+|---|---|
+| `onUpdate` コールバック | composition 中の未確定テキストも含めて発火する |
+| `tiptapToMarkdown()` 呼び出し | 未確定テキストが Markdown 文字列に混入する |
+| 自動保存 / ファイルウォッチャー | composition 中に保存が走ると壊れた Markdown が書き込まれる |
+| Undo 履歴 | composition 確定前に Undo すると予期しない状態に戻る |
+
+### 9.2 Composition 状態の管理
+
+```typescript
+// src/core/editor.ts
+
+export class MarkdownEditor {
+  private _isComposing = false;
+
+  /** 呼び出し元が composition 中かどうかを確認するための公開プロパティ */
+  get isComposing(): boolean {
+    return this._isComposing;
+  }
+
+  private setupCompositionGuard(editorDom: HTMLElement): void {
+    editorDom.addEventListener('compositionstart', () => {
+      this._isComposing = true;
+    });
+
+    editorDom.addEventListener('compositionend', () => {
+      this._isComposing = false;
+      // composition 確定後に保留中のシリアライズ・保存を実行する
+      this.flushPendingOperations();
+    });
+  }
+
+  /** composition 中は null を返す。確定後にのみ Markdown を返す。 */
+  serializeToMarkdown(): string | null {
+    if (this._isComposing) return null;
+    return tiptapToMarkdown(this.editor.getJSON());
+  }
+}
+```
+
+### 9.3 `onUpdate` ハンドラへの適用
+
+TipTap の `onUpdate` は composition 中も発火するため、ガードを必ず入れる。
+
+```typescript
+// src/components/Editor/Editor.tsx
+
+const editor = useEditor({
+  extensions: [...],
+  onUpdate: ({ editor, transaction }) => {
+    // composition 中は一切処理しない
+    if (editorRef.current?.isComposing) return;
+
+    // 自動保存のデバウンス開始
+    scheduleSave();
+  },
+});
+```
+
+> **注意**: `transaction.getMeta('composition')` で composition フラグを判定する方法は
+> TipTap のバージョンによって動作が異なるため使用しない。
+> DOM イベントベースの `compositionstart/end` を使うほうが信頼性が高い。
+
+### 9.4 自動保存との連携
+
+```typescript
+// src/file/auto-save.ts
+
+const DEBOUNCE_MS = 1000;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingSave = false;
+
+export function scheduleSave(editor: MarkdownEditor, filePath: string): void {
+  // タイマーをリセット
+  if (saveTimer) clearTimeout(saveTimer);
+
+  if (editor.isComposing) {
+    // composition 中はタイマーを起動せず、フラグだけ立てる
+    pendingSave = true;
+    return;
+  }
+
+  saveTimer = setTimeout(() => {
+    const md = editor.serializeToMarkdown();
+    if (md !== null) {
+      writeFile(filePath, md);
+      pendingSave = false;
+    }
+  }, DEBOUNCE_MS);
+}
+
+export function flushPendingOperations(editor: MarkdownEditor, filePath: string): void {
+  // compositionend 後にここを呼ぶ
+  if (pendingSave) {
+    scheduleSave(editor, filePath);
+  }
+}
+```
+
+### 9.5 Undo / Redo との関係
+
+ProseMirror の History プラグインは **composition 中のトランザクションを1つの履歴エントリにまとめる**仕様になっている（`compositionDepth` によるグループ化）。そのため、日本語の1単語の変換は Undo 1回で取り消される。
+
+ただし、**composition 中に `Ctrl+Z` を押した場合**の動作はブラウザによって異なる：
+
+- Chrome / Edge: `compositionend` を発火してから Undo
+- Firefox: composition をキャンセルして Undo
+
+対策：composition 中はキーボードショートカットハンドラ全体をサプレスするか、
+`KeyboardEvent.isComposing` が `true` の場合に Undo コマンドを無視する。
+
+```typescript
+// src/renderer/wysiwyg/plugins/keyboard-guard.ts
+
+import { Plugin, PluginKey } from 'prosemirror-state';
+
+export const compositionKeyboardGuard = new Plugin({
+  key: new PluginKey('compositionKeyboardGuard'),
+
+  props: {
+    handleKeyDown(view, event) {
+      // composition 中はすべてのキーボードショートカットを無効化
+      if (event.isComposing) return true; // true = "handled" (preventDefault 相当)
+      return false;
+    },
+  },
+});
+```
+
+### 9.6 テスト戦略
+
+IME 関連のテストはブラウザ環境でしか検証できないため、Playwright を用いた E2E テストで担保する。
+
+```typescript
+// tests/e2e/ime.test.ts
+
+import { test, expect } from '@playwright/test';
+
+test('日本語入力後の Markdown シリアライズが正しい', async ({ page }) => {
+  await page.goto('/');
+
+  // IME composition をシミュレートする
+  const editor = page.locator('.ProseMirror');
+  await editor.click();
+
+  // Playwright の insertText は compositionstart/end をエミュレートする
+  await editor.press('Control+Home');
+  await page.keyboard.insertText('日本語テスト');
+
+  // シリアライズ結果を取得
+  const markdown = await page.evaluate(() => window.__editor?.serializeToMarkdown());
+  expect(markdown).toContain('日本語テスト');
+  expect(markdown).not.toContain('undefined');
+});
+
+test('composition 中に自動保存が走らない', async ({ page }) => {
+  // ...
+});
 ```
 
 ---
