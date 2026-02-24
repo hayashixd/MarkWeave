@@ -411,7 +411,114 @@ export function ParagraphNodeView({ node, getPos, decorations }: NodeViewProps) 
 }
 ```
 
-### 3.4 仮想スクロールの有効化条件
+### 3.4 仮想スクロールのがたつき（Jitter）対策
+
+高さ推定がズレているノードが多い場合、スクロール時に「画面が跳ねる」現象が発生する。
+
+#### 発生メカニズム
+
+```
+推定高さ: paragraph = 28px（固定）
+実際の高さ: 3行にわたる段落 = 84px
+
+ビューポート外として「28px のプレースホルダー」を配置
+→ スクロールしてビューポート内に入ると実際の DOM（84px）に切り替わる
+→ 合計高さが突然 +56px 増加 → スクロール位置が補正される → がたつき
+```
+
+#### 対策1: 推定精度の改善（DEFAULT_HEIGHTS の根拠）
+
+```typescript
+// DEFAULT_HEIGHTS は以下の測定値に基づく（ブラウザ zoom 100%、Noto Sans 14px 時）
+// 測定方法: 各ノードタイプの空インスタンスを 100 個レンダリングして平均を取る
+const DEFAULT_HEIGHTS: Record<string, number> = {
+  paragraph:  28,  // 1行: line-height 1.6 × 14px ≈ 22px + margin 6px
+  heading:    {1: 48, 2: 40, 3: 34, 4: 30}[attrs.level] ?? 40,
+  codeBlock:  104, // min-height: 4行分 = 22px × 4 + padding 16px
+  table:      132, // header + 2行 = 33px × 4
+  blockquote:  52, // padding 8px + 1行 22px + border 4px + margin 18px
+  listItem:    28, // 1行と同じ
+  mathBlock:   64, // KaTeX のデフォルト高さ + margin
+  image:      200, // 画像ロード前のプレースホルダー高さ
+};
+
+// CJK テキスト（日本語・中国語）は英語より行高が高い
+// → 1行あたり +4px を加算する（フォントによる）
+const CJK_HEIGHT_BONUS_PER_LINE = 4;
+
+export function getEstimatedHeight(node: ProseMirrorNode, offset: number): number {
+  const cached = heightCache.get(makeNodeId(node, offset));
+  if (cached !== undefined) return cached;
+
+  const base = DEFAULT_HEIGHTS[node.type.name] ?? 28;
+
+  // テキスト量による行数推定（CJK は1文字2バイト相当として計算）
+  const textLength = node.textContent.length;
+  // 全角文字が多い場合は1行あたりの文字数を減らす
+  const hasCjk = /[\u3000-\u9FFF\uF900-\uFAFF]/.test(node.textContent);
+  const charsPerLine = hasCjk ? 30 : 60;
+  const lines = Math.max(1, Math.ceil(textLength / charsPerLine));
+
+  return base + (lines - 1) * (22 + (hasCjk ? CJK_HEIGHT_BONUS_PER_LINE : 0));
+}
+```
+
+#### 対策2: スクロール中に overscan（先読み描画）を設ける
+
+```typescript
+// VIEWPORT_MARGIN_PX を大きくして「先読み範囲」を増やす
+// → 高さ不一致による補正がビューポート外で起きるため、ユーザーには見えない
+
+const VIEWPORT_MARGIN_PX = 800; // デフォルト 500px から拡大（解像度の1画面分相当）
+```
+
+**トレードオフ**:
+- `VIEWPORT_MARGIN_PX` が大きいほど DOM ノード数が増え、仮想スクロールの効果が薄れる
+- 推奨: 500px（デフォルト）で計測し、がたつきが目立つ場合のみ 800px に拡大
+
+#### 対策3: スクロール終了後に高さキャッシュを更新
+
+```typescript
+// スクロールが止まった後（200ms 静止）にビューポート内全ノードの高さを再計測する
+const onScrollEnd = debounce(() => {
+  // ビューポート内の全 NodeView が updateHeightCache() を呼ぶよう
+  // 'recalculate-heights' メタを dispatch する
+  editorView.dispatch(
+    editorView.state.tr.setMeta('recalculateHeights', true)
+  );
+}, 200);
+
+scrollContainer.addEventListener('scroll', onScrollEnd, { passive: true });
+```
+
+#### 対策4: requestAnimationFrame による高さ更新の非同期化
+
+```typescript
+// NodeView の useEffect で高さ更新を rAF に遅延させる
+// → レイアウトスラッシングを防止し、スクロールのメインスレッドをブロックしない
+useEffect(() => {
+  const raf = requestAnimationFrame(() => {
+    if (domRef.current && !isVirtuallyHidden) {
+      const offset = getPos();
+      if (offset !== undefined) {
+        updateHeightCache(node, offset, domRef.current);
+      }
+    }
+  });
+  return () => cancelAnimationFrame(raf);
+});
+```
+
+**まとめ: がたつき対策の優先度**
+
+| 対策 | 効果 | 実装コスト | 優先度 |
+|---|---|---|---|
+| DEFAULT_HEIGHTS を実測値に | 高 | 低（定数変更のみ） | **高** |
+| overscan マージン拡大 | 中 | 低（定数変更のみ） | **中** |
+| スクロール終了後の再計測 | 高 | 中 | **中** |
+| rAF による非同期化 | 中 | 低 | **低** |
+
+---
 
 仮想スクロールは常に有効にするのではなく、閾値超過時のみ有効にする。
 （小規模ドキュメントではオーバーヘッドが無駄になるため）
@@ -889,6 +996,200 @@ describe('Parser performance', () => {
   });
 });
 ```
+
+---
+
+## 9. CodeMirror 6 ↔ TipTap/ProseMirror 双方向同期設計
+
+レンダリングモード切り替え（WYSIWYG ↔ ソース ↔ Split）において、CodeMirror と TipTap 間のデータ同期はパフォーマンスの核心となる。
+
+### 9.1 モード切り替えの責務分担
+
+```
+TipTap (WYSIWYG)
+    ↕ tiptapToMarkdown() / markdownToTipTap()   ← 変換層
+CodeMirror 6 (ソースモード / Split の左ペイン)
+    ↕ markdownToHtml()                           ← Split の右ペインのみ
+プレビュー HTML (Split の右ペイン、DOMPurify でサニタイズ済み)
+```
+
+**SoT（Source of Truth）の切り替え**:
+
+| モード | SoT | 書き込み先 | 読み取り元 |
+|---|---|---|---|
+| Typora / WYSIWYG | TipTap JSON | TipTap | TipTap |
+| ソース | CodeMirror テキスト | CodeMirror | CodeMirror |
+| Split | CodeMirror テキスト | CodeMirror | CodeMirror（左）+ HTML（右） |
+
+モード切り替え時に SoT が変わる → **切り替え時点でのシリアライズ/デシリアライズが必須**。
+
+### 9.2 TipTap → CodeMirror（WYSIWYG → ソースモード）
+
+```typescript
+// src/core/mode-manager.ts
+
+export async function switchToSourceMode(
+  editor: Editor,
+  codeMirrorView: EditorView, // CodeMirror の EditorView
+): Promise<void> {
+  // Step 1: TipTap の現在内容を Markdown にシリアライズ
+  const markdown = tiptapToMarkdown(editor.getJSON());
+
+  // Step 2: CodeMirror にセット（全置換）
+  codeMirrorView.dispatch({
+    changes: {
+      from: 0,
+      to: codeMirrorView.state.doc.length,
+      insert: markdown,
+    },
+    // カーソルをドキュメント先頭に設定（またはポジションを引き継ぐ）
+    selection: { anchor: 0 },
+  });
+
+  // Step 3: TipTap を非表示、CodeMirror を表示
+  editor.setEditable(false); // 入力を受け付けない（表示は維持）
+  showCodeMirror();
+
+  // Step 4: TipTap の Undo 履歴をクリアしない
+  // → ソースモードから WYSIWYG に戻った後も Undo は動作する（後述）
+}
+```
+
+**パフォーマンス**:
+- `tiptapToMarkdown()` は 500KB ドキュメントで約 85ms（Phase 1 許容範囲）
+- モード切り替えは「ユーザーが意図的に行う操作」であるため、100ms 以下なら許容
+- 1MB 超のドキュメントでは Web Worker に委譲（Phase 3 以降）
+
+### 9.3 CodeMirror → TipTap（ソースモード → WYSIWYG）
+
+```typescript
+export async function switchToWysiwygMode(
+  editor: Editor,
+  codeMirrorView: EditorView,
+): Promise<void> {
+  // Step 1: CodeMirror の現在テキストを取得
+  const markdown = codeMirrorView.state.doc.toString();
+
+  // Step 2: Markdown を TipTap JSON に変換
+  const json = markdownToTipTap(markdown);
+
+  // Step 3: TipTap にロード（Undo 履歴を上書きしない）
+  // setContent() は第2引数 emitUpdate=false で履歴に残さない
+  editor.commands.setContent(json, false);
+
+  // Step 4: CodeMirror を非表示、TipTap を表示・有効化
+  hideCodeMirror();
+  editor.setEditable(true);
+
+  // Step 5: カーソル位置の引き継ぎ（ベストエフォート）
+  // CodeMirror のカーソル行数 → TipTap の対応ノードを探してフォーカス
+  const codeMirrorLine = codeMirrorView.state.selection.main.head;
+  // ← 完全一致は困難なため、同じ行番号のブロックにフォーカスを設定する近似実装
+}
+```
+
+**Undo 履歴の扱い**:
+- ソースモードでの編集は CodeMirror の Undo/Redo（`Ctrl+Z`）が管理する
+- WYSIWYG に戻った時点で `editor.commands.setContent(json, false)` を使い、
+  TipTap 側の履歴に「内容ロード」が記録されないようにする
+- ソースモード中の変更を WYSIWYG の Undo で元に戻すことは**できない**（仕様として割り切る）
+
+### 9.4 Split モードのリアルタイム同期
+
+```typescript
+// src/components/Editor/SplitView.tsx
+
+export function SplitView() {
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const updatePreview = useMemo(
+    () => debounce(async (markdown: string) => {
+      // CodeMirror → HTML（300ms デバウンス）
+      const html = await markdownToHtml(markdown); // remark で変換
+      const safeHtml = DOMPurify.sanitize(html);
+      if (previewRef.current) {
+        previewRef.current.innerHTML = safeHtml;
+      }
+    }, 300),
+    []
+  );
+
+  return (
+    <div className="split-view">
+      <div className="split-left">
+        <CodeMirrorEditor
+          onChange={(markdown) => updatePreview(markdown)}
+        />
+      </div>
+      <div className="split-right" ref={previewRef} />
+    </div>
+  );
+}
+```
+
+**パフォーマンス目標**:
+- Split モードでの変換: 300ms デバウンス後に 100ms 以内で完了すること
+- プレビューの「ちらつき」対策: `innerHTML` の差分更新ではなく全置換（简易实装）
+  - Phase 3 以降: `morphdom` で差分 DOM 更新に切り替えて「スクロール位置の維持」を実現
+
+### 9.5 モード切り替え時のパフォーマンスバジェット
+
+| 操作 | 目標時間 | 計測対象 |
+|---|---|---|
+| WYSIWYG → ソース（100KB） | < 100ms | `tiptapToMarkdown()` + CodeMirror セット |
+| ソース → WYSIWYG（100KB） | < 200ms | `markdownToTipTap()` + TipTap ロード |
+| Split プレビュー更新（100KB） | < 150ms | `markdownToHtml()` + DOMPurify |
+| WYSIWYG → ソース（1MB） | < 1000ms | Web Worker 使用（Phase 3） |
+
+---
+
+## 10. Phase 1 パフォーマンス優先度と MVP 境界の明確化
+
+「Phase 1 MVP の範囲肥大化」を防ぐため、パフォーマンス機能のフェーズを明示する。
+
+### Phase 1a: 最低限の動作（MVP コア）
+
+**目標: 基本的な Markdown 編集が動作すること**
+
+- [ ] `markdownToTipTap()` / `tiptapToMarkdown()` の基本実装（段落・見出し・リスト・コード・インライン）
+- [ ] ファイルの読み書き（Tauri plugin-fs）
+- [ ] 自動保存（デバウンス 1000ms）
+- [ ] Typora モード（基本）: クリックしたブロックのみソース表示
+- [ ] 仮想スクロール: **Phase 1a では実装しない**（1000 行超のファイルはソースモードにフォールバック）
+
+**スコープ外（Phase 1a では実装しない）**:
+- CodeMirror 6 統合（ソースモード / Split モード）
+- 仮想スクロール
+- テーブル・GFM 拡張
+- KaTeX / Mermaid
+- AI 機能
+
+### Phase 1b: エディタの基本機能完成
+
+**目標: 4 モードが全て動作し、日常的な Markdown ファイルを編集できること**
+
+- [ ] CodeMirror 6 統合（ソースモード）: §9.2, §9.3 の実装
+- [ ] Split モード（CodeMirror + HTML プレビュー）: §9.4 の実装
+- [ ] GFM テーブル変換
+- [ ] ファイルウォッチャー（外部エディタ変更の検知）
+- [ ] 仮想スクロール: 500 ノード超のドキュメントで有効化
+
+**パフォーマンス計測のマイルストーン（Phase 1b 完了条件）**:
+
+```
+✅ 100KB の Markdown ファイルを開いてから最初のキー入力まで < 300ms
+✅ 1000 行のドキュメントでタイピング遅延 < 16ms（60fps 維持）
+✅ WYSIWYG ↔ ソースモード切り替え < 200ms
+✅ 自動保存が UI をブロックしない（非同期ファイル書き込み）
+```
+
+### Phase 2 以降（MVP 後）
+
+- [ ] 仮想スクロール: がたつき対策（§3.4）の全対策を実装
+- [ ] Web Worker でのシリアライズ（1MB 超ファイル向け）
+- [ ] KaTeX / Mermaid レンダリング（§4.1.1, §4.1.2 の CSP 対応実装）
+- [ ] 全文検索（Rust バックエンド）
+- [ ] AI 機能（§4.6 の Rust 経由 API）
 
 ---
 

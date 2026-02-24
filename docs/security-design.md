@@ -367,9 +367,137 @@ export async function isPathWithinBase(
 
 **注意点**:
 - `'unsafe-eval'` は KaTeX / Mermaid が動的コード生成を行う場合に必要になることがある。
-  KaTeX は `'unsafe-eval'` 不要のビルドを使用し、Mermaid は CSP 対応モードを確認する。
+  KaTeX は `'unsafe-eval'` 不要のビルドを使用し、Mermaid は CSP 対応モードを確認する（具体的な対応は下記 §4.5 参照）。
 - `connect-src 'none'` により、WebView から直接外部 API を叩くことを禁止する。
-  AI API 等の外部通信は必ず Rust（Tauri コマンド）側を経由させる。
+  AI API 等の外部通信は必ず Rust（Tauri コマンド）側を経由させる（具体的な実装は §4.6 参照）。
+
+### 4.1.1 KaTeX の CSP 対応（`unsafe-eval` 不使用）
+
+KaTeX の `renderToString()` は **HTML 文字列を返すのみで `eval` / `new Function()` を使用しない**。
+バージョン 0.12 以降は `'unsafe-eval'` なしで動作することが確認されている。
+
+```typescript
+// src/renderer/wysiwyg/extensions/math-inline.ts
+
+import katex from 'katex';
+// katex/dist/katex.min.css も import すること（style-src 'self' で提供）
+
+/**
+ * KaTeX で数式を HTML 文字列に変換する。
+ * renderToString() は eval を使わないため unsafe-eval 不要。
+ */
+export function renderMathToHtml(expression: string, displayMode: boolean): string {
+  try {
+    return katex.renderToString(expression, {
+      displayMode,
+      throwOnError: false,   // 構文エラーでも表示を維持する
+      output: 'html',        // 'mathml' も可（アクセシビリティ重視なら 'htmlAndMathml'）
+      trust: false,          // \url{} 等の潜在的な XSS を無効化
+    });
+  } catch {
+    return `<span class="math-error">${expression}</span>`;
+  }
+}
+```
+
+**CSP 設定との整合性**:
+
+| KaTeX の機能 | `unsafe-eval` の必要性 |
+|---|---|
+| `renderToString()` | **不要** ✅ |
+| `render()`（DOM に直接書く） | 不要 ✅（innerHTML 経由で OK） |
+| Auto-render extension（`renderMathInElement`） | 不要 ✅（正規表現ベース） |
+| `\htmlId`, `\htmlClass` などのカスタムマクロ | `trust: true` を設定した場合のみ XSS リスク |
+
+> **採用バージョン**: katex >= 0.16 を推奨。`trust: false`（デフォルト）を維持すること。
+
+### 4.1.2 Mermaid の CSP 対応（`unsafe-eval` 不使用）
+
+Mermaid は内部で `new Function()` を使用するバージョンが存在するため、
+**主 WebView での直接実行は行わない**。代わりに**サンドボックス iframe 内で実行**する。
+
+```
+主 WebView (CSP: script-src 'self')
+  ↓ postMessage でダイアグラム定義を送信
+iframe (sandbox="allow-scripts", src="mermaid-sandbox.html")
+  ↓ Mermaid でレンダリング → SVG 生成
+  ↓ postMessage で SVG 文字列を返す
+主 WebView で DOMPurify.sanitize(svg) → 表示
+```
+
+```typescript
+// src/renderer/wysiwyg/extensions/mermaid-extension.ts
+
+/**
+ * Mermaid ダイアグラムを iframe 経由でレンダリングする。
+ * 主 WebView の CSP を汚染しないためサンドボックス iframe を使用する。
+ */
+export async function renderMermaid(definition: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts'); // allow-same-origin は付与しない
+    iframe.src = '/mermaid-sandbox.html';            // Tauri asset server で提供
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const timeout = setTimeout(() => {
+      iframe.remove();
+      reject(new Error('Mermaid レンダリングタイムアウト'));
+    }, 10_000);
+
+    window.addEventListener('message', function handler(event) {
+      if (event.source !== iframe.contentWindow) return;
+      if (event.data.type !== 'mermaid-result') return;
+
+      clearTimeout(timeout);
+      iframe.remove();
+      window.removeEventListener('message', handler);
+
+      if (event.data.error) {
+        reject(new Error(event.data.error));
+      } else {
+        // DOMPurify でサニタイズしてから表示
+        const safeSvg = DOMPurify.sanitize(event.data.svg, {
+          USE_PROFILES: { svg: true, svgFilters: true },
+        });
+        resolve(safeSvg);
+      }
+    });
+
+    // iframe のロード完了後にメッセージを送信
+    iframe.onload = () => {
+      iframe.contentWindow?.postMessage({ type: 'render', definition }, '*');
+    };
+  });
+}
+```
+
+```html
+<!-- public/mermaid-sandbox.html (Tauri asset server で提供) -->
+<!DOCTYPE html>
+<html>
+<head>
+  <!-- この iframe 内では unsafe-eval を許可する（主 WebView には影響しない） -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'unsafe-inline'">
+  <script src="/mermaid.min.js"></script>
+</head>
+<body>
+  <div id="graph"></div>
+  <script>
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'antiscript' });
+    window.addEventListener('message', async (event) => {
+      try {
+        const { svg } = await mermaid.render('graph', event.data.definition);
+        window.parent.postMessage({ type: 'mermaid-result', svg }, '*');
+      } catch (error) {
+        window.parent.postMessage({ type: 'mermaid-result', error: error.message }, '*');
+      }
+    });
+  </script>
+</body>
+</html>
+```
 
 ### 4.2 Tauri コマンドの入力検証
 
@@ -437,9 +565,222 @@ editor.on('click', ({ event }) => {
 | `<script>` 保存 vs プレビュー分離 | NodeView でバッジ表示・保存は維持 | **必須** |
 | 外部リンクをブラウザで開く | `@tauri-apps/plugin-shell` の `open()` | **必須** |
 | パストラバーサル防止 | TypeScript 側検証 + Tauri スコープ | **必須** |
-| CSP の `unsafe-eval` 排除 | KaTeX/Mermaid CSP 対応版を使用 | **推奨** |
+| CSP の `unsafe-eval` 排除 | KaTeX は renderToString のみ使用、Mermaid は sandbox iframe | **推奨** |
 | iframe sandbox によるプレビュー隔離 | オプション設定として提供 | **推奨** |
-| AI API などの外部通信を Rust 経由に制限 | `connect-src 'none'` + Tauri コマンド | **将来対応** |
+| AI API などの外部通信を Rust 経由に制限 | `connect-src 'none'` + Tauri コマンド経由（§4.6 参照） | **Phase 3 実装** |
+
+---
+
+### 4.5 外部 URL 画像キャッシュのセキュリティ
+
+`$APP_CACHE_DIR` にキャッシュする外部 URL 画像は、以下のリスクを持つ。
+
+- **SSRF（Server-Side Request Forgery）的リスク**: 悪意のある Markdown に `![](http://internal-server/secret)` が埋め込まれると、Rust が内部サーバーにリクエストを送る可能性がある
+- **キャッシュポイズニング**: URL は同じでも内容が改ざんされているケース（ETag/Last-Modified で検証する）
+
+```rust
+// src-tauri/src/commands/image_cache.rs
+
+const ALLOWED_SCHEMES: &[&str] = &["https"]; // http は不可（HTTPS のみ）
+const MAX_CACHE_SIZE_BYTES: u64 = 100 * 1024 * 1024; // 100MB
+
+/// 外部 URL の画像を取得してキャッシュする。
+/// SSRF 対策として、プライベート IP アドレスへのリクエストを禁止する。
+#[tauri::command]
+pub async fn fetch_external_image(url: String) -> Result<String, String> {
+    // 1. URL スキームの検証（HTTPS のみ）
+    let parsed = url::Url::parse(&url).map_err(|e| format!("URL parse error: {e}"))?;
+    if !ALLOWED_SCHEMES.contains(&parsed.scheme()) {
+        return Err("HTTPS URL のみサポートしています".to_string());
+    }
+
+    // 2. プライベート IP アドレスへのリクエストを禁止（SSRF 対策）
+    let host = parsed.host_str().ok_or("ホスト名が取得できません")?;
+    if is_private_host(host) {
+        return Err("プライベートネットワークへのアクセスは禁止されています".to_string());
+    }
+
+    // 3. キャッシュキー = URL の SHA-256 ハッシュ
+    let cache_key = sha256_hex(&url);
+    // ... キャッシュ読み取り・書き込み
+    Ok(cache_key)
+}
+
+fn is_private_host(host: &str) -> bool {
+    // localhost, 127.x.x.x, 10.x.x.x, 192.168.x.x, 172.16-31.x.x を禁止
+    matches!(host, "localhost" | "::1")
+        || host.starts_with("127.")
+        || host.starts_with("10.")
+        || host.starts_with("192.168.")
+        || {
+            // 172.16.0.0/12
+            let parts: Vec<u8> = host.split('.').filter_map(|s| s.parse().ok()).collect();
+            parts.len() == 4 && parts[0] == 172 && (16..=31).contains(&parts[1])
+        }
+}
+```
+
+---
+
+### 4.6 AI API 外部通信の Rust 経由設計
+
+CSP の `connect-src 'none'` により WebView から外部 API への直接通信を禁止し、
+すべての AI API 通信を Tauri コマンド（Rust）経由とする。
+
+#### 設計原則
+
+| 禁止 | 許可 |
+|------|------|
+| `fetch('https://api.anthropic.com/...')` を WebView 内で呼ぶ | `invoke('call_ai_api', {...})` で Rust に委譲 |
+| WebView で API key を localStorage に保存 | API key は `plugin-stronghold`（暗号化ストレージ）で Rust 側に保持 |
+| WebView で受け取ったレスポンスを直接 innerHTML に | DOMPurify でサニタイズしてから表示 |
+
+#### Rust コマンド実装
+
+```rust
+// src-tauri/src/commands/ai.rs
+
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+
+/// サポートするモデルのホワイトリスト。
+/// 新モデルの追加はここを編集する（フロントエンドから任意のモデルを指定させない）。
+const ALLOWED_MODELS: &[(&str, &str)] = &[
+    ("anthropic", "claude-sonnet-4-5"),
+    ("anthropic", "claude-haiku-4-5-20251001"),
+    ("openai",    "gpt-4o"),
+    ("openai",    "gpt-4o-mini"),
+];
+
+#[derive(Deserialize)]
+pub struct AiRequest {
+    pub provider: String, // "anthropic" | "openai"
+    pub model: String,
+    pub prompt: String,
+    pub max_tokens: u32,
+}
+
+#[derive(Serialize)]
+pub struct AiResponse {
+    pub content: String,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
+#[tauri::command]
+pub async fn call_ai_api(
+    state: tauri::State<'_, crate::AppState>,
+    request: AiRequest,
+) -> Result<AiResponse, String> {
+    // 1. モデルのホワイトリスト検証
+    let is_allowed = ALLOWED_MODELS.iter().any(|(p, m)| {
+        p == &request.provider && m == &request.model
+    });
+    if !is_allowed {
+        return Err(format!(
+            "サポートしていないプロバイダ/モデル: {}/{}", request.provider, request.model
+        ));
+    }
+
+    // 2. プロンプト長の上限（100KB = 約25,000トークン相当）
+    if request.prompt.len() > 102_400 {
+        return Err("プロンプトが長すぎます（最大 100KB）".to_string());
+    }
+
+    // 3. max_tokens の上限（モデル上限を超えないよう制限）
+    if request.max_tokens > 8192 {
+        return Err("max_tokens が上限を超えています（最大 8192）".to_string());
+    }
+
+    // 4. API key の取得（Rust 側の設定ストアから取得、フロントから渡させない）
+    let api_key = state.get_api_key(&request.provider)
+        .ok_or_else(|| format!("{} の API key が設定されていません", request.provider))?;
+
+    // 5. プロバイダ別のリクエスト実行
+    match request.provider.as_str() {
+        "anthropic" => call_anthropic(&api_key, &request.model, &request.prompt, request.max_tokens).await,
+        "openai"    => call_openai(&api_key, &request.model, &request.prompt, request.max_tokens).await,
+        _           => Err("未対応プロバイダ".to_string()),
+    }
+}
+
+async fn call_anthropic(
+    api_key: &str,
+    model: &str,
+    prompt: &str,
+    max_tokens: u32,
+) -> Result<AiResponse, String> {
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let body = serde_json::json!({
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [{ "role": "user", "content": prompt }]
+    });
+
+    let resp = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", api_key)
+        .header("anthropic-version", "2023-06-01")
+        .header("content-type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("API 通信エラー: {e}"))?;
+
+    if !resp.status().is_success() {
+        let status = resp.status().as_u16();
+        let msg = resp.text().await.unwrap_or_default();
+        return Err(format!("Anthropic API エラー {status}: {msg}"));
+    }
+
+    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let content = json["content"][0]["text"].as_str().unwrap_or("").to_string();
+    let input_tokens = json["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32;
+    let output_tokens = json["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32;
+
+    Ok(AiResponse { content, input_tokens, output_tokens })
+}
+```
+
+#### フロントエンド側の呼び出し
+
+```typescript
+// src/core/ai/ai-client.ts
+
+import { invoke } from '@tauri-apps/api/core';
+
+export interface AiRequest {
+  provider: 'anthropic' | 'openai';
+  model: string;
+  prompt: string;
+  maxTokens: number;
+}
+
+export interface AiResponse {
+  content: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/**
+ * AI API を Rust 経由で呼び出す。
+ * WebView から直接 API を叩くことは CSP により禁止されている。
+ */
+export async function callAiApi(request: AiRequest): Promise<AiResponse> {
+  return invoke<AiResponse>('call_ai_api', {
+    request: {
+      provider: request.provider,
+      model: request.model,
+      prompt: request.prompt,
+      max_tokens: request.maxTokens,
+    },
+  });
+}
+```
 
 ---
 

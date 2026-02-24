@@ -349,6 +349,156 @@ const blockquoteInputRule = new InputRule({
 
 ---
 
+---
+
+## 3.5 ケース4: 複数段落選択削除時の Undo 粒度
+
+### シナリオ
+
+```
+段落A・段落B・段落C の3段落をまとめて選択 → Delete キー → Ctrl+Z
+```
+
+### 推奨動作: 1回の Ctrl+Z でA・B・C が全て復元される
+
+複数段落を「1操作」として削除したのだから、Undo も1ステップで全復元すべき。
+「3回 Ctrl+Z で1段落ずつ」は Undo の操作コストが不当に高い。
+
+### ProseMirror の動作（デフォルト）
+
+ProseMirror は **Delete/Backspace キーを1回押す = 1トランザクション** として記録する。
+選択範囲に複数ノードが含まれていても、削除は1トランザクションになる。
+
+```
+[A][B][C] → 全選択 → Delete
+  → ProseMirror: replaceSelection('') を1トランザクションで実行
+  → 1つの Undo エントリとして記録
+  → Ctrl+Z で [A][B][C] が同時に復元 ✅
+```
+
+**カスタム実装は不要**。ProseMirror のデフォルト動作が正しく機能する。
+
+### 注意: ドラッグ＆ドロップは別トランザクション
+
+複数段落をドラッグして移動する場合:
+- **削除**（元位置）と**挿入**（新位置）が別トランザクションになることがある
+- この場合、Ctrl+Z を1回押すと「挿入が消える」→ 2回押すと「削除が復元される」
+- Typora も同様の動作のため、許容範囲内とする
+
+---
+
+## 3.6 ケース5: テキスト入力の Undo 粒度（newGroupDelay と単語境界）
+
+### 「1文字 vs 1単語」の実際の動作
+
+ProseMirror の履歴グループ化は **時間ベース**であり、単語境界ベースではない。
+
+```
+newGroupDelay = 500ms （推奨設定）の場合:
+
+「Hello」を 400ms 以内に素早くタイプ
+  → 5文字が1グループ → Ctrl+Z で「Hello」全体が一度に消える
+
+「Hello」の後で 600ms 待ってから「World」をタイプ
+  → 「Hello」と「World」が別グループ → Ctrl+Z を2回必要
+
+Ctrl+Backspace（単語削除）
+  → 1キー操作 = 1トランザクション = 1 Undo ステップ
+  → 「World」全体が1回の Ctrl+Z で復元される
+```
+
+### Typora との比較
+
+Typora（Electron + CodeMirror 5）は **Undo スタックを独自管理**しており、
+「スペース・句読点でグループを区切る」単語ベースの Undo を実装している。
+ProseMirror のタイムベース方式は Typora と異なるが、VS Code 等と同じ動作であるため、
+**ProseMirror のデフォルトを採用し、Typora との完全一致は求めない**。
+
+```typescript
+// 推奨設定（undo-redo-design.md 5.1 参照）
+history: {
+  depth: 100,
+  newGroupDelay: 500, // 500ms 以内の連続入力は1グループ
+}
+
+// より Typora に近づけたい場合の代替設定（要テスト）
+history: {
+  depth: 200,
+  newGroupDelay: 300, // 短くすると「細かい Undo」になる
+}
+```
+
+### 実測値に基づく推奨
+
+| newGroupDelay | ユーザー体験 | 適用ケース |
+|---|---|---|
+| 200ms | とても細かい（1〜2文字単位） | コード編集向け |
+| 500ms ← **採用** | 標準（1〜3単語程度） | 文章執筆向け |
+| 750ms | おおまか（1文〜） | 長文入力向け |
+
+---
+
+## 3.7 ケース6: 自動保存デバウンスと closeHistory のタイミング
+
+### 問題
+
+自動保存デバウンス（500ms〜1000ms）と `closeHistory` の呼び出しタイミングが競合すると、
+意図しない Undo グループ境界が発生する可能性がある。
+
+```
+タイムライン例（問題ケース）:
+  t=0    : ユーザーが "Hello" とタイプ → トランザクション1
+  t=450  : 自動保存デバウンスが closeHistory を呼ぶ（← 問題）
+  t=500  : ユーザーが " World" をタイプ → トランザクション2
+  t=800  : ユーザーが blur → TyporaFocusPlugin が closeHistory を呼ぶ
+
+  Ctrl+Z を押すと:
+    → "World" が消える（ここまでは正しい）
+    → 再度 Ctrl+Z で "Hello" が消える（正しい）
+    ※ 自動保存による closeHistory が余分な境界を作っていた場合、
+      " World" と "Hello" が分割されるが、これは許容範囲内とする
+```
+
+### 設計方針: 自動保存では closeHistory を呼ばない
+
+```typescript
+// src/file/auto-save.ts
+
+/**
+ * 自動保存はドキュメントの「シリアライズとファイル書き込み」のみ行う。
+ * closeHistory は呼ばない（Undo 粒度に影響させない）。
+ * closeHistory は blur イベント（TyporaFocusPlugin）に委任する。
+ */
+export function scheduleSave(
+  editor: Editor,
+  filePath: string,
+  debouncedSave: (md: string) => void,
+): void {
+  // IME composition 中はスキップ（markdown-tiptap-conversion.md §9 参照）
+  if (isComposing) return;
+
+  const md = tiptapToMarkdown(editor.getJSON());
+  debouncedSave(md); // 500ms〜1000ms のデバウンス（ファイル書き込みのみ）
+
+  // ❌ 以下はやってはいけない:
+  // const { tr } = editor.state;
+  // closeHistory(tr);
+  // editor.view.dispatch(tr);
+}
+```
+
+### エッジケース: アプリ強制終了前の保存
+
+アプリ終了前の「即時保存」でも `closeHistory` は呼ばない。
+終了後は履歴は消えるため、境界設定は意味がない。
+
+```typescript
+// src-tauri/src/main.rs のウィンドウクローズハンドラから呼ばれる
+// → フロントエンドで tiptapToMarkdown() → ファイル書き込みのみ実行
+```
+
+---
+
 ## 4. Typora 式フォーカスモデルと Undo の統合設計
 
 ### 4.1 状態遷移図
@@ -532,9 +682,12 @@ import { yUndoPlugin, undo, redo } from 'y-prosemirror'
 
 | ケース | 推奨動作 | 実装 |
 |--------|---------|------|
-| **ケース1** テキスト編集 | 「Earth」→「World」（変更分のみ） | blur時に `closeHistory(tr)` |
+| **ケース1** テキスト編集 | 「Earth」→「World」（変更分のみ） | blur 時に `closeHistory(tr)` |
 | **ケース2** テーブル行追加×3 | 1行ずつ取り消し | 各コマンドを別 `dispatch()` で実行 |
 | **ケース3** Input Rule 変換 | H2 → 段落 + "## " テキスト復元 | TipTap が自動処理（対応不要） |
+| **ケース4** 複数段落選択削除 | 1回の Ctrl+Z で全復元 | ProseMirror のデフォルト動作（対応不要） |
+| **ケース5** テキスト入力粒度 | 500ms 以内の入力は1グループ | `newGroupDelay: 500` 設定のみ |
+| **ケース6** 自動保存 vs closeHistory | 自動保存は closeHistory を呼ばない | 保存はファイル書き込みのみ（blur 時に委任） |
 | フォーカス切替 | Undo の対象外 | `addToHistory: false` |
 | レンダリング切替 | Undo の対象外 | `addToHistory: false` |
 | プログラム的変換 | Undo の対象外 | `addToHistory: false` |
@@ -545,8 +698,9 @@ import { yUndoPlugin, undo, redo } from 'y-prosemirror'
 高 ① blur 時の closeHistory（ケース1の核心）
 高 ② テーブル各操作の個別 dispatch（ケース2）
 中 ③ Input Rule は TipTap のデフォルトで動作（ケース3）
-低 ④ History の depth / newGroupDelay チューニング
-低 ⑤ ブロックフォーカス状態のデコレーション管理
+中 ④ 自動保存で closeHistory を呼ばない（ケース6）
+低 ⑤ History の depth / newGroupDelay チューニング（ケース5）
+低 ⑥ ブロックフォーカス状態のデコレーション管理
 ```
 
 ---

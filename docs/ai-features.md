@@ -263,13 +263,372 @@ interface Placeholder {
 
 ---
 
-## 7. 未解決の設計課題
+## 7. 設計課題と解決方針
 
-1. **言語タグ自動推定の精度**: 無タグコードブロックの言語を推定するヒューリスティックの品質
-2. **プロンプト構造検出の誤検知**: 通常ドキュメントをプロンプトと誤検知するケース
-3. **カスタムテンプレートの保存**: ユーザーが自作テンプレートを保存・管理する仕組み
-4. **AIプロバイダ連携（将来）**: 直接API呼び出し（OpenAI/Anthropic）でエディタ内で補完する機能
-5. **プロンプトバージョン管理**: 過去に送ったプロンプトの履歴管理
+### 7.1 言語タグ自動推定のフォールバック戦略
+
+コードブロックの言語タグ推定は精度に限界があるため、段階的フォールバックで対処する。
+
+```typescript
+// src/core/ai/code-lang-detector.ts
+
+/**
+ * コードブロックの言語タグを推定する。
+ * 確信度が低い場合は空文字列（タグなし）を返す。
+ */
+export function detectLanguage(code: string): string {
+  // Step 1: 特徴語マッチング（精度 > 90%）
+  const byFeature = detectByFeatures(code);
+  if (byFeature.confidence >= 0.9) return byFeature.lang;
+
+  // Step 2: ファイル拡張子ヒント（ファイル名文脈がある場合）
+  const byContext = detectByFileContext();
+  if (byContext) return byContext;
+
+  // Step 3: 確信度が低い場合は空文字列を返す（誤タグより無タグが安全）
+  return '';
+  // ← UI 側で「言語不明」バッジを表示し、ユーザーが手動で指定できるようにする
+}
+
+/** 言語ごとの特徴語リスト（精度重視で厳しめに設定） */
+const LANGUAGE_SIGNATURES: Record<string, RegExp[]> = {
+  typescript: [/:\s*(string|number|boolean|void|any)\b/, /interface\s+\w+/, /=>\s*\{/],
+  rust:       [/fn\s+\w+\(/, /let\s+mut\s+/, /impl\s+\w+/],
+  python:     [/^def\s+\w+\(/m, /^import\s+\w+/m, /print\(/],
+  sql:        [/\bSELECT\b.*\bFROM\b/i, /\bINSERT\s+INTO\b/i],
+  // ... 他言語
+};
+```
+
+**UI フォールバック**:
+```tsx
+// コードブロック NodeView での表示
+<div className="code-block">
+  <span className="lang-badge">
+    {lang || <span className="lang-unknown" title="言語を手動指定してください">不明</span>}
+  </span>
+  <code>{content}</code>
+</div>
+```
+
+### 7.2 プロンプト構造検出の誤検知防止
+
+「RTICCO フォーマット不足の提案」機能は、通常ドキュメントを誤検知しないよう保守的に設定する。
+
+```typescript
+// 検出条件: 以下の全てを満たす場合のみプロンプトと判断する
+const isLikelyPrompt = (doc: MdastRoot): boolean => {
+  const headings = extractHeadings(doc);
+
+  // 条件1: 見出しが 3〜10 個（少なすぎると通常文書、多すぎると長文文書）
+  if (headings.length < 3 || headings.length > 10) return false;
+
+  // 条件2: AI 指示語キーワードが 2 個以上（1個では誤検知リスク大）
+  const AI_KEYWORDS = ['役割', 'タスク', '制約', '出力', '指示', 'role', 'task', 'output'];
+  const matchCount = headings.filter(h =>
+    AI_KEYWORDS.some(kw => h.toLowerCase().includes(kw.toLowerCase()))
+  ).length;
+  if (matchCount < 2) return false;
+
+  // 条件3: コードブロックのみのドキュメントはプロンプトではない
+  const textNodeCount = countTextNodes(doc);
+  if (textNodeCount < 50) return false; // 50文字未満はスキップ
+
+  return true;
+};
+
+// → 検出した場合も「強制変換」でなく「提案ダイアログ」を表示する
+```
+
+### 7.3 カスタムテンプレートの保存設計
+
+ユーザーが作成したテンプレートを `$APP_DATA/templates/` に保存する。
+
+```
+$APP_DATA/
+  templates/
+    builtin/           ← アプリ同梱テンプレート（読み取り専用）
+      code-review.md
+      bug-report.md
+    user/              ← ユーザー作成テンプレート（読み書き可能）
+      my-template-1.md
+      my-template-2.md
+    index.json         ← テンプレート一覧（名前・説明・カテゴリ）のメタデータ
+```
+
+```typescript
+// テンプレートのメタデータ（YAML フロントマター）
+---
+title: "コードレビュー依頼"
+category: "development"
+description: "コードレビューを AI に依頼するためのテンプレート"
+placeholders:
+  - key: LANGUAGE
+    type: select
+    label: "プログラミング言語"
+    options: ["TypeScript", "Rust", "Python", "Go"]
+  - key: CODE
+    type: code
+    label: "レビュー対象コード"
+---
+
+# 役割 (Role)
+あなたはシニアの {{LANGUAGE}} エンジニアです。
+
+# タスク (Task)
+以下のコードをレビューしてください。
+
+```{{LANGUAGE}}
+{{CODE}}
+```
+```
+
+```typescript
+// src/core/ai/template-manager.ts
+
+export class TemplateManager {
+  private readonly templatesDir: string;
+
+  async listTemplates(): Promise<TemplateMetadata[]> {
+    // builtin/ と user/ を結合して返す
+  }
+
+  async saveUserTemplate(name: string, content: string): Promise<void> {
+    const sanitizedName = name.replace(/[^a-z0-9-_]/gi, '_');
+    const path = `${this.templatesDir}/user/${sanitizedName}.md`;
+    await writeTextFile(path, content);
+    await this.rebuildIndex(); // index.json を更新
+  }
+
+  async deleteUserTemplate(name: string): Promise<void> {
+    // builtin テンプレートは削除不可
+    if (name.startsWith('builtin/')) {
+      throw new Error('組み込みテンプレートは削除できません');
+    }
+    await removeFile(`${this.templatesDir}/user/${name}.md`);
+    await this.rebuildIndex();
+  }
+}
+```
+
+### 7.4 最適化パイプラインの実行順序の根拠
+
+`OptimizationPipeline` の各ステップは **依存関係順** に実行する。順序を変えると結果が変わる。
+
+```typescript
+// 正しい順序と依存関係
+const pipeline: OptimizationStep[] = [
+  // Step 1: 見出し正規化（最初に実行: 以降のステップが見出し構造に依存するため）
+  normalizeHeadings,
+
+  // Step 2: コードブロック言語タグ付与（Step 1 後: 見出し下のコードブロックをコンテキストで判定）
+  annotateCodeBlocks,
+
+  // Step 3: リスト記号統一（Step 1/2 に依存しないが早めに実行）
+  normalizeListMarkers,
+
+  // Step 4: 空行の正規化（コードブロック内の空行は保護する必要があるため Step 2 後）
+  normalizeBlankLines,
+
+  // Step 5: テキスト修飾（最後: 構造が確定した後でインライン処理）
+  normalizeInlineFormatting,
+
+  // Step 6: プロンプト構造の提案（最後: 全体構造が確定した後で提案する）
+  suggestPromptStructure,
+];
+```
+
+**順序を変えると壊れるケース**:
+
+| 順序違反 | 問題 |
+|---|---|
+| Step 4（空行正規化）を Step 2 より先に実行 | コードブロック内の空行が除去されてしまう |
+| Step 5（インライン修飾）を Step 1 より先に実行 | `# **太字見出し**` の `**` が誤処理される |
+| Step 6（構造提案）を Step 1 より先に実行 | 見出し正規化前の「壊れた構造」を提案の入力にしてしまう |
+
+---
+
+## 8. エディタ統合 API（AI パネル ↔ エディタ）
+
+AI パネルとエディタは **イベントバス** 経由で疎結合に通信する。
+直接インスタンス参照は避ける（テスタビリティとモジュール独立性のため）。
+
+### 8.1 AI パネルからエディタへの操作
+
+```typescript
+// src/core/ai/editor-bridge.ts
+
+/**
+ * AI パネルがエディタを操作するためのブリッジ。
+ * TipTap の editor インスタンスを直接持ち回らず、コマンドとして定義する。
+ */
+export interface EditorAiBridge {
+  /**
+   * 現在のドキュメントを最適化済み Markdown 文字列として取得する。
+   * IME composition 中は null を返す（markdown-tiptap-conversion.md §9 参照）。
+   */
+  getOptimizedMarkdown(): string | null;
+
+  /**
+   * Markdown 文字列をカーソル位置（または末尾）に挿入する。
+   * TipTap の markdownToTipTap() でパースして挿入する。
+   */
+  insertMarkdown(markdown: string, position?: 'cursor' | 'end'): void;
+
+  /**
+   * 現在の選択範囲のテキストを取得する。
+   * 選択なしの場合は空文字列を返す。
+   */
+  getSelectedText(): string;
+
+  /**
+   * 現在の選択範囲を指定した Markdown で置換する。
+   * 選択なしの場合は何もしない。
+   */
+  replaceSelection(markdown: string): void;
+
+  /**
+   * AI 処理中であることをエディタに通知する。
+   * エディタは入力を一時的に無効化しない（楽観的 UI を維持）。
+   */
+  setAiProcessing(isProcessing: boolean): void;
+}
+```
+
+### 8.2 実装（TipTap コマンドベース）
+
+```typescript
+// src/renderer/wysiwyg/ai-bridge-impl.ts
+
+import { Editor } from '@tiptap/react';
+import { markdownToTipTap } from '../../core/converter/markdown-to-tiptap';
+import { tiptapToMarkdown } from '../../core/converter/tiptap-to-markdown';
+import { optimizeForAi } from '../../core/ai/optimizer';
+
+export function createEditorAiBridge(editor: Editor): EditorAiBridge {
+  return {
+    getOptimizedMarkdown(): string | null {
+      // IME 中は null（markdown-tiptap-conversion.md §9 参照）
+      if (editor.storage.compositionGuard?.isComposing) return null;
+
+      const raw = tiptapToMarkdown(editor.getJSON());
+      return optimizeForAi(raw);
+    },
+
+    insertMarkdown(markdown: string, position: 'cursor' | 'end' = 'cursor'): void {
+      const json = markdownToTipTap(markdown);
+      const content = json.content ?? [];
+
+      if (position === 'end') {
+        // 末尾に追加
+        editor.commands.setTextSelection(editor.state.doc.content.size);
+      }
+      // insertContentAt でカーソル位置に挿入
+      editor.commands.insertContent(content);
+    },
+
+    getSelectedText(): string {
+      const { from, to, empty } = editor.state.selection;
+      if (empty) return '';
+      return editor.state.doc.textBetween(from, to, '\n');
+    },
+
+    replaceSelection(markdown: string): void {
+      const { empty } = editor.state.selection;
+      if (empty) return;
+
+      const json = markdownToTipTap(markdown);
+      editor.commands.insertContent(json.content ?? []);
+    },
+
+    setAiProcessing(isProcessing: boolean): void {
+      // AI 処理中のビジュアルフィードバック（ツールバーのスピナー等）
+      editor.emit('aiProcessing', { isProcessing });
+    },
+  };
+}
+```
+
+### 8.3 AI パネルの呼び出しフロー
+
+```typescript
+// src/components/AiPanel/AiPanel.tsx
+
+export function AiPanel({ bridge }: { bridge: EditorAiBridge }) {
+  const handleCopyClick = async () => {
+    const md = bridge.getOptimizedMarkdown();
+    if (md === null) {
+      toast.warning('日本語入力確定後に操作してください');
+      return;
+    }
+
+    await navigator.clipboard.writeText(md);
+    toast.success('AIコピー完了');
+  };
+
+  const handleInsertTemplate = async (template: Template) => {
+    const filled = await openPlaceholderDialog(template);
+    if (filled === null) return; // キャンセル
+
+    bridge.setAiProcessing(true);
+    bridge.insertMarkdown(filled, 'cursor');
+    bridge.setAiProcessing(false);
+  };
+
+  // AI API を直接呼ぶ場合（Phase 3 以降）
+  const handleAiComplete = async () => {
+    bridge.setAiProcessing(true);
+    try {
+      const selected = bridge.getSelectedText();
+      const response = await callAiApi({
+        provider: 'anthropic',
+        model: 'claude-haiku-4-5-20251001',
+        prompt: selected,
+        maxTokens: 2048,
+      });
+      bridge.replaceSelection(response.content);
+    } finally {
+      bridge.setAiProcessing(false);
+    }
+  };
+
+  return (
+    <aside className="ai-panel">
+      <button onClick={handleCopyClick}>AIコピー</button>
+      {/* ... */}
+    </aside>
+  );
+}
+```
+
+### 8.4 テスト可能性の確保
+
+`EditorAiBridge` インターフェースを介することで、AI パネルの単体テストが容易になる。
+
+```typescript
+// tests/unit/AiPanel.test.tsx
+
+const mockBridge: EditorAiBridge = {
+  getOptimizedMarkdown: vi.fn().mockReturnValue('# Test\n\nContent\n'),
+  insertMarkdown: vi.fn(),
+  getSelectedText: vi.fn().mockReturnValue('selected text'),
+  replaceSelection: vi.fn(),
+  setAiProcessing: vi.fn(),
+};
+
+test('AIコピーボタンでクリップボードにコピーされる', async () => {
+  render(<AiPanel bridge={mockBridge} />);
+  await userEvent.click(screen.getByText('AIコピー'));
+  expect(navigator.clipboard.writeText).toHaveBeenCalledWith('# Test\n\nContent\n');
+});
+
+test('IME composition 中はコピーをブロックする', async () => {
+  mockBridge.getOptimizedMarkdown = vi.fn().mockReturnValue(null);
+  render(<AiPanel bridge={mockBridge} />);
+  await userEvent.click(screen.getByText('AIコピー'));
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+});
+```
 
 ---
 
