@@ -2,7 +2,7 @@
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
 > バージョン: 1.0
-> 更新日: 2026-02-24
+> 更新日: 2026-02-25
 
 ---
 
@@ -565,3 +565,344 @@ src/themes/
 - [ ] カスタムテーマの JSON 定義フォーマット確定
 - [ ] カスタムテーマの読み込み・適用ロジック
 - [ ] テーマ管理 UI（設定ダイアログへの組み込み）
+- [ ] §5.4〜§5.7 で設計した GUI カラーピッカー・フォントセレクタ・オーバーライドレイヤーの実装
+
+---
+
+## 5.4 テーマカスタマイザー GUI 概要
+
+Phase 7 で実装するビジュアルテーマカスタマイザー。JSON ファイルを手書きせずに GUI で CSS 変数を変更し、カスタムテーマを作成・保存できる。
+
+```
+設定 → 外観 → テーマ → [カスタマイズ]
+
+┌────────────────────────────────────────────────────────────────────┐
+│  テーマカスタマイザー                         [リセット] [保存]    │
+├──────────────────────┬─────────────────────────────────────────────┤
+│  カラー              │  ■ 背景色              [#ffffff] [●]       │
+│  フォント            │  ■ テキスト色          [#24292f] [●]       │
+│  スペーシング    ◄── │  ■ アクセントカラー    [#0969da] [●]       │
+│                      │  ■ ボーダー色          [#d0d7de] [●]       │
+│                      │  ■ コードブロック背景   [#f6f8fa] [●]      │
+│                      │                                             │
+│                      │  ─── プレビュー ─────────────────────────  │
+│                      │  # 見出し1                                  │
+│                      │  本文テキスト。**太字** と _斜体_ を含む。  │
+│                      │  `インラインコード`                         │
+│                      │  > 引用ブロック                             │
+└──────────────────────┴─────────────────────────────────────────────┘
+```
+
+### 5.5 カラーピッカーコンポーネント設計
+
+```tsx
+// src/components/ThemeCustomizer/ColorPickerField.tsx
+
+interface ColorPickerFieldProps {
+  label: string;
+  cssVariable: string;           // 例: '--color-bg'
+  value: string;                 // 現在の色値（例: '#ffffff'）
+  onChange: (cssVar: string, color: string) => void;
+}
+
+export function ColorPickerField({ label, cssVariable, value, onChange }: ColorPickerFieldProps) {
+  const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState(value);
+
+  // ドラフト変更をリアルタイムでプレビューに反映
+  React.useEffect(() => {
+    if (isValidColor(draft)) {
+      onChange(cssVariable, draft);
+    }
+  }, [draft]);
+
+  return (
+    <div className="color-picker-field">
+      <label>{label}</label>
+      <div className="color-controls">
+        {/* カラースウォッチ（クリックでピッカー展開）*/}
+        <button
+          className="color-swatch"
+          style={{ backgroundColor: value }}
+          onClick={() => setOpen(v => !v)}
+          aria-label={`${label}: ${value}`}
+        />
+        {/* hex テキスト入力 */}
+        <input
+          type="text"
+          value={draft}
+          maxLength={9}
+          pattern="^#[0-9a-fA-F]{3,8}$"
+          onChange={e => setDraft(e.target.value)}
+          onBlur={() => { if (!isValidColor(draft)) setDraft(value); }}
+        />
+        {/* ネイティブ input[type="color"]（ブラウザ標準ピッカー）*/}
+        <input
+          type="color"
+          value={value.length === 7 ? value : '#000000'}
+          onChange={e => { setDraft(e.target.value); onChange(cssVariable, e.target.value); }}
+          className="native-color-input"
+          aria-label="カラーピッカーを開く"
+        />
+      </div>
+    </div>
+  );
+}
+
+function isValidColor(s: string): boolean {
+  return /^#[0-9a-fA-F]{3}$|^#[0-9a-fA-F]{6}$|^#[0-9a-fA-F]{8}$/.test(s);
+}
+```
+
+### 5.6 フォントセレクタコンポーネント設計
+
+```tsx
+// src/components/ThemeCustomizer/FontSelectorField.tsx
+
+/** システムフォントのよく使われる候補 */
+const COMMON_FONTS = [
+  { value: '', label: 'テーマデフォルト' },
+  { value: '"Noto Sans JP", sans-serif', label: 'Noto Sans JP' },
+  { value: '"Hiragino Sans", sans-serif', label: 'ヒラギノ角ゴ（macOS）' },
+  { value: '"Yu Gothic UI", sans-serif', label: '游ゴシック UI（Windows）' },
+  { value: '"Meiryo UI", sans-serif', label: 'メイリオ UI（Windows）' },
+  { value: 'Georgia, serif', label: 'Georgia（英語）' },
+  { value: '"Courier New", monospace', label: 'Courier New（等幅）' },
+];
+
+interface FontSelectorFieldProps {
+  label: string;
+  cssVariable: string;
+  value: string;
+  onChange: (cssVar: string, font: string) => void;
+}
+
+export function FontSelectorField({ label, cssVariable, value, onChange }: FontSelectorFieldProps) {
+  const [custom, setCustom] = React.useState('');
+  const isCustom = !COMMON_FONTS.some(f => f.value === value);
+
+  return (
+    <div className="font-selector-field">
+      <label>{label}</label>
+      <select
+        value={isCustom ? '__custom__' : value}
+        onChange={e => {
+          if (e.target.value !== '__custom__') onChange(cssVariable, e.target.value);
+        }}
+      >
+        {COMMON_FONTS.map(f => (
+          <option key={f.value} value={f.value}>{f.label}</option>
+        ))}
+        <option value="__custom__">カスタム…</option>
+      </select>
+      {/* カスタム入力フィールド（プルダウンで「カスタム」選択時に表示）*/}
+      {isCustom && (
+        <input
+          type="text"
+          value={isCustom ? value : custom}
+          placeholder='"Font Name", fallback-family'
+          onChange={e => onChange(cssVariable, e.target.value)}
+        />
+      )}
+      {/* フォントプレビュー */}
+      <span className="font-preview" style={{ fontFamily: value || 'inherit' }}>
+        The quick brown fox jumps over the lazy dog. 日本語テキストサンプル。
+      </span>
+    </div>
+  );
+}
+```
+
+### 5.7 CSS 変数オーバーライドレイヤー
+
+カスタマイザーで変更した CSS 変数は `<style id="custom-theme-vars">` タグに書き込む。`:root` への直接代入は **しない**（テーマ切り替え時に上書きされてしまうため）。
+
+```typescript
+// src/themes/override-layer.ts
+
+/**
+ * CSS 変数オーバーライドレイヤー。
+ * `:root` に直接書くのではなく、`:root` セレクタを含む <style> タグに
+ * 書き込むことで、テーマ CSS（variables.css）より高いカスケード優先度を確保する。
+ */
+const OVERRIDE_STYLE_ID = 'custom-theme-vars';
+
+/** 変数オーバーライドを DOM に適用する（デバウンス不要・即時反映）*/
+export function applyOverrideVars(vars: Record<string, string>): void {
+  let el = document.getElementById(OVERRIDE_STYLE_ID) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement('style');
+    el.id = OVERRIDE_STYLE_ID;
+    document.head.appendChild(el);
+  }
+
+  if (Object.keys(vars).length === 0) {
+    el.textContent = '';
+    return;
+  }
+
+  const declarations = Object.entries(vars)
+    .map(([k, v]) => `  ${k}: ${v};`)
+    .join('\n');
+  el.textContent = `:root {\n${declarations}\n}`;
+}
+
+/** 現在の <style> タグから変数マップを読み取る（設定画面を開いた時の初期化用）*/
+export function readCurrentOverrideVars(): Record<string, string> {
+  const el = document.getElementById(OVERRIDE_STYLE_ID) as HTMLStyleElement | null;
+  if (!el?.textContent) return {};
+
+  const result: Record<string, string> = {};
+  for (const match of el.textContent.matchAll(/\s*(--[\w-]+):\s*([^;]+);/g)) {
+    result[match[1].trim()] = match[2].trim();
+  }
+  return result;
+}
+```
+
+### 5.8 Zustand 統合と永続化
+
+```typescript
+// src/store/themeCustomizerStore.ts
+
+import { create } from 'zustand';
+import { load } from '@tauri-apps/plugin-store';
+import { applyOverrideVars, readCurrentOverrideVars } from '../themes/override-layer';
+
+interface ThemeCustomizerStore {
+  /** 現在のオーバーライド変数マップ */
+  overrideVars: Record<string, string>;
+  /** カスタムテーマの表示名 */
+  customThemeName: string;
+  /** 変数を更新（即時 DOM 反映）*/
+  setVar: (cssVar: string, value: string) => void;
+  /** 変数を削除（ベーステーマの値に戻す）*/
+  removeVar: (cssVar: string) => void;
+  /** 全変数をリセット */
+  resetAll: () => void;
+  /** settings.json に保存 */
+  saveCustomTheme: () => Promise<void>;
+  /** settings.json から読み込み（起動時）*/
+  loadCustomTheme: () => Promise<void>;
+}
+
+export const useThemeCustomizerStore = create<ThemeCustomizerStore>((set, get) => ({
+  overrideVars: {},
+  customThemeName: 'My Theme',
+
+  setVar: (cssVar, value) => {
+    const next = { ...get().overrideVars, [cssVar]: value };
+    set({ overrideVars: next });
+    applyOverrideVars(next);   // 即時 DOM 反映（保存ボタン不要）
+  },
+
+  removeVar: (cssVar) => {
+    const next = { ...get().overrideVars };
+    delete next[cssVar];
+    set({ overrideVars: next });
+    applyOverrideVars(next);
+  },
+
+  resetAll: () => {
+    set({ overrideVars: {} });
+    applyOverrideVars({});
+  },
+
+  saveCustomTheme: async () => {
+    const store = await load('settings.json');
+    await store.set('customTheme', {
+      name: get().customThemeName,
+      variables: get().overrideVars,
+    });
+    await store.save();
+  },
+
+  loadCustomTheme: async () => {
+    const store = await load('settings.json');
+    const saved = await store.get<{ name: string; variables: Record<string, string> }>('customTheme');
+    if (saved?.variables) {
+      set({ overrideVars: saved.variables, customThemeName: saved.name ?? 'My Theme' });
+      applyOverrideVars(saved.variables);
+    }
+  },
+}));
+```
+
+### 5.9 カスタマイザー全体コンポーネント
+
+```tsx
+// src/components/ThemeCustomizer/ThemeCustomizer.tsx
+
+import { useThemeCustomizerStore } from '../../store/themeCustomizerStore';
+import { ColorPickerField } from './ColorPickerField';
+import { FontSelectorField } from './FontSelectorField';
+
+/** カスタマイズ対象の変数グループ */
+const COLOR_VARS = [
+  { label: '背景色',             cssVar: '--color-bg' },
+  { label: 'テキスト色',         cssVar: '--color-text' },
+  { label: 'アクセントカラー',   cssVar: '--color-accent' },
+  { label: 'ボーダー色',         cssVar: '--color-border' },
+  { label: 'コードブロック背景', cssVar: '--preview-code-bg' },
+  { label: '引用ボーダー',       cssVar: '--preview-blockquote-border' },
+];
+const FONT_VARS = [
+  { label: '本文フォント',         cssVar: '--font-sans' },
+  { label: 'コードフォント',       cssVar: '--font-mono' },
+];
+
+export function ThemeCustomizer() {
+  const { overrideVars, setVar, resetAll, saveCustomTheme, customThemeName } =
+    useThemeCustomizerStore();
+
+  return (
+    <div className="theme-customizer">
+      <div className="customizer-header">
+        <input
+          className="theme-name-input"
+          value={customThemeName}
+          onChange={e => useThemeCustomizerStore.setState({ customThemeName: e.target.value })}
+          placeholder="テーマ名"
+        />
+        <button onClick={resetAll}>リセット</button>
+        <button className="save-btn" onClick={saveCustomTheme}>保存</button>
+      </div>
+
+      <section>
+        <h3>カラー</h3>
+        {COLOR_VARS.map(({ label, cssVar }) => (
+          <ColorPickerField
+            key={cssVar}
+            label={label}
+            cssVariable={cssVar}
+            value={overrideVars[cssVar] ?? getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim()}
+            onChange={setVar}
+          />
+        ))}
+      </section>
+
+      <section>
+        <h3>フォント</h3>
+        {FONT_VARS.map(({ label, cssVar }) => (
+          <FontSelectorField
+            key={cssVar}
+            label={label}
+            cssVariable={cssVar}
+            value={overrideVars[cssVar] ?? ''}
+            onChange={setVar}
+          />
+        ))}
+      </section>
+
+      <section>
+        <h3>プレビュー</h3>
+        <div className="theme-preview editor-preview">
+          <h1>見出し1</h1>
+          <p>本文テキスト。<strong>太字</strong>と<em>斜体</em>を含む。</p>
+          <code>インラインコード</code>
+          <blockquote>引用ブロックのサンプルテキスト。</blockquote>
+        </div>
+      </section>
+    </div>
+  );
+}

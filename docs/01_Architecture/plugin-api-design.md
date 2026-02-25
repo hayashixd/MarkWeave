@@ -2,7 +2,7 @@
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
 > バージョン: 1.0
-> 更新日: 2026-02-24
+> 更新日: 2026-02-25
 
 ---
 
@@ -16,6 +16,7 @@
 6. [プラグインのライフサイクル](#6-プラグインのライフサイクル)
 7. [プラグインの配布とインストール](#7-プラグインの配布とインストール)
 8. [実装フェーズ](#8-実装フェーズ)
+9. [プラグイン設定 GUI とストア UX](#9-プラグイン設定-gui-とストア-ux)
 
 ---
 
@@ -618,3 +619,375 @@ Phase 7 でローカルインストールと同時に実装する。
 - [ ] Rust 側のプラグイン向け `fs:read` / `fs:write` スコープ制限コマンド
 - [ ] プラグインのクラッシュ検知・自動無効化
 - [ ] プラグイン管理 UI（有効/無効・アンインストール）
+- [ ] §9 で設計したプラグイン設定 GUI・動的フォーム生成の実装
+- [ ] セーフモード起動オプション（`--safe-mode` フラグ）
+
+---
+
+## 9. プラグイン設定 GUI とストア UX
+
+### 9.1 manifest.json 設定宣言スキーマ
+
+プラグインが提供する設定項目を `manifest.json` の `settings` フィールドで宣言する。アプリはこの宣言をもとに設定 UI を**動的生成**する。
+
+```jsonc
+// manifest.json（拡張版）
+{
+  "id": "com.example.my-plugin",
+  "name": "My Plugin",
+  "version": "1.0.0",
+  "permissions": ["editor:read", "ui:toolbar"],
+
+  "settings": [
+    {
+      "key": "highlightColor",
+      "label": "ハイライト色",
+      "type": "color",
+      "default": "#ffeb3b",
+      "description": "ハイライト要素の背景色"
+    },
+    {
+      "key": "fontSize",
+      "label": "フォントサイズ (px)",
+      "type": "number",
+      "default": 16,
+      "min": 10,
+      "max": 48,
+      "step": 1
+    },
+    {
+      "key": "mode",
+      "label": "動作モード",
+      "type": "select",
+      "default": "auto",
+      "options": [
+        { "value": "auto",   "label": "自動" },
+        { "value": "manual", "label": "手動" },
+        { "value": "off",    "label": "オフ" }
+      ]
+    },
+    {
+      "key": "enableNotifications",
+      "label": "通知を有効にする",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "apiEndpoint",
+      "label": "API エンドポイント URL",
+      "type": "string",
+      "default": "https://api.example.com",
+      "placeholder": "https://...",
+      "description": "外部 API の URL（network:fetch 権限が必要）"
+    }
+  ]
+}
+```
+
+**設定フィールドの型一覧:**
+
+| `type` | 対応する React コンポーネント | 追加属性 |
+|--------|--------------------------|---------|
+| `string` | `<input type="text">` | `placeholder`, `maxLength` |
+| `number` | `<input type="number">` + スライダー | `min`, `max`, `step` |
+| `boolean` | `<input type="checkbox">` | — |
+| `color` | カラーピッカー（§9.2 参照） | — |
+| `select` | `<select>` ドロップダウン | `options: [{value, label}]` |
+| `textarea` | `<textarea>` | `rows`, `placeholder` |
+| `file` | ファイルピッカー（Tauri dialog） | `filters: [{name, extensions}]` |
+
+### 9.2 動的フォーム生成（Dynamic Settings Form）
+
+```typescript
+// src/components/PluginSettingsForm.tsx
+
+import type { PluginSettingDeclaration } from '../plugins/plugin-api';
+
+interface PluginSettingsFormProps {
+  pluginId: string;
+  declarations: PluginSettingDeclaration[];
+  values: Record<string, unknown>;
+  onChange: (key: string, value: unknown) => void;
+}
+
+export function PluginSettingsForm({
+  pluginId, declarations, values, onChange,
+}: PluginSettingsFormProps) {
+  return (
+    <div className="plugin-settings-form">
+      {declarations.map(decl => (
+        <div key={decl.key} className="settings-row">
+          <label htmlFor={`${pluginId}-${decl.key}`}>{decl.label}</label>
+          {decl.description && (
+            <p className="settings-description">{decl.description}</p>
+          )}
+          <SettingField
+            id={`${pluginId}-${decl.key}`}
+            decl={decl}
+            value={values[decl.key] ?? decl.default}
+            onChange={v => onChange(decl.key, v)}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SettingField({
+  id, decl, value, onChange,
+}: {
+  id: string;
+  decl: PluginSettingDeclaration;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  switch (decl.type) {
+    case 'string':
+      return (
+        <input
+          id={id}
+          type="text"
+          value={String(value ?? '')}
+          placeholder={decl.placeholder}
+          maxLength={decl.maxLength}
+          onChange={e => onChange(e.target.value)}
+        />
+      );
+    case 'number':
+      return (
+        <div className="number-field">
+          <input
+            id={id}
+            type="range"
+            min={decl.min} max={decl.max} step={decl.step}
+            value={Number(value)}
+            onChange={e => onChange(Number(e.target.value))}
+          />
+          <input
+            type="number"
+            min={decl.min} max={decl.max} step={decl.step}
+            value={Number(value)}
+            onChange={e => onChange(Number(e.target.value))}
+          />
+        </div>
+      );
+    case 'boolean':
+      return (
+        <input
+          id={id}
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={e => onChange(e.target.checked)}
+        />
+      );
+    case 'color':
+      return (
+        <input
+          id={id}
+          type="color"
+          value={String(value ?? '#000000')}
+          onChange={e => onChange(e.target.value)}
+        />
+      );
+    case 'select':
+      return (
+        <select id={id} value={String(value)} onChange={e => onChange(e.target.value)}>
+          {decl.options?.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      );
+    case 'textarea':
+      return (
+        <textarea
+          id={id}
+          value={String(value ?? '')}
+          rows={decl.rows ?? 4}
+          placeholder={decl.placeholder}
+          onChange={e => onChange(e.target.value)}
+        />
+      );
+    default:
+      return null;
+  }
+}
+```
+
+**型定義の追加（`plugin-api.ts`）:**
+
+```typescript
+// src/plugins/plugin-api.ts に追加
+
+export interface PluginSettingDeclaration {
+  key: string;
+  label: string;
+  type: 'string' | 'number' | 'boolean' | 'color' | 'select' | 'textarea' | 'file';
+  default: unknown;
+  description?: string;
+  placeholder?: string;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  rows?: number;
+  options?: Array<{ value: string; label: string }>;
+  filters?: Array<{ name: string; extensions: string[] }>;
+}
+
+// PluginManifest に settings フィールドを追加
+export interface PluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description?: string;
+  author?: string;
+  repository?: string;
+  permissions: PluginPermission[];
+  settings?: PluginSettingDeclaration[];   // ← 追加
+  minApiVersion?: string;
+  changelog?: string;
+}
+
+// プラグイン API にプラグイン設定アクセス手段を追加
+export interface EditorPluginAPI {
+  // ... 既存フィールド ...
+
+  /** プラグイン設定へのアクセス */
+  settings: {
+    /** 設定値を取得（宣言した key のみ） */
+    get<T = unknown>(key: string): T;
+    /** 設定値を変更（ui:settings 権限不要、自己設定変更は常に許可） */
+    set(key: string, value: unknown): Promise<void>;
+    /** 設定変更を購読 */
+    onChange(key: string, handler: (value: unknown) => void): () => void;
+  };
+}
+```
+
+### 9.3 プラグインストア UI レイアウト
+
+```
+設定 → プラグイン
+
+┌─────────────────────────────────────────────────────────────────┐
+│  プラグイン                                                      │
+├──────────────────────────────┬──────────────────────────────────┤
+│  インストール済み (3)          │  [My Plugin]                    │
+│  ────────────────────────    │  v1.0.0  ·  com.example.my-plugin│
+│  ✅ My Plugin       [設定 ▶] │                                  │
+│  ✅ Highlight Tool  [設定 ▶] │  ハイライト色                    │
+│  🔴 Broken Plugin   [削除]   │  ████ #ffeb3b                    │
+│                              │                                  │
+│  + プラグインを追加           │  フォントサイズ (px)             │
+│    （フォルダを選択）          │  ─────●────  16                  │
+│                              │                                  │
+│                              │  動作モード                      │
+│                              │  [自動       ▼]                  │
+│                              │                                  │
+│                              │  [✓] 通知を有効にする            │
+│                              │                                  │
+│                              │  API エンドポイント URL          │
+│                              │  [https://api.example.com    ]   │
+│                              │                                  │
+│                              │  [無効にする]  [アンインストール] │
+└──────────────────────────────┴──────────────────────────────────┘
+```
+
+**プラグイン状態表示:**
+
+| アイコン | 状態 | 説明 |
+|--------|------|------|
+| ✅ | 有効 | 正常稼働中 |
+| ⏸ | 無効 | ユーザーが手動で無効化 |
+| 🔴 | エラー | クラッシュ・起動失敗 |
+| 🔒 | セーフモード | セーフモード起動のため自動無効化 |
+
+### 9.4 プラグイン設定の永続化
+
+プラグイン設定は `@tauri-apps/plugin-store` の `settings.json` に `plugins.settings` セクションとして保存する。
+
+```typescript
+// settings.json（プラグイン設定部分）
+{
+  "plugins": {
+    "installed": [
+      { "id": "com.example.my-plugin", "enabled": true, "path": "...", "version": "1.0.0" }
+    ],
+    "settings": {
+      "com.example.my-plugin": {
+        "highlightColor": "#ff9900",
+        "fontSize": 18,
+        "mode": "manual",
+        "enableNotifications": false,
+        "apiEndpoint": "https://custom.api.com"
+      }
+    }
+  }
+}
+```
+
+```typescript
+// src/plugins/pluginSettingsStore.ts
+import { create } from 'zustand';
+import { load } from '@tauri-apps/plugin-store';
+
+interface PluginSettingsStore {
+  /** プラグインID → 設定値マップ */
+  settings: Record<string, Record<string, unknown>>;
+  getPluginSettings: (pluginId: string) => Record<string, unknown>;
+  setPluginSetting: (pluginId: string, key: string, value: unknown) => Promise<void>;
+}
+
+export const usePluginSettingsStore = create<PluginSettingsStore>((set, get) => ({
+  settings: {},
+
+  getPluginSettings: (pluginId) => get().settings[pluginId] ?? {},
+
+  setPluginSetting: async (pluginId, key, value) => {
+    const next = {
+      ...get().settings,
+      [pluginId]: { ...get().settings[pluginId], [key]: value },
+    };
+    set({ settings: next });
+    const store = await load('settings.json');
+    await store.set('plugins.settings', next);
+    await store.save();
+  },
+}));
+```
+
+### 9.5 セーフモード設計
+
+セーフモードでは全サードパーティプラグインを無効化して起動する。クラッシュループからの回復手段。
+
+```
+セーフモード起動トリガー:
+  1. コマンドラインオプション: mdeditor --safe-mode
+  2. クラッシュリカバリ検出: 連続 3 回起動失敗 → 次回はセーフモード
+  3. 起動時の確認ダイアログ（重篤クラッシュ後）
+
+セーフモード中の動作:
+  - ビルトインプラグインは通常通り有効（Mermaid・KaTeX・画像）
+  - サードパーティプラグインは全て 🔒 無効化（永続設定は保持）
+  - ステータスバーに「🔒 セーフモード」バナー表示
+  - 設定画面の「通常モードで再起動」ボタンからのみ通常起動に戻れる
+```
+
+```typescript
+// src/plugins/safeMode.ts
+import { invoke } from '@tauri-apps/api/core';
+
+export async function isSafeModeActive(): Promise<boolean> {
+  return invoke<boolean>('is_safe_mode_active');
+}
+
+export async function restartInNormalMode(): Promise<void> {
+  await invoke('restart_app', { safeMode: false });
+}
+
+// PluginManager.activatePlugin の先頭で呼ばれる
+export function shouldSkipPlugin(pluginId: string, safeModeActive: boolean): boolean {
+  if (!safeModeActive) return false;
+  // ビルトインプラグインは ID が "builtin." で始まる
+  return !pluginId.startsWith('builtin.');
+}

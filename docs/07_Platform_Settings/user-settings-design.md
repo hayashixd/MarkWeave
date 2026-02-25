@@ -2,7 +2,7 @@
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
 > バージョン: 1.0
-> 更新日: 2026-02-24
+> 更新日: 2026-02-25
 
 ---
 
@@ -16,6 +16,7 @@
 6. [デフォルト値](#6-デフォルト値)
 7. [設定マイグレーション設計](#7-設定マイグレーション設計)
 8. [実装フェーズ](#8-実装フェーズ)
+9. [プラグイン設定との連携](#9-プラグイン設定との連携)
 
 ---
 
@@ -395,6 +396,131 @@ export function migrateSettings(raw: unknown): AppSettings {
 
 ---
 
+---
+
+## 9. プラグイン設定との連携
+
+### 9.1 設計方針
+
+プラグイン設定（各プラグインの独自設定値）は `AppSettings` とは**別ストア**（`pluginSettingsStore`）で管理する。ただし、保存先の `settings.json` は同一ファイルの `plugins.settings` セクションを使用する。
+
+| 管理単位 | ストア | スキーマの所在 |
+|---------|--------|--------------|
+| アプリ共通設定 | `useSettingsStore` | `AppSettings` 型定義（§3） |
+| プラグイン個別設定 | `usePluginSettingsStore` | 各 `manifest.json` の `settings` 宣言 |
+| プラグイン有効/無効・インストール一覧 | `usePluginSettingsStore` | `PluginInstallRecord[]` |
+
+### 9.2 settings.json 全体スキーマ
+
+```typescript
+// settings.json のルートオブジェクト全体像
+
+interface SettingsFile {
+  /** AppSettings（§3 で定義）*/
+  settings: AppSettings;
+
+  /** プラグイン管理データ */
+  plugins: {
+    /** インストール済みプラグイン一覧 */
+    installed: PluginInstallRecord[];
+
+    /** プラグイン個別設定値（key: pluginId, value: 設定値マップ）*/
+    settings: Record<string, Record<string, unknown>>;
+  };
+}
+
+export interface PluginInstallRecord {
+  id: string;
+  name: string;
+  version: string;
+  /** プラグインファイルの絶対パス */
+  path: string;
+  /** 有効/無効フラグ */
+  enabled: boolean;
+  /** インストール日時（ISO 8601）*/
+  installedAt: string;
+  /** 付与済み権限（権限確認ダイアログで承認済みのもの）*/
+  grantedPermissions: string[];
+}
+```
+
+### 9.3 設定 UI タブへのプラグイン統合
+
+プリファレンスダイアログに「プラグイン」タブを追加し、§9.3（`plugin-api-design.md`）で設計したプラグイン管理 UI を組み込む。
+
+```
+設定ダイアログ:
+
+┌──────────────┬─────────────────────────────────────────────────┐
+│  外観         │                                                 │
+│  エディタ     │  ← 既存タブ                                    │
+│  Markdown    │                                                 │
+│  ファイル     │                                                 │
+│  AI コピー   │                                                 │
+│  ─────────── │                                                 │
+│  プラグイン ← │  ← Phase 7 で追加                              │
+└──────────────┴─────────────────────────────────────────────────┘
+```
+
+### 9.4 プラグイン設定へのアクセス（EditorPluginAPI 経由）
+
+プラグインは `api.settings.get(key)` で自身の設定値を取得できる。型安全にするため、宣言した `default` の型が自動的に適用される。
+
+```typescript
+// プラグイン側のコード例
+export const myPlugin: EditorPlugin = {
+  manifest: {
+    id: 'com.example.my-plugin',
+    // ...
+    settings: [
+      { key: 'highlightColor', type: 'color', label: '色', default: '#ffeb3b' },
+    ],
+  },
+
+  activate(api: EditorPluginAPI) {
+    // 設定値の取得
+    const color = api.settings.get<string>('highlightColor');
+
+    // 設定変更の購読
+    const unsubscribe = api.settings.onChange('highlightColor', (newColor) => {
+      updateHighlightColor(newColor as string);
+    });
+
+    // deactivate 時に購読解除
+    return () => unsubscribe();
+  },
+};
+```
+
+### 9.5 マイグレーション上の考慮
+
+プラグイン設定は `AppSettings.version` とは独立してバージョン管理する。プラグインのバージョンアップ時に旧設定値が型不一致になる場合は、`PluginManager.activatePlugin` 内でデフォルト値で補完する。
+
+```typescript
+// src/plugins/PluginManager.ts（マイグレーション処理）
+function resolvePluginSettings(
+  manifest: PluginManifest,
+  stored: Record<string, unknown>,
+): Record<string, unknown> {
+  const resolved: Record<string, unknown> = {};
+  for (const decl of manifest.settings ?? []) {
+    const val = stored[decl.key];
+    // 型チェック: 合わなければデフォルト値を使用
+    resolved[decl.key] = isCompatible(val, decl.type) ? val : decl.default;
+  }
+  return resolved;
+}
+
+function isCompatible(value: unknown, type: string): boolean {
+  if (value === undefined || value === null) return false;
+  if (type === 'boolean') return typeof value === 'boolean';
+  if (type === 'number') return typeof value === 'number' && !isNaN(value);
+  return typeof value === 'string';
+}
+```
+
+---
+
 ## 関連ドキュメント
 
 - [image-storage-design.md](./image-storage-design.md) — 画像保存設定の詳細
@@ -402,3 +528,4 @@ export function migrateSettings(raw: unknown): AppSettings {
 - [window-tab-session-design.md](./window-tab-session-design.md) — セッション復元設定
 - [smart-paste-design.md](./smart-paste-design.md) — スマートペースト設定
 - [ai-features.md](./ai-features.md) — AI コピー機能の詳細
+- [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9 — プラグイン設定 GUI・動的フォーム生成・セーフモード設計

@@ -112,9 +112,10 @@ docs/
 | ファイル | 役割 | 追記すべき情報 |
 |---------|------|--------------|
 | `slash-commands-design.md` | `/` による要素挿入コマンド（ポップアップ・ファジーフィルタ・コマンド定義） | 新コマンド追加、コマンドカテゴリ変更 |
-| `wikilinks-backlinks-design.md` | `[[...]]` 記法・オートコンプリート・インデックス・バックリンクパネル・リネーム時自動更新 | Wikiリンク記法拡張（エイリアス等）、インデックス戦略変更 |
+| `wikilinks-backlinks-design.md` | `[[...]]` 記法・オートコンプリート・インデックス・バックリンクパネル・リネーム時自動更新・グラフビュー可視化 | Wikiリンク記法拡張（エイリアス等）、インデックス戦略変更、グラフレイアウト変更 |
 | `git-integration-design.md` | Git 状態バッジ・エディタガター差分・Git パネル・コミット UI・コミット履歴・Rust `git2` バックエンド | Git 操作機能追加（push/pull UI 等）、差分表示の変更 |
 | `search-design.md` | ファイル内検索・置換・ワークスペース横断全文検索・検索オプション・パフォーマンス | 検索 UI 変更、新オプション追加（インデックス導入等） |
+| `metadata-query-design.md` | SQLite メタデータインデックス（frontmatter/tags/tasks/links）・クエリ構文・SQLite 変換・テーブル/リスト/カレンダービュー | クエリ構文拡張、新ビュー追加、スキーマ変更 |
 
 ### AI/ サブディレクトリ
 
@@ -212,7 +213,10 @@ docs/
 | 新しい AI 最適化ステップ・テンプレート | `05_Features/AI/ai-design.md` |
 | HTML 対応要素の追加 | `05_Features/HTML/html-editing-design.md` |
 | パフォーマンス改善の設計 | `01_Architecture/performance-design.md` |
-| 新プラグイン拡張ポイント | `01_Architecture/plugin-api-design.md` |
+| 新プラグイン拡張ポイント・プラグイン設定 GUI | `01_Architecture/plugin-api-design.md` |
+| メタデータクエリ・SQLite スキーマ変更 | `05_Features/metadata-query-design.md` |
+| グラフビュー・リンクグラフ可視化 | `05_Features/wikilinks-backlinks-design.md` §11 |
+| テーマカスタマイザー GUI・CSS 変数オーバーライド | `03_UI_UX/theme-design.md` §5.4〜§5.9 |
 | 新 OS・モバイルプラットフォーム対応 | `07_Platform_Settings/cross-platform-design.md` |
 | モバイル固有機能（SAF・iCloud等） | `07_Platform_Settings/mobile-advanced-design.md` |
 | 新テストシナリオ・テスト方針変更 | `08_Testing_Quality/testing-strategy-design.md` |

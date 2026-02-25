@@ -354,6 +354,57 @@
 
 ---
 
+## 26. 新規追加機能 第2弾（2026-02-25）の設計ドキュメント
+
+> PKM 深化・プラグインエコシステム・テーマ UX を強化する機能群。
+
+### 26.1 メタデータクエリエンジン
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| SQLite スキーマ（files/frontmatter/tags/tasks/links）| ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §2 |
+| クエリ構文定義（SELECT/WHERE/ORDER BY/VIEW）| ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §3 |
+| TypeScript クエリパーサー・SQLite 変換ロジック | ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §4 |
+| Tauri コマンド（build_metadata_index / execute_metadata_query）| ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §5 |
+| テーブルビュー・リストビュー・カレンダービュー | ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §6 |
+| `QueryBlockView` NodeView（クエリブロックのインライン表示）| ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §6.4 |
+
+### 26.2 グラフビュー（リンクグラフ可視化）
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| レンダリングエンジン選定（D3.js/SVG vs Canvas/WebGL）| ✅ | [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11.1 |
+| グラフデータ構造（GraphNode/GraphEdge/GraphData）| ✅ | [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11.2 |
+| `get_graph_data` Tauri コマンド・IPC ペイロード | ✅ | [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11.2 |
+| D3.js Force グラフコンポーネント実装方針 | ✅ | [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11.3 |
+| ホバーカード・クリックナビゲーション・ズーム/パン | ✅ | [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11.4 |
+| タグフィルタ UI・孤立ノード非表示オプション | ✅ | [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11.5 |
+
+### 26.3 プラグイン設定 GUI・ストア UX
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| manifest.json 設定宣言スキーマ（8 フィールド型）| ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9.1 |
+| 動的フォーム生成（PluginSettingsForm・SettingField）| ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9.2 |
+| プラグインストア UI レイアウト（左ペイン一覧・右ペイン設定）| ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9.3 |
+| プラグイン設定の `pluginSettingsStore` 永続化 | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9.4 |
+| セーフモード設計（クラッシュループ回復）| ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9.5 |
+| `AppSettings` × プラグイン設定の分離方針 | ✅ | [user-settings-design.md](../07_Platform_Settings/user-settings-design.md) §9 |
+| `settings.json` 全体スキーマ（PluginInstallRecord 含む）| ✅ | [user-settings-design.md](../07_Platform_Settings/user-settings-design.md) §9.2 |
+
+### 26.4 ビジュアルテーマカスタマイザー GUI
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| テーマカスタマイザー GUI 概要（カラー/フォント/プレビュー）| ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5.4 |
+| カラーピッカーコンポーネント（ColorPickerField）| ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5.5 |
+| フォントセレクタコンポーネント（FontSelectorField）| ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5.6 |
+| CSS 変数オーバーライドレイヤー（`<style>` タグ注入）| ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5.7 |
+| `themeCustomizerStore`（Zustand + plugin-store 永続化）| ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5.8 |
+| `ThemeCustomizer` 全体コンポーネント | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5.9 |
+
+---
+
 ## 25. 新規追加機能（2026-02-25）の設計ドキュメント
 
 > PKM（パーソナルナレッジ管理）・執筆生産性の向上を目的として追加設計した機能群。
