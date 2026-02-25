@@ -2,7 +2,7 @@
 
 > プロジェクト: Markdown / HTML Editor
 > バージョン: 1.0
-> 更新日: 2026-02-24
+> 更新日: 2026-02-25
 
 ---
 
@@ -16,6 +16,10 @@
 6. [全体アーキテクチャ](#6-全体アーキテクチャ)
 7. [状態管理設計（Zustand）](#7-状態管理設計zustand)
 8. [実装フェーズ](#8-実装フェーズ)
+9. [自動保存の詳細仕様](#9-自動保存の詳細仕様)
+10. [クラッシュリカバリ設計](#10-クラッシュリカバリ設計)
+11. [複数 WebviewWindow 設計（Phase 5+）](#11-複数-webviewwindow-設計phase-5)
+12. [Undo / Redo 整合性と排他制御](#12-undo--redo-整合性と排他制御)
 
 ---
 
@@ -1093,6 +1097,497 @@ if (contentBytes >= AUTO_SAVE_MAX_BYTES) {
   return; // チェックポイントも記録しない（ストアへの書き込みコスト回避）
 }
 ```
+
+---
+
+---
+
+## 11. 複数 WebviewWindow 設計（Phase 5+）
+
+### 11.1 アーキテクチャ概要
+
+Phase 5 以降でタブをウィンドウに切り出す機能を実装する際、Tauri の `WebviewWindow` はそれぞれ独立した Renderer プロセスを持つため、React の Zustand ストアはウィンドウ間で共有されない。
+
+```
+┌─────────────────────────┐   ┌─────────────────────────┐
+│  WebviewWindow 1         │   │  WebviewWindow 2         │
+│  ┌─────────────────────┐│   │  ┌─────────────────────┐ │
+│  │ React + Zustand     ││   │  │ React + Zustand     │ │
+│  │ tabStore（独立）     ││   │  │ tabStore（独立）     │ │
+│  └─────────────────────┘│   │  └─────────────────────┘ │
+│  Renderer Process 1      │   │  Renderer Process 2      │
+└────────────┬────────────┘   └────────────┬────────────┘
+             │                             │
+             └──────────────┬──────────────┘
+                            │ IPC（同期が必要な状態）
+                            ▼
+          ┌─────────────────────────────────┐
+          │  Rust バックエンド（全ウィンドウ共有） │
+          │  - ファイル I/O                  │
+          │  - 設定（plugin-store）          │
+          │  - ファイルロック Registry       │
+          │  - Source of Truth              │
+          └─────────────────────────────────┘
+```
+
+### 11.2 IPC 方式の選定：BroadcastChannel vs Tauri Events
+
+ウィンドウ間での状態同期に使用できる方式を比較する。
+
+| 観点 | BroadcastChannel API | Tauri Events |
+|------|---------------------|--------------|
+| **方向** | 同一オリジンの全ウィンドウへブロードキャスト | Rust → フロントエンド、またはフロントエンド → Rust → フロントエンド |
+| **Rust 関与** | 不要（フロントエンドのみで完結） | 必要（Rust がメッセージのルーティングに関与） |
+| **信頼性** | 独立した Renderer プロセス間では動作が保証されない | Tauri IPC は Renderer → Rust → Renderer の経路で確実に動作 |
+| **Source of Truth** | フロントエンドに分散 | Rust バックエンドに集中管理できる |
+| **実装コスト** | 低 | 中 |
+
+**採用方針**: **Tauri Events（Rust バックエンドを Source of Truth とする）**
+
+理由:
+1. BroadcastChannel は同一プロセス内の共有メモリに依存する実装が多く、Tauri の異なる WebviewWindow（独立した Renderer プロセス）では動作が保証されない
+2. Rust バックエンドを Source of Truth とすることで、設定・ファイルロック状態・ワークスペース状態の整合性を保証しやすい
+3. Tauri Events は `app.emit_to(label, ...)` で特定のウィンドウへ、または `app.emit(...)` で全ウィンドウへ送信できる
+
+### 11.3 IPC メッセージペイロード定義
+
+同期が必要な状態と対応するイベント名を定義する。
+
+```typescript
+// src/ipc/window-sync-events.ts
+
+/**
+ * ウィンドウ間同期イベントの種別と対応するペイロード型。
+ * Tauri Events の payload フィールドに JSON シリアライズして送受信する。
+ */
+export type WindowSyncEventMap = {
+  'settings-changed':        SettingsChangedPayload;
+  'file-opened':             FileOpenedPayload;
+  'file-closed':             FileClosedPayload;
+  'file-saved':              FileSavedPayload;
+  'workspace-changed':       WorkspaceChangedPayload;
+  'file-lock-acquired':      FileLockPayload;
+  'file-lock-released':      FileLockPayload;
+  'write-access-transfer-requested': WriteAccessTransferPayload;
+};
+
+/** 設定変更（テーマ・フォントサイズ等）*/
+export interface SettingsChangedPayload {
+  key: string;     // 変更された設定キー（例: "theme", "fontSize"）
+  value: unknown;  // 新しい値
+}
+
+/** あるウィンドウでファイルが開かれた（ロック通知用）*/
+export interface FileOpenedPayload {
+  windowLabel: string; // 開いたウィンドウの Tauri label（例: "main", "window-2"）
+  filePath: string;
+  isReadOnly: boolean; // 別ウィンドウがロック中のため読み取り専用で開いた場合 true
+}
+
+/** あるウィンドウでファイルが閉じられた（ロック解放通知）*/
+export interface FileClosedPayload {
+  windowLabel: string;
+  filePath: string;
+}
+
+/** あるウィンドウでファイルが保存された（他ウィンドウへ外部変更通知）*/
+export interface FileSavedPayload {
+  windowLabel: string;
+  filePath: string;
+  savedAt: string; // ISO 8601
+}
+
+/** ワークスペース（フォルダ）の変更 */
+export interface WorkspaceChangedPayload {
+  workspacePath: string | null;
+}
+
+/** ファイルロック状態の変更 */
+export interface FileLockPayload {
+  filePath: string;
+  windowLabel: string; // ロックを保有するウィンドウの label
+}
+
+/** Read-Only ウィンドウが書き込みウィンドウに権限譲渡をリクエスト */
+export interface WriteAccessTransferPayload {
+  filePath: string;
+  requesterLabel: string; // 権限をほしいウィンドウ
+  ownerLabel: string;     // 現在の書き込みウィンドウ
+}
+```
+
+```rust
+// src-tauri/src/commands/window_sync.rs
+use std::collections::HashMap;
+use std::sync::Mutex;
+use tauri::{AppHandle, Manager, State};
+
+/// ファイルロック状態を Rust 側で一元管理する（Source of Truth）
+pub struct FileLockRegistry(pub Mutex<HashMap<String, String>>);
+//                                               ^ path  ^ window_label
+
+impl FileLockRegistry {
+    /// ロックの取得を試みる。成功すれば true を返す。
+    pub fn try_acquire(&self, file_path: &str, window_label: &str) -> bool {
+        let mut map = self.0.lock().unwrap();
+        if map.contains_key(file_path) {
+            return false;
+        }
+        map.insert(file_path.to_string(), window_label.to_string());
+        true
+    }
+
+    /// ロックを解放する。保有者のみ解放できる。
+    pub fn release(&self, file_path: &str, window_label: &str) -> bool {
+        let mut map = self.0.lock().unwrap();
+        if map.get(file_path).map(|s| s.as_str()) == Some(window_label) {
+            map.remove(file_path);
+            return true;
+        }
+        false
+    }
+
+    /// ロック保有者のウィンドウ label を返す。
+    pub fn get_owner(&self, file_path: &str) -> Option<String> {
+        self.0.lock().unwrap().get(file_path).cloned()
+    }
+
+    /// ロック保有者を別のウィンドウに移譲する。
+    pub fn transfer(&self, file_path: &str, from_label: &str, to_label: &str) -> bool {
+        let mut map = self.0.lock().unwrap();
+        if map.get(file_path).map(|s| s.as_str()) == Some(from_label) {
+            map.insert(file_path.to_string(), to_label.to_string());
+            return true;
+        }
+        false
+    }
+}
+
+#[tauri::command]
+pub fn try_acquire_file_lock(
+    app: AppHandle,
+    registry: State<FileLockRegistry>,
+    file_path: String,
+    window_label: String,
+) -> serde_json::Value {
+    if registry.try_acquire(&file_path, &window_label) {
+        // ロック取得成功：全ウィンドウに通知
+        let _ = app.emit("file-lock-acquired", serde_json::json!({
+            "filePath": file_path,
+            "windowLabel": window_label,
+        }));
+        serde_json::json!({ "acquired": true, "ownerLabel": null })
+    } else {
+        let owner = registry.get_owner(&file_path);
+        serde_json::json!({ "acquired": false, "ownerLabel": owner })
+    }
+}
+
+#[tauri::command]
+pub fn release_file_lock(
+    app: AppHandle,
+    registry: State<FileLockRegistry>,
+    file_path: String,
+    window_label: String,
+) {
+    if registry.release(&file_path, &window_label) {
+        let _ = app.emit("file-lock-released", serde_json::json!({
+            "filePath": file_path,
+            "windowLabel": window_label,
+        }));
+    }
+}
+```
+
+### 11.4 Zustand ストアのウィンドウ間同期
+
+各ウィンドウの Zustand は独立しているため、同期が必要な状態（設定・ワークスペース）は Tauri Events を受信して更新する。
+
+```typescript
+// src/hooks/useWindowSync.ts
+import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { useSettingsStore } from '../store/settingsStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { useTabStore } from '../store/tabStore';
+
+/**
+ * 他のウィンドウからの状態変更イベントを受信して Zustand ストアを更新する。
+ * AppRoot コンポーネントで一度だけマウントする。
+ */
+export function useWindowSync() {
+  useEffect(() => {
+    const unlisten: Array<() => void> = [];
+    const myLabel = getCurrentWebviewWindow().label;
+
+    // 設定変更の同期（テーマ・フォントサイズ等）
+    listen<SettingsChangedPayload>('settings-changed', ({ payload }) => {
+      useSettingsStore.getState().setFromSync(payload.key, payload.value);
+    }).then((fn) => unlisten.push(fn));
+
+    // ワークスペース変更の同期
+    listen<WorkspaceChangedPayload>('workspace-changed', ({ payload }) => {
+      useWorkspaceStore.getState().setWorkspace(payload.workspacePath);
+    }).then((fn) => unlisten.push(fn));
+
+    // 他ウィンドウでのファイル保存通知（外部変更ダイアログのトリガー）
+    listen<FileSavedPayload>('file-saved', ({ payload }) => {
+      if (payload.windowLabel === myLabel) return; // 自分の保存は無視
+
+      const openTab = useTabStore
+        .getState()
+        .tabs.find((t) => t.path === payload.filePath);
+      if (openTab) {
+        // 外部変更検知フラグを立てる（既存の外部変更通知フローに乗せる）
+        useFileWatchStore.getState().markExternalChange(payload.filePath);
+      }
+    }).then((fn) => unlisten.push(fn));
+
+    // ファイルロック解放通知（Read-Only → 書き込み可能に切り替えを促す）
+    listen<FileLockPayload>('file-lock-released', ({ payload }) => {
+      const tab = useTabStore
+        .getState()
+        .tabs.find((t) => t.path === payload.filePath && t.isReadOnly);
+      if (tab) {
+        useToastStore.getState().show(
+          'info',
+          `「${basename(tab.path)}」の編集ロックが解放されました。編集できます。`,
+          {
+            label: '編集を開始',
+            onClick: () => acquireFileLock(tab.path),
+          }
+        );
+      }
+    }).then((fn) => unlisten.push(fn));
+
+    return () => unlisten.forEach((fn) => fn());
+  }, []);
+}
+```
+
+### 11.5 同一ファイル多重オープンの制御
+
+同じファイルを複数ウィンドウで**書き込み可能モード**で同時に開くと、後から保存した方が先の変更を上書きしてしまう。**ファイルロック機構**（§12 参照）によりこれを防ぐ。
+
+**同一ファイルを別ウィンドウで開こうとしたときのフロー**:
+
+```
+[Window 2 で既にロック済みのファイルを開こうとする]
+  │
+  ▼
+[Rust: try_acquire_file_lock → { acquired: false, ownerLabel: "main" }]
+  │
+  ▼
+  ┌──────────────────────────────────────────────┐
+  │  このファイルは別のウィンドウで開かれています  │
+  │                                              │
+  │  「note.md」はウィンドウ 1 で編集中です。     │
+  │  読み取り専用で開きますか？                  │
+  │                                              │
+  │     [読み取り専用で開く]   [キャンセル]       │
+  └──────────────────────────────────────────────┘
+```
+
+```typescript
+// src/file/fileManager.ts（マルチウィンドウ対応）
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { ask } from '@tauri-apps/plugin-dialog';
+
+export async function openFileInWindow(filePath: string): Promise<void> {
+  const windowLabel = getCurrentWebviewWindow().label;
+
+  const lockResult = await invoke<{ acquired: boolean; ownerLabel: string | null }>(
+    'try_acquire_file_lock',
+    { filePath, windowLabel }
+  );
+
+  if (lockResult.acquired) {
+    await openFileWritable(filePath);
+    await invoke('notify_file_opened', { windowLabel, filePath, isReadOnly: false });
+  } else {
+    const confirmed = await ask(
+      `「${basename(filePath)}」は別のウィンドウで編集中です。\n読み取り専用で開きますか？`,
+      {
+        title: 'ファイルが開かれています',
+        okLabel: '読み取り専用で開く',
+        cancelLabel: 'キャンセル',
+      }
+    );
+    if (confirmed) {
+      await openFileReadOnly(filePath);
+      await invoke('notify_file_opened', { windowLabel, filePath, isReadOnly: true });
+    }
+  }
+}
+```
+
+---
+
+## 12. Undo / Redo 整合性と排他制御
+
+### 12.1 問題定義
+
+ProseMirror / TipTap の Undo 履歴（`EditorHistory`）は各ウィンドウの Renderer プロセスに独立して存在する。同一ファイルを 2 つのウィンドウで書き込み可能モードで開いた場合、次のような問題が生じる。
+
+```
+シナリオ: note.md を Window 1（書き込み）と Window 2（書き込み）の両方で開く
+
+[Window 1]: 段落 A を追加 → 自動保存（disk: A）
+[Window 2]: 段落 B を追加 → 自動保存（disk: B ← A が上書きされ消える）
+[Window 1]: Undo → 「段落 A 追加前」の状態をディスクに書き込む（disk: 段落なし）
+                    → Window 2 が書いた段落 B も消える
+
+→ 段落 B が失われる！
+```
+
+この問題はファイルロック機構（§12.2）で根本的に回避する。
+
+### 12.2 ファイルロック機構による排他制御（採用方針）
+
+**設計方針**: ファイルは必ず 1 ウィンドウだけが書き込み権限を持つ。他のウィンドウは Read-Only モードでのみ開ける。
+
+これにより Undo/Redo の整合性問題は根本的に回避できる。
+
+**Read-Only モードの仕様**:
+
+| 機能 | 書き込みモード | Read-Only モード |
+|------|-------------|----------------|
+| テキスト編集 | ✅ | ❌（入力を無効化） |
+| Undo / Redo | ✅ | ❌ |
+| 自動保存 | ✅ | ❌ |
+| コピー / 検索 | ✅ | ✅ |
+| 外部変更の自動リロード | ✅ | ✅（書き込みウィンドウが保存したら即リロード） |
+
+```typescript
+// src/store/tabStore.ts（Read-Only フラグ追加）
+export interface Tab {
+  id: string;
+  path: string;
+  content: string;
+  savedContent: string;
+  isDirty: boolean;
+  scrollPosition: number;
+  cursorOffset: number;
+  isReadOnly: boolean; // ← 追加: true のとき編集・Undo 不可
+}
+```
+
+```typescript
+// src/components/Editor/EditorWrapper.tsx
+export function EditorWrapper({ tab }: { tab: Tab }) {
+  return (
+    <div className={`editor-wrapper ${tab.isReadOnly ? 'read-only' : ''}`}>
+      {tab.isReadOnly && (
+        <div className="read-only-banner" role="status">
+          🔒 読み取り専用（別のウィンドウで編集中）
+          <button onClick={() => requestWriteAccess(tab.path)}>
+            編集権限を取得する
+          </button>
+        </div>
+      )}
+      <TipTapEditor
+        editable={!tab.isReadOnly}
+        content={tab.content}
+        // editable=false のとき TipTap は入力・Undo/Redo を無効化する
+      />
+    </div>
+  );
+}
+```
+
+### 12.3 書き込み権限の譲渡フロー
+
+Read-Only ウィンドウから「編集権限を取得する」ボタンを押したとき、現在の書き込みウィンドウへ権限譲渡をリクエストする。
+
+```
+[Window 2（Read-Only）が「編集権限を取得」を押す]
+  │
+  ▼
+[Rust: write_access_transfer_requested イベントを Window 1 に送信]
+  │
+  ▼
+[Window 1: 確認ダイアログを表示]
+  ┌──────────────────────────────────────────────────┐
+  │  別のウィンドウが編集権限をリクエストしています     │
+  │                                                  │
+  │  ウィンドウ 2 が「note.md」の編集権限を要求中です。 │
+  │  このウィンドウでの編集権限を手放しますか？         │
+  │                                                  │
+  │    [権限を譲渡する（Read-Only になる）]  [拒否]    │
+  └──────────────────────────────────────────────────┘
+  │
+  ├─ 譲渡する
+  │    → Window 1 が Read-Only になる
+  │    → Rust: FileLockRegistry で所有者を Window 2 に変更
+  │    → 全ウィンドウに "file-lock-acquired/released" イベント送信
+  │
+  └─ 拒否する → Window 2 に拒否通知（トースト）
+```
+
+```typescript
+// src/hooks/useWriteAccessTransfer.ts
+
+/** Window 1 側: 権限譲渡リクエストを受信して確認ダイアログを表示する */
+export function useWriteAccessTransferHandler() {
+  useEffect(() => {
+    const unlistenPromise = listen<WriteAccessTransferPayload>(
+      'write-access-transfer-requested',
+      async ({ payload }) => {
+        const myLabel = getCurrentWebviewWindow().label;
+        if (payload.ownerLabel !== myLabel) return; // 自分宛てでなければ無視
+
+        const confirmed = await ask(
+          `ウィンドウ 2 が「${basename(payload.filePath)}」の編集権限を要求しています。\n` +
+            'このウィンドウは読み取り専用になります。権限を譲渡しますか？',
+          { title: '編集権限の譲渡', okLabel: '譲渡する', cancelLabel: '拒否' }
+        );
+
+        if (confirmed) {
+          await invoke('transfer_file_lock', {
+            filePath: payload.filePath,
+            fromLabel: myLabel,
+            toLabel: payload.requesterLabel,
+          });
+          // 自ウィンドウのタブを Read-Only に変更
+          useTabStore.getState().setReadOnly(payload.filePath, true);
+        } else {
+          // 拒否通知を requester に送信
+          await invoke('notify_write_access_denied', {
+            filePath: payload.filePath,
+            requesterLabel: payload.requesterLabel,
+          });
+        }
+      }
+    );
+    return () => { unlistenPromise.then((fn) => fn()); };
+  }, []);
+}
+```
+
+### 12.4 Yjs CRDT による同期（将来オプションとしての検討）
+
+ファイルロックによる排他制御の代わりに Yjs などの CRDT を導入することで、複数ウィンドウからの真のリアルタイム同時編集を実現できる。
+
+**比較**:
+
+| 観点 | ファイルロック（Phase 5 採用） | Yjs CRDT（将来オプション） |
+|------|--------------------------|------------------------|
+| **実装コスト** | 低（Phase 5 で実装可能） | 高（`@tiptap/extension-collaboration` + `y-protocols` 必要） |
+| **ユーザー体験** | 1 ウィンドウのみ編集可能 | 複数ウィンドウで同時編集可能 |
+| **Undo の整合性** | 完全（書き込みウィンドウのみ履歴あり） | `Y.UndoManager` で各ウィンドウ独立管理 |
+| **ネットワーク** | 不要（ローカル IPC のみ） | 不要（Y-IPC や SharedArrayBuffer でローカル同期可能） |
+| **ファイル保存** | シンプル（書き込みウィンドウが責任を持つ） | Y.Doc → Markdown のシリアライズコストが発生 |
+
+**採用決定**: Phase 5 では**ファイルロック方式**を採用する。Yjs の導入は「複数ウィンドウからの同時コラボレーション」が明確なニーズとして浮上した段階で Phase 6 以降に再検討する。
+
+### 12.5 実装フェーズ（複数ウィンドウ関連）
+
+| フェーズ | 実装内容 |
+|---------|---------|
+| Phase 5（前半）| タブのウィンドウ切り出し UI、`FileLockRegistry`（Rust）、`try_acquire_file_lock` / `release_file_lock` コマンド、`notify_file_opened/closed` イベント、Read-Only モードのエディタ表示 |
+| Phase 5（後半）| 設定・ワークスペースのウィンドウ間同期（`useWindowSync` フック）、書き込み権限譲渡フロー（`useWriteAccessTransferHandler`）、ファイルロック解放通知によるトースト |
+| Phase 6（将来）| Yjs CRDT の評価・試験実装（同時編集ニーズが確定した場合） |
 
 ---
 

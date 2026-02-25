@@ -2,7 +2,7 @@
 
 > プロジェクト: Markdown / HTML Editor - Tauri 2.0
 > バージョン: 1.0
-> 更新日: 2026-02-24
+> 更新日: 2026-02-25
 
 ---
 
@@ -16,7 +16,8 @@
 6. [ユーザー向け通知 UI 設計](#6-ユーザー向け通知-ui-設計)
 7. [パース失敗時の回復設計](#7-パース失敗時の回復設計)
 8. [エラーケース別の対応方針一覧](#8-エラーケース別の対応方針一覧)
-9. [実装フェーズ](#9-実装フェーズ)
+9. [モバイル固有ネットワーク・権限エラーマトリクス](#9-モバイル固有ネットワーク権限エラーマトリクス)
+10. [実装フェーズ](#10-実装フェーズ)
 
 ---
 
@@ -475,7 +476,130 @@ async function saveFile(path: string): Promise<void> {
 
 ---
 
-## 9. 実装フェーズ
+## 9. モバイル固有ネットワーク・権限エラーマトリクス
+
+### 9.1 モバイル特有のエラー種別
+
+デスクトップと異なり、モバイル（Android / iOS）環境では以下のエラーが追加で発生する。
+
+| カテゴリ | エラー | プラットフォーム |
+|---------|-------|---------------|
+| **SAF 権限** | URI 権限失効（`SecurityException`） | Android |
+| **SAF アクセス** | ファイルプロバイダー側でファイル削除（`FileNotFoundException`） | Android |
+| **SAF オフライン** | クラウドドライブへの接続なし | Android |
+| **iCloud 状態** | ファイルがクラウドのみに存在（未ダウンロード） | iOS |
+| **iCloud 競合** | 複数デバイスでの同時編集による競合 | iOS |
+| **ネットワーク** | 機内モード・Wi-Fi 切断 | Android / iOS |
+| **バックグラウンド** | OS によるバックグラウンドアプリの強制終了 | Android / iOS |
+
+### 9.2 Android SAF エラーマトリクス
+
+| エラー種別 | 重大度 | ユーザー通知 | ログ | 回復動作 |
+|-----------|--------|-----------|------|---------|
+| SAF URI 権限失効（`SecurityException`） | Error | モーダルダイアログ | ✅ | ファイル再選択ダイアログを起動 |
+| SAF ファイル削除済み（`FileNotFoundException`） | Error | トースト | ✅ | タブを閉じる選択肢を提示 |
+| SAF オフライン（クラウドファイル、キャッシュなし） | Warning | トースト | ✅ | オフラインバナー表示、キャッシュ確認 |
+| SAF 書き込み権限なし（読み取り専用ドキュメント） | Warning | トースト | ✅ | Read-Only モードで開く |
+| DocumentsProvider が応答しない（タイムアウト） | Error | トースト | ✅ | タイムアウト後にリトライ選択肢を提示 |
+| `takePersistableUriPermission` 失敗 | Warning | トースト | ✅ | セッションを終えると URI が失効する旨を警告 |
+
+### 9.3 iCloud Drive（iOS）エラーマトリクス
+
+| エラー種別 | 重大度 | ユーザー通知 | ログ | 回復動作 |
+|-----------|--------|-----------|------|---------|
+| ファイル未ダウンロード（`.ubiquitousItemDownloadingStatus` ≠ `.current`） | Warning | プログレスバー | ✅ | `startDownloadingUbiquitousItem` 後にポーリング待機 |
+| ダウンロードタイムアウト（30 秒超） | Error | モーダルダイアログ | ✅ | キャンセルして後で再試行する選択肢を提示 |
+| iCloud ストレージ容量不足 | Error | モーダルダイアログ | ✅ | iCloud 設定を開くリンクを提示 |
+| ファイル競合（`unresolvedConflictVersionsOfItem` 非空） | Warning | 通知バナー | ✅ | 手動マージ画面へ誘導（`mobile-advanced-design.md §6.3`） |
+| iCloud サインアウト状態 | Error | トースト | ✅ | 設定 → Apple ID → iCloud へ誘導 |
+
+### 9.4 ネットワーク状態別エラーマトリクス
+
+モバイル環境ではネットワーク接続が不安定なため、接続状態に応じたきめ細かいエラーハンドリングが必要。
+
+```typescript
+// src/utils/network-status.ts
+
+export type NetworkStatus =
+  | 'online'   // Wi-Fi または LTE でネットワーク接続あり
+  | 'offline'  // 機内モードまたはネットワーク接続なし
+  | 'slow';    // 接続あるが低速（2G / 3G 相当）
+
+export function useNetworkStatus(): NetworkStatus {
+  const [status, setStatus] = useState<NetworkStatus>(
+    navigator.onLine ? 'online' : 'offline'
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setStatus('online');
+    const handleOffline = () => setStatus('offline');
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  return status;
+}
+```
+
+| 操作 | オンライン | オフライン | 低速 |
+|------|---------|---------|-----|
+| ローカルファイルを開く | ✅ 正常 | ✅ 正常 | ✅ 正常 |
+| クラウドファイルを開く（キャッシュあり） | ✅ 正常 | ✅ キャッシュから開く + オフラインバナー | ✅ キャッシュから開く |
+| クラウドファイルを開く（キャッシュなし） | ✅ 正常 | ❌ エラーモーダル | ⚠ タイムアウト可能性 → プログレスバー表示 |
+| ローカルファイルを保存 | ✅ 正常 | ✅ 正常 | ✅ 正常 |
+| クラウドへの同期 | ✅ 即時 | ⚠ キューに積む → 復帰後自動同期 | ⚠ 低速警告 + バックグラウンド同期 |
+| アプリ内アップデート確認 | ✅ 正常 | ℹ サイレントスキップ（通知なし） | ✅ 正常 |
+
+### 9.5 モバイルバックグラウンド強制終了への対応
+
+iOS / Android では、メモリ不足時にバックグラウンドのアプリが OS によって強制終了される。
+これはクラッシュリカバリ（`window-tab-session-design.md §10`）のチェックポイント機構が対応するが、
+モバイル固有の追加対応として **アプリがバックグラウンドに移行するたびにチェックポイントを即時保存**する。
+
+```typescript
+// src/hooks/useMobileAppLifecycle.ts
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { saveCheckpoint } from '../store/crash-recovery';
+import { useTabStore } from '../store/tabStore';
+
+/**
+ * アプリがバックグラウンドに移行するタイミングでチェックポイントを保存し、
+ * フォアグラウンド復帰時に外部変更・競合を確認する。
+ */
+export function useMobileAppLifecycle() {
+  useEffect(() => {
+    const appWindow = getCurrentWebviewWindow();
+    const unlisten: Array<() => void> = [];
+
+    // バックグラウンド移行時（iOS: applicationWillResignActive 相当）
+    appWindow.listen('tauri://blur', async () => {
+      const entries = useTabStore.getState().tabs.map((tab) => ({
+        filePath: tab.path,
+        content: tab.content,
+        savedContent: tab.savedContent,
+        checkpointAt: new Date().toISOString(),
+      }));
+      await saveCheckpoint(entries);
+    }).then((fn) => unlisten.push(fn));
+
+    // フォアグラウンド復帰時（iOS: applicationDidBecomeActive 相当）
+    appWindow.listen('tauri://focus', async () => {
+      // 開いているファイルの外部変更・競合状態を確認
+      await checkOpenFilesForExternalChanges();
+    }).then((fn) => unlisten.push(fn));
+
+    return () => unlisten.forEach((fn) => fn());
+  }, []);
+}
+```
+
+---
+
+## 10. 実装フェーズ
 
 | フェーズ | 実装内容 |
 |---------|---------|
@@ -490,5 +614,6 @@ async function saveFile(path: string): Promise<void> {
 
 - [distribution-design.md](./distribution-design.md) — アップデートエラー処理
 - [workspace-design.md](./workspace-design.md) — 外部ファイル変更検知
-- [window-tab-session-design.md](./window-tab-session-design.md) §10 — クラッシュリカバリ
+- [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §10 — クラッシュリカバリ
+- [mobile-advanced-design.md](../07_Platform_Settings/mobile-advanced-design.md) §6 — SAF / iCloud エッジケースと例外処理フロー
 - [security-design.md](./security-design.md) — DOMPurify エラー処理
