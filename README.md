@@ -35,6 +35,31 @@
 
 ---
 
+## アーキテクチャ概要
+
+### コア原則
+
+| 原則 | 説明 |
+|------|------|
+| **完全な双方向変換（ロスレス）** | Markdown ↔ TipTap JSON 間でロスレスなラウンドトリップ変換を実現 |
+| **ローカル・オフラインファースト** | 外部サーバーに依存せず、全データをローカルで処理・完結 |
+| **フロントエンド/バックエンドの責務分離** | UI（React + TipTap）とシステム操作（Rust: ファイル I/O、SQLite、外部 API）を Tauri IPC で分離 |
+| **適材適所のマルチエンジン構成** | WYSIWYG には TipTap、ソースモードには CodeMirror 6 |
+
+### 技術スタック
+
+| レイヤー | 技術 |
+|---------|------|
+| デスクトップ基盤 | **Tauri 2.0**（Rust） — Windows / macOS / Linux / Android / iOS |
+| フロントエンド | **React + TypeScript + Vite** |
+| エディタエンジン | **TipTap**（ProseMirror）+ **CodeMirror 6** |
+| 状態管理 | **Zustand** |
+| メタデータ DB | **SQLite**（Rust 側 rusqlite） |
+| スタイル | **Tailwind CSS** |
+| テスト | **Vitest + Playwright** |
+
+---
+
 ## 主要機能
 
 ### AI連携機能
@@ -65,10 +90,12 @@
 
 ### Markdown 編集（WYSIWYG）
 
-- フォーカス時にソース記法を表示、非フォーカス時にレンダリング表示
+- フォーカス時にソース記法を表示、非フォーカス時にレンダリング表示（Typora式）
 - 見出し・段落・リスト・引用・テーブル・コードブロック・数式・図表
 - 入力ルール（`# ` を入力すると自動的に見出しへ変換）
 - Excelライクなテーブル編集（行・列のDnD、リサイズ、セル配置）
+- 4モード切り替え: Typora式 / 常にWYSIWYG / ソース表示 / サイドバイサイド
+- 3MB以上 / 3,000ノード以上のファイルはソースモードに自動フォールバック
 
 ### HTML 編集（WYSIWYG）
 
@@ -85,55 +112,134 @@
 | Markdown → HTML エクスポート | スタイル付きスタンドアロンHTMLファイルを生成 |
 | Markdown → HTML（編集用） | HTMLエディタモードで続けて編集可能 |
 | HTML → Markdown 変換 | HTMLコンテンツをMarkdownに変換（ロス警告つき） |
-| → PDF エクスポート | 印刷品質のPDF出力（将来対応） |
+| → PDF エクスポート | 印刷品質のPDF出力 |
+| → Word / LaTeX / epub | Pandoc 連携によるエクスポート |
 
 ---
 
 ## プロジェクト構成
 
+### プロジェクトルート
+
 ```
-.
-├── README.md                      # このファイル（プロジェクト概要）
-├── docs/
-│   ├── typora-analysis.md         # Typora機能分析レポート
-│   ├── html-editor-analysis.md    # HTML編集機能 設計分析
-│   ├── ai-features.md             # AI連携機能 設計ドキュメント
-│   ├── system-design.md           # システム設計ドキュメント
-│   └── roadmap.md                 # 開発ロードマップ
+/
+├── README.md                      # このファイル
+├── CLAUDE.md                      # AI エージェント向け作業ガイド
+├── package.json                   # Node パッケージ管理
+├── tsconfig.json                  # TypeScript 設定
+├── vite.config.ts                 # Vite ビルド設定
+├── docs/                          # 設計ドキュメント
+├── src/                           # フロントエンド（React / TypeScript）
+├── src-tauri/                     # バックエンド（Rust / Tauri）
+└── public/                        # 静的アセット
+```
+
+### フロントエンド (src/)
+
+```
+src/
+├── core/                          # エディタコアロジック
+│   ├── document/                  # AST 型定義・ドキュメント操作
+│   ├── parser/                    # Markdown / HTML パーサ
+│   ├── converter/                 # mdast ↔ TipTap JSON 変換
+│   ├── commands/                  # テキスト・ブロック・テーブル操作コマンド
+│   ├── history/                   # Undo/Redo
+│   └── editor.ts                  # エントリポイント
+│
+├── renderer/                      # レンダリングエンジン
+│   ├── wysiwyg/                   # TipTap / ProseMirror セットアップ
+│   │   ├── node-views/            # 各ブロックの WYSIWYG ビュー
+│   │   └── plugins/               # 入力ルール・キーバインディング
+│   ├── html/                      # HTML 編集モード
+│   └── source/                    # ソースモード（CodeMirror 6）
+│
+├── components/                    # UI コンポーネント（React）
+│   ├── Editor/                    # エディタ・ツールバー・ステータスバー
+│   ├── Sidebar/                   # サイドバー・ファイルツリー・アウトライン
+│   ├── Table/                     # テーブル編集 UI
+│   └── common/                    # モーダル・コンテキストメニュー等
+│
+├── plugins/                       # プラグインシステム
+│   ├── plugin-api.ts              # プラグイン API 定義
+│   ├── plugin-manager.ts          # プラグイン管理
+│   └── built-in/                  # ビルトインプラグイン（Mermaid・KaTeX・画像）
+│
+├── store/                         # Zustand グローバル状態管理
+│   ├── settingsStore.ts           # ユーザー設定
+│   └── tabStore.ts                # タブ・セッション管理
+│
+├── file/                          # ファイル管理・エクスポート
+├── hooks/                         # React カスタムフック
+├── menu/                          # Tauri ネイティブメニュー
+├── themes/                        # テーマ CSS
+├── i18n/                          # 国際化（i18next）
+├── types/                         # TypeScript 型定義
+├── utils/                         # ユーティリティ
+└── app.tsx                        # アプリケーションエントリポイント
+```
+
+### バックエンド (src-tauri/)
+
+```
+src-tauri/
+├── Cargo.toml                    # Rust パッケージ設定
+├── tauri.conf.json               # Tauri システム設定（CSP 等）
+├── capabilities/
+│   └── default.json              # Tauri Capabilities（FS スコープ・権限）
+│
 └── src/
-    ├── ai/                        # AI連携機能
-    │   ├── optimizer/             # AIコピー最適化エンジン
-    │   └── templates/             # AIテンプレートシステム
-    │       └── built-in/          # 標準搭載テンプレート
-    ├── core/                      # エディタコアロジック（MD/HTML共通）
-    │   ├── parser/                # MD・HTMLパーサ
-    │   ├── converter/             # MD↔HTML変換パイプライン
-    │   └── commands/              # 編集コマンド
-    ├── renderer/                  # レンダリングエンジン
-    │   ├── wysiwyg/               # WYSIWYG レンダラ
-    │   └── html/                  # HTML専用レンダラ
-    ├── components/                # UIコンポーネント（React）
-    │   ├── AiPanel/               # AIコピーボタン・テンプレートパネル
-    │   └── ...
-    ├── file/                      # ファイル管理・エクスポート
-    ├── plugins/                   # プラグインシステム
-    ├── themes/                    # テーマ（エディタ・エクスポート用）
-    └── utils/                     # ユーティリティ
+    ├── main.rs                   # Tauri アプリケーションセットアップ
+    ├── commands/                 # IPC エンドポイント（invoke() で呼ばれる）
+    │   ├── fs_commands.rs        # ファイル読み書き・排他制御
+    │   ├── db_commands.rs        # SQLite メタデータクエリ
+    │   ├── ai_commands.rs        # 外部 AI API プロキシ（APIキー隠蔽）
+    │   └── window_commands.rs    # ウィンドウ管理
+    ├── db/                       # SQLite 連携（rusqlite）
+    ├── fs/                       # ファイル変更監視・Front Matter 解析
+    ├── menu/                     # OS ネイティブメニュー
+    └── models/                   # データ構造体（serde）
+```
+
+### 静的アセット (public/)
+
+```
+public/
+├── icons/                        # アプリアイコン群
+├── mermaid-sandbox.html          # Mermaid レンダリング用サンドボックス
+└── plugin-runtime.html           # サードパーティプラグイン隔離用（Phase 7）
 ```
 
 ---
 
-## 参考資料
+## 設計ドキュメント
 
-- [Typora公式サイト](https://typora.io/)
-- [docs/typora-analysis.md](./docs/typora-analysis.md) - Typora詳細機能分析
-- [docs/html-editor-analysis.md](./docs/html-editor-analysis.md) - HTML編集機能設計
-- [docs/ai-features.md](./docs/ai-features.md) - AI連携機能設計
-- [docs/system-design.md](./docs/system-design.md) - システム設計
-- [docs/markdown-tiptap-conversion.md](./docs/markdown-tiptap-conversion.md) - Markdown↔TipTap 双方向変換設計
-- [docs/tiptap-roundtrip-test-strategy.md](./docs/tiptap-roundtrip-test-strategy.md) - TipTap JSON詳細 & ラウンドトリップテスト戦略
-- [docs/security-design.md](./docs/security-design.md) - セキュリティ設計（HTMLサニタイズ・fsスコープ・scriptタグ分離）
-- [docs/roadmap.md](./docs/roadmap.md) - 開発ロードマップ
+設計ドキュメントは `docs/` 以下に体系的に整理されています。
+
+```
+docs/
+├── 00_Meta/              # プロジェクト管理・索引
+├── 01_Architecture/      # 横断的アーキテクチャ設計
+├── 02_Core_Editor/       # エディタエンジン（AST 変換・テキスト処理）
+├── 03_UI_UX/             # UI コンポーネント・操作性・テーマ
+├── 04_File_Workspace/    # ファイル I/O・ワークスペース・セッション
+├── 05_Features/          # 機能別設計（AI / HTML / Image）
+├── 06_Export_Interop/    # エクスポート・外部ツール連携
+├── 07_Platform_Settings/ # プラットフォーム・設定・配布
+└── 08_Testing_Quality/   # テスト戦略・エラーハンドリング
+```
+
+### 主要ドキュメント
+
+| ドキュメント | 内容 |
+|------------|------|
+| [design-index.md](./docs/00_Meta/design-index.md) | 設計ファイル索引（どのファイルに何を書くか） |
+| [design-coverage.md](./docs/00_Meta/design-coverage.md) | 設計検討済み項目一覧（✅/🔶/❌） |
+| [roadmap.md](./docs/00_Meta/roadmap.md) | 開発ロードマップ（Phase 1〜8） |
+| [system-design.md](./docs/01_Architecture/system-design.md) | システム全体設計・コア原則・技術スタック・ディレクトリ構成 |
+| [security-design.md](./docs/01_Architecture/security-design.md) | セキュリティ設計（XSS・CSP・fsスコープ・AI API通信） |
+| [performance-design.md](./docs/01_Architecture/performance-design.md) | パフォーマンス設計（仮想スクロール・非同期パース） |
+| [plugin-api-design.md](./docs/01_Architecture/plugin-api-design.md) | プラグインAPI・サンドボックス設計 |
+| [markdown-tiptap-conversion.md](./docs/02_Core_Editor/markdown-tiptap-conversion.md) | Markdown ↔ TipTap 双方向変換設計 |
 
 ---
 
