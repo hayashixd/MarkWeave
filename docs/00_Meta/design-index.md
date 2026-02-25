@@ -47,7 +47,7 @@ docs/
 
 | ファイル | 役割 | 追記すべき情報 |
 |---------|------|--------------|
-| `system-design.md` | 全体アーキテクチャ・技術スタック・フェーズ概要・モード切替 | ContentEditable 構造、AST フロー、Tauri コマンド一覧、Phase 定義 |
+| `system-design.md` | 全体アーキテクチャ・技術スタック・フェーズ概要・モード切替・Rust バックエンド構成 | ContentEditable 構造、AST フロー、コアアーキテクチャ原則、Tauri コマンド一覧、src-tauri/ ディレクトリ構成、Phase 定義 |
 | `security-design.md` | XSS 対策・CSP・`plugin-fs` スコープ・スクリプト分離・署名 | 新規 Tauri Capability 追加時、CSP ルール変更、新セキュリティリスク発生時 |
 | `performance-design.md` | パフォーマンスバジェット・仮想スクロール・インクリメンタルパース・メモリ管理 | 新たなパフォーマンス問題の分析結果、ベンチマーク基準変更 |
 | `plugin-api-design.md` | プラグイン API 型定義・サンドボックス設計・ライフサイクル・配布 | 新拡張ポイント追加、API バージョン変更、プラグイン権限追加 |
@@ -217,6 +217,7 @@ docs/
 | 新しい画像処理・フォーマット | `05_Features/Image/image-design.md` |
 | 新しい AI 最適化ステップ・テンプレート | `05_Features/AI/ai-design.md` |
 | HTML 対応要素の追加 | `05_Features/HTML/html-editing-design.md` |
+| Rust バックエンド構成・IPC コマンド追加 | `01_Architecture/system-design.md` §3.2 |
 | パフォーマンス改善の設計 | `01_Architecture/performance-design.md` |
 | 新プラグイン拡張ポイント・プラグイン設定 GUI | `01_Architecture/plugin-api-design.md` |
 | メタデータクエリ・SQLite スキーマ変更 | `05_Features/metadata-query-design.md` |

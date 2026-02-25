@@ -1,7 +1,7 @@
 # 設計検討済み項目一覧
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 1.4
+> バージョン: 1.5
 > 更新日: 2026-02-25
 
 本ドキュメントは、プロジェクト全体の設計トピックを網羅した索引である。
@@ -26,6 +26,9 @@
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
 | 全体アーキテクチャ（ContentEditable + AST） | ✅ | [system-design.md](./system-design.md) §1 |
+| コアアーキテクチャ原則（ロスレス変換・ローカルファースト・責務分離・マルチエンジン） | ✅ | [system-design.md](./system-design.md) §1.1 |
+| データ処理基盤（SQLite メタデータインデックス・ファイルロック） | ✅ | [system-design.md](./system-design.md) §1.1.1、[metadata-query-design.md](../05_Features/metadata-query-design.md) |
+| Rust バックエンド構成（src-tauri/ ディレクトリ設計・責務分担） | ✅ | [system-design.md](./system-design.md) §3.2 |
 | ファイルサイズ閾値・モード自動切替 | ✅ | [system-design.md](./system-design.md) §2.2、[performance-design.md](./performance-design.md) §2 |
 | Typora式カーソル位置計算 | ✅ | [system-design.md](./system-design.md) §3 |
 | Markdown ↔ TipTap JSON 変換設計 | ✅ | [markdown-tiptap-conversion.md](./markdown-tiptap-conversion.md) |
