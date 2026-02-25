@@ -35,7 +35,7 @@
 | ユニットテスト | Vitest | Node.js (jsdom) |
 | コンポーネントテスト | Vitest + @testing-library/react | jsdom |
 | 統合テスト | Vitest | jsdom + Tauri モック |
-| E2E テスト | WebdriverIO + tauri-driver | 実 Tauri アプリ |
+| E2E テスト | Playwright + tauri-driver | 実 Tauri アプリ |
 | パフォーマンス | Lighthouse CI / カスタムベンチマーク | 実ブラウザ |
 
 ### 1.2 カバレッジ目標
@@ -149,32 +149,28 @@ export function createEditor(options: {
 
 ## 3. E2E テストシナリオ
 
-### 3.1 Tauri WebDriver セットアップ
+### 3.1 Playwright + tauri-driver セットアップ
 
 ```typescript
 // tests/e2e/setup.ts
-import { Builder, WebDriver } from 'webdriverio';
+import { chromium, Browser, Page } from '@playwright/test';
 import { spawn, ChildProcess } from 'child_process';
 
-let driver: WebDriver;
+let browser: Browser;
+let page: Page;
 let tauriDriver: ChildProcess;
 
-before(async () => {
+beforeAll(async () => {
   // tauri-driver を起動
   tauriDriver = spawn('tauri-driver', [], { stdio: 'inherit' });
 
-  driver = await new Builder()
-    .usingServer('http://localhost:4444')
-    .withCapabilities({
-      'tauri:options': {
-        application: './target/release/md-editor',
-      },
-    })
-    .build();
+  browser = await chromium.connectOverCDP('http://localhost:4444');
+  page = await browser.newPage();
+  await page.goto('tauri://localhost');
 });
 
-after(async () => {
-  await driver.deleteSession();
+afterAll(async () => {
+  await browser.close();
   tauriDriver.kill();
 });
 ```
@@ -184,19 +180,19 @@ after(async () => {
 #### シナリオ 1: ファイルの作成・編集・保存
 
 ```typescript
-it('新規ファイルを作成して保存できる', async () => {
+test('新規ファイルを作成して保存できる', async () => {
   // Ctrl+N で新規ファイルを作成
-  await driver.keys(['Control', 'n']);
-  const tab = await driver.$('.tab-title');
-  expect(await tab.getText()).toContain('Untitled-1');
+  await page.keyboard.press('Control+n');
+  const tab = page.locator('.tab-title');
+  await expect(tab).toContainText('Untitled-1');
 
   // テキストを入力
-  const editor = await driver.$('.ProseMirror');
+  const editor = page.locator('.ProseMirror');
   await editor.click();
-  await driver.keys(['# Hello World', 'Enter', 'This is a test.']);
+  await page.keyboard.type('# Hello World\nThis is a test.');
 
   // Ctrl+S で保存
-  await driver.keys(['Control', 's']);
+  await page.keyboard.press('Control+s');
 
   // ファイル保存ダイアログの処理（OS ネイティブなのでスキップ）
   // ...
@@ -206,53 +202,45 @@ it('新規ファイルを作成して保存できる', async () => {
 #### シナリオ 2: Markdown → HTML 切り替え
 
 ```typescript
-it('WYSIWYG と Source モードを切り替えられる', async () => {
+test('WYSIWYG と Source モードを切り替えられる', async () => {
   // Source モードに切り替え
-  const modeButton = await driver.$('[data-mode="source"]');
-  await modeButton.click();
+  await page.locator('[data-mode="source"]').click();
 
-  const codeEditor = await driver.$('.cm-editor');
-  expect(await codeEditor.isDisplayed()).toBe(true);
+  const codeEditor = page.locator('.cm-editor');
+  await expect(codeEditor).toBeVisible();
 
   // WYSIWYG に戻す
-  const wysiwygButton = await driver.$('[data-mode="wysiwyg"]');
-  await wysiwygButton.click();
+  await page.locator('[data-mode="wysiwyg"]').click();
 
-  const proseMirror = await driver.$('.ProseMirror');
-  expect(await proseMirror.isDisplayed()).toBe(true);
+  const proseMirror = page.locator('.ProseMirror');
+  await expect(proseMirror).toBeVisible();
 });
 ```
 
 #### シナリオ 3: 検索・置換
 
 ```typescript
-it('テキストを検索して置換できる', async () => {
-  await driver.keys(['Control', 'h']); // 置換パネルを開く
+test('テキストを検索して置換できる', async () => {
+  await page.keyboard.press('Control+h'); // 置換パネルを開く
 
-  const searchInput = await driver.$('[data-testid="search-input"]');
-  await searchInput.setValue('Hello');
-
-  const replaceInput = await driver.$('[data-testid="replace-input"]');
-  await replaceInput.setValue('World');
-
-  const replaceAllBtn = await driver.$('[data-testid="replace-all"]');
-  await replaceAllBtn.click();
+  await page.locator('[data-testid="search-input"]').fill('Hello');
+  await page.locator('[data-testid="replace-input"]').fill('World');
+  await page.locator('[data-testid="replace-all"]').click();
 
   // 置換結果を確認
-  const toastMsg = await driver.$('.toast-message');
-  expect(await toastMsg.getText()).toMatch(/2 件を置換/);
+  const toastMsg = page.locator('.toast-message');
+  await expect(toastMsg).toContainText(/2 件を置換/);
 });
 ```
 
 #### シナリオ 4: ファイルツリーからファイルを開く
 
 ```typescript
-it('ファイルツリーのダブルクリックでファイルを開ける', async () => {
-  const fileItem = await driver.$('[data-testid="file-tree-item"][data-filename="README.md"]');
-  await fileItem.doubleClick();
+test('ファイルツリーのダブルクリックでファイルを開ける', async () => {
+  await page.locator('[data-testid="file-tree-item"][data-filename="README.md"]').dblclick();
 
-  const tab = await driver.$('.tab-title.active');
-  expect(await tab.getText()).toContain('README.md');
+  const tab = page.locator('.tab-title.active');
+  await expect(tab).toContainText('README.md');
 });
 ```
 

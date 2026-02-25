@@ -2,7 +2,7 @@
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
 > 対象: TipTap (ProseMirror ラッパー) を使った Undo/Redo 設計
-> 更新日: 2026-02-23
+> 更新日: 2026-02-24
 
 ---
 

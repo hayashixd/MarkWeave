@@ -24,7 +24,7 @@
 | ~~取り消し線~~ | `Alt+Shift+5` | `Ctrl+Shift+5` | ✅ | Typora 互換 |
 | `インラインコード` | `Ctrl+Shift+`` ` `` | `Cmd+Shift+`` ` `` | ✅ | |
 | リンク挿入 | `Ctrl+K` | `Cmd+K` | ✅ | |
-| ==ハイライト== | `Ctrl+Shift+H` | `Cmd+Shift+H` | ❌🆕 | macOS で `Cmd+H`（隠す）と競合、注意 |
+| ==ハイライト== | `Ctrl+Shift+H` | `Cmd+Option+H` | ❌🆕 | macOS では `Cmd+Shift+H` が検索・置換と競合するため `Cmd+Option+H` を使用 |
 | 下線 | `Ctrl+U` | `Cmd+U` | ❌🆕 | Markdown 非標準だが有用 |
 | 上付き文字 | `Ctrl+Shift+.` | `Cmd+Shift+.` | ❌🆕 | |
 | 下付き文字 | `Ctrl+Shift+,` | `Cmd+Shift+,` | ❌🆕 | |
@@ -242,6 +242,54 @@ document.addEventListener('keydown', (e) => {
   }
 }, { capture: true }) // capture: true で最上位から処理
 ```
+
+### 2-4. IME 変換中のショートカット制御
+
+日本語・中国語・韓国語 IME の変換中（composition 中）に、`Backspace`・`Enter`・`Space`・`Ctrl+B` 等の
+エディタショートカットが意図せず発火することがある。これを防ぐため、すべてのショートカットハンドラに
+`isComposing` チェックを組み込む。
+
+**基本方針**: `KeyboardEvent.isComposing === true` の場合はショートカットを発火しない。
+ただし TipTap/ProseMirror は内部的に `compositionstart/compositionend` を処理するため、
+カスタムキーバインドを追加する際のみ明示的なガードが必要。
+
+```typescript
+// TipTap のカスタムキーバインド例（src/editor/keybindings.ts）
+import { Extension } from '@tiptap/core';
+
+export const CustomKeybindings = Extension.create({
+  addKeyboardShortcuts() {
+    return {
+      // Ctrl+B: 太字（TipTap デフォルトは isComposing を考慮しているが、
+      // カスタム拡張では明示的に確認する）
+      'Ctrl-b': ({ editor }) => {
+        // ProseMirror の keydown ハンドラは compositionevent 中は呼ばれないため
+        // 基本的にガード不要。ただし独自の document.addEventListener では必要。
+        return editor.commands.toggleBold();
+      },
+    };
+  },
+});
+
+// document レベルの独自イベントリスナーには必ずガードを入れる
+document.addEventListener('keydown', (e) => {
+  if (e.isComposing) return; // ← IME 変換中はすべてのショートカットをスキップ
+
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault();
+    openSearchPanel();
+  }
+  // ... 他のショートカット
+}, { capture: true });
+```
+
+**注意点**:
+- `Backspace` と `Enter` は IME 変換中も特定の操作（変換候補の選択・キャンセル）に使われるため、
+  ProseMirror/TipTap の内部ハンドラに委ねる（独自実装しない）
+- `Space` は変換中は変換確定に使われるため、カスタムの `Space` ショートカットには
+  `e.isComposing` ガードを必ず設ける
+- `isComposing` の検知は `text-statistics-design.md §4` の自動保存スキップ（IME 入力中の保存遅延）
+  と同じ仕組みで実装できる
 
 ---
 

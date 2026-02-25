@@ -1,7 +1,7 @@
 # 設計検討済み項目一覧
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 1.2
+> バージョン: 1.3
 > 更新日: 2026-02-24
 
 本ドキュメントは、プロジェクト全体の設計トピックを網羅した索引である。
@@ -51,7 +51,7 @@
 | リンクのクリック動作設計（Ctrl+クリックで外部ブラウザ / 内部ファイル遷移） | ✅ | [editor-ux-design.md](./editor-ux-design.md) §7 |
 | ファイルツリーからのドラッグ&ドロップによる Markdown リンク挿入 | ✅ | [editor-ux-design.md](./editor-ux-design.md) §8 |
 | スプリットビューのスクロール同期アルゴリズム詳細 | ✅ | [editor-ux-design.md](./editor-ux-design.md) §9 |
-| スマートクォーテーション・オートコレクト動作設計 | 🔶 | [user-settings-design.md](./user-settings-design.md) §2.2（設定項目のみ） |
+| スマートクォーテーション・オートコレクト動作設計 | 🔶 | [user-settings-design.md](./user-settings-design.md) §2.2（設定項目のみ）。[cross-platform-design.md](./cross-platform-design.md) §2.4 に macOS WKWebView の自動変換抑制策あり。エディタ UX 詳細設計（Undo 対応・変換タイミング）は未作成 |
 | 空ドキュメントのプレースホルダー表示 UX | ✅ | [editor-ux-design.md](./editor-ux-design.md) §10 |
 
 ---
@@ -70,7 +70,7 @@
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
 | TipTap 履歴プラグイン設計 | ✅ | [undo-redo-design.md](./undo-redo-design.md) |
-| モード切替をまたいだ履歴管理 | ✅ | [undo-redo-design.md](./undo-redo-design.md) §3 |
+| モード切替をまたいだ履歴管理 | ✅ | [performance-design.md](./performance-design.md) §9.3（「ソースモード中の変更を WYSIWYG の Undo で元に戻すことはできない」）|
 | Undo 粒度設計 | ✅ | [undo-redo-design.md](./undo-redo-design.md) §2 |
 
 ---
@@ -83,6 +83,7 @@
 | OS 間競合の分析と対処 | ✅ | [keyboard-shortcuts.md](./keyboard-shortcuts.md) §2 |
 | ショートカットのユーザーカスタマイズ | 🔶 | [keyboard-shortcuts.md](./keyboard-shortcuts.md) §4-3（将来対応と記載のみ）|
 | ショートカットカスタマイズの詳細 UX・永続化設計 | ✅ | [keyboard-shortcuts.md](./keyboard-shortcuts.md) §6 |
+| IME 変換中のショートカット制御方針（`isComposing` ガード） | ✅ | [keyboard-shortcuts.md](./keyboard-shortcuts.md) §2-4 |
 
 ---
 
@@ -105,6 +106,9 @@
 | バックアップ設計（定期バックアップの仕組み・保存先・世代数） | ✅ | [file-operations-design.md](./file-operations-design.md) §5 |
 | 印刷機能（ネイティブ印刷ダイアログ・印刷用 CSS 設計） | ✅ | [file-operations-design.md](./file-operations-design.md) §6 |
 | ウィンドウへのドラッグ&ドロップによるファイルオープン | ✅ | [file-operations-design.md](./file-operations-design.md) §7 |
+| セッション復元と LRU タブ上限の整合性（超過タブの扱い） | ✅ | [window-tab-session-design.md](./window-tab-session-design.md) §2.5 |
+| 3MB 超ファイルのクラッシュリカバリ制約とユーザー警告 | ✅ | [window-tab-session-design.md](./window-tab-session-design.md) §10.7 |
+| 外部ファイル変更時の競合解決 UX（マージ選択ダイアログ・カーソル復元） | ✅ | [workspace-design.md](./workspace-design.md) §4.2.1 |
 
 ---
 
@@ -185,7 +189,6 @@
 | AI コピーボタン（最適化パイプライン） | ✅ | [ai-features.md](./ai-features.md) §2.1、§3 |
 | AI テンプレートシステム | ✅ | [ai-features.md](./ai-features.md) §2.2 |
 | RTICCO 構造解析 | ✅ | [ai-features.md](./ai-features.md) §3.3 |
-| AI プロバイダ直接連携（OpenAI / Anthropic API）| 🔶 | [roadmap.md](./roadmap.md) 技術的負債欄（「将来機能」と記載のみ）|
 | AI コピーの言語推定精度向上設計（linguist-languages 連携・ヒューリスティック改善） | ✅ | [ai-enhancements-design.md](./ai-enhancements-design.md) §1 |
 | カスタムテンプレートの永続化・管理 UI 設計（保存・編集・削除・インポート/エクスポート） | ✅ | [ai-enhancements-design.md](./ai-enhancements-design.md) §2 |
 
@@ -200,6 +203,7 @@
 | ライト/ダークモード・システムテーマ追従 | ✅ | [theme-design.md](./theme-design.md) §4 |
 | ユーザー定義テーマ（JSON カスタムテーマ）| ✅ | [theme-design.md](./theme-design.md) §5 |
 | コードハイライトテーマの自動切り替え | ✅ | [theme-design.md](./theme-design.md) §4.3 |
+| プラットフォーム別フォントスタック（Windows / macOS / Linux / Android / iOS） | ✅ | [theme-design.md](./theme-design.md) §2.5 |
 
 ---
 
@@ -214,6 +218,7 @@
 | ソフトキーボード対応設計（ビューポート自動調整・ツールバー位置変更） | ✅ | [mobile-advanced-design.md](./mobile-advanced-design.md) §1 |
 | Android SAF（ドキュメントプロバイダー）統合設計 | ✅ | [mobile-advanced-design.md](./mobile-advanced-design.md) §2 |
 | iCloud Drive 連携設計（iOS ファイルアクセス） | ✅ | [mobile-advanced-design.md](./mobile-advanced-design.md) §3 |
+| モバイル（Android SAF / iOS）でのエンコーディング検出制約と対応方針 | ✅ | [cross-platform-design.md](./cross-platform-design.md) §4.3.1 |
 
 ---
 
@@ -224,7 +229,7 @@
 | 単一ファイル内検索・置換 UX（検索バー・ハイライト・置換）| ✅ | [search-design.md](./search-design.md) §2 |
 | ワークスペース横断全文検索 UX（結果 UI・クリックジャンプ）| ✅ | [search-design.md](./search-design.md) §3 |
 | 検索オプション（正規表現・大文字小文字・単語単位）| ✅ | [search-design.md](./search-design.md) §5 |
-| 全文検索のパフォーマンス（ripgrep バックエンド）| ✅ | [performance-design.md](./performance-design.md) §6 |
+| 全文検索のパフォーマンス（Rust walkdir + regex、外部 ripgrep 不使用）| ✅ | [performance-design.md](./performance-design.md) §6.2、[search-design.md](./search-design.md) §3.2 |
 
 ---
 
@@ -237,6 +242,7 @@
 | ビルトインプラグイン（Mermaid・KaTeX・画像）| ✅ | [plugin-api-design.md](./plugin-api-design.md) §5 |
 | プラグインライフサイクル・クリーンアップ | ✅ | [plugin-api-design.md](./plugin-api-design.md) §6 |
 | プラグインの配布・インストール | ✅ | [plugin-api-design.md](./plugin-api-design.md) §7 |
+| プラグイン更新フロー（バージョン比較・API 互換性チェック・ロールバック） | ✅ | [plugin-api-design.md](./plugin-api-design.md) §7.4 |
 
 ---
 
@@ -317,7 +323,7 @@
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
 | UI コンポーネントテスト設計（Testing Library・テスト対象・カバレッジ目標） | ✅ | [testing-strategy-design.md](./testing-strategy-design.md) §2 |
-| E2E テストシナリオ設計（Playwright・主要ユーザーフロー・CI 連携） | ✅ | [testing-strategy-design.md](./testing-strategy-design.md) §3 |
+| E2E テストシナリオ設計（Playwright + tauri-driver・主要ユーザーフロー・CI 連携） | ✅ | [testing-strategy-design.md](./testing-strategy-design.md) §3 |
 | パフォーマンス計測・リグレッションテスト計画（ベンチマーク基準・自動化） | ✅ | [testing-strategy-design.md](./testing-strategy-design.md) §4 |
 | セキュリティテスト計画（XSS・CSP 検証・Tauri パーミッション監査） | ✅ | [testing-strategy-design.md](./testing-strategy-design.md) §5 |
 
@@ -338,11 +344,45 @@
 
 | 項目 | 優先度 | 備考 |
 |------|--------|------|
-| 国際化（i18n）設計 | 低 | UI テキストの多言語対応 |
+| 国際化（i18n）設計 | 低 | UI テキストの多言語対応（Phase 5 以降） |
 | RTL（右から左）言語対応（Arabic / Hebrew 等） | 低 | CSS `direction: rtl` + BiDi テキスト処理 |
 | Git 統合 | 低 | Typora 分析で差別化候補として言及 |
-| AI プロバイダ直接連携の詳細設計 | 低 | OpenAI / Anthropic API を直接呼び出す UX・API キー管理 |
-| コラボレーション（リアルタイム共同編集）| 低 | 個人開発フェーズでは対象外 |
-| クラウドストレージ統合（Dropbox / OneDrive / Google Drive / iCloud） | 低 | ファイルの同期・競合解決が複雑 |
-| ウェブクリッパー連携（ブラウザ拡張からの Markdown 保存） | 低 | ブラウザ拡張の別途開発が必要 |
 | マルチウィンドウ独立動作設計（デスクトップ専用、Phase 7 以降） | 低 | タブ→ウィンドウ切り出し後の状態同期 |
+
+---
+
+## 24. 整合性分析（2026-02-24）で確認・対応済みの矛盾・課題
+
+> 旧ドキュメント `document-consistency-analysis.md` の全項目を検討し、以下の対応を実施した。
+> 対応完了後、分析ドキュメントは削除済み。
+
+### 24.1 解消した矛盾（矛盾1〜9）
+
+| # | 矛盾内容 | 対応内容 |
+|---|---------|---------|
+| 矛盾1 | フェーズ番号体系の二重定義（system-design: Phase 0-5 / roadmap: Phase 1-8） | `system-design.md §6` と `roadmap.md` 冒頭に対応関係の注記を追加。roadmap.md を SoT と明記 |
+| 矛盾2 | Mermaid.js のレンダリング実装方式（直接 vs sandbox iframe） | `system-design.md §1.2` の技術スタック表に「sandbox iframe 経由」の注記を追加 |
+| 矛盾3 | E2E テストフレームワーク不統一（Playwright vs WebdriverIO） | `testing-strategy-design.md §1.1` を Playwright + tauri-driver に統一。§3 のセットアップコードも Playwright API に更新 |
+| 矛盾4 | macOS ハイライトショートカットの二重定義（Cmd+Shift+H が検索・置換と競合） | `keyboard-shortcuts.md §1-1` のハイライトを `Cmd+Option+H` に修正し注記を更新 |
+| 矛盾5 | 取り消し線ショートカットのコードバグ（`ctrl: false` → `ctrl: true`） | `cross-platform-design.md §3.3` の PLATFORM_SHORTCUTS.STRIKETHROUGH を修正 |
+| 矛盾6 | 自動保存デバウンス値の不整合（500ms vs 1000ms） | 両値は異なるファイルサイズレンジに対応する正しい仕様（SoT: `window-tab-session-design.md §9`）。`system-design.md §Phase 1` と `performance-design.md §5.2` に SoT への参照注記を追加 |
+| 矛盾7 | プラグインフェーズとセキュリティ要件の矛盾（外部 vs ビルトイン） | `security-design.md §4.8` に「本セクションは外部プラグインのみ対象。ビルトインは Phase 3 から実装」という注記を追加 |
+| 矛盾8 | AI モデル名の書式不統一（日付サフィックスあり / なし） | `security-design.md §4.6` の ALLOWED_MODELS にコメントで意図（最新エイリアス vs バージョン固定）を明示 |
+| 矛盾9 | ドキュメント更新日の乖離（undo-redo / window-tab-session が 2026-02-23） | 両ドキュメントの更新日を 2026-02-24 に修正 |
+
+### 24.2 対応済み課題（課題A〜L）
+
+| # | 課題内容 | 対応内容 |
+|---|---------|---------|
+| 課題A | design-coverage.md §4 の参照先誤り | 本ドキュメント §4「モード切替をまたいだ履歴管理」の参照先を `performance-design.md §9.3` に修正 |
+| 課題B | アクセシビリティ・国際化の実装フェーズ未定義 | `roadmap.md` 技術的負債欄に a11y 詳細設計ドキュメントへのリンクと i18n フェーズ目安（Phase 5 以降）を追記 |
+| 課題C | Pandoc インストール確認・フェーズ未定義 | `roadmap.md Phase 7` に Pandoc 統合タスク（インストール確認 UX・Word/LaTeX/epub エクスポート）を追加 |
+| 課題D | セッション復元と LRU タブ上限の整合性 | `window-tab-session-design.md §2.5` に LRU 超過時の復元フローと「任意復元リスト」提示の仕様を追加 |
+| 課題E | 3MB 超ファイルのクラッシュリカバリ欠如 | `window-tab-session-design.md §10.7` に 3MB 超ファイルの警告表示方針と将来的な差分チェックポイント案を追記 |
+| 課題F | 外部ファイル変更時の競合解決 UX 詳細不足 | `workspace-design.md §4.2.1` に競合解決ダイアログ（再読込 / 保持 / 差分表示）・カーソル復元・自動保存競合の設計を追加 |
+| 課題G | モバイルプラットフォームでの Shift-JIS 対応 | `cross-platform-design.md §4.3.1` にモバイルでのエンコーディング検出制約と対応方針（ベストエフォート + 手動指定 UI）を追記 |
+| 課題H | プラグイン更新メカニズムの未設計 | `plugin-api-design.md §7.4` にバージョン比較・API 互換性チェック・ロールバック・manifest フィールド拡張を追加 |
+| 課題I | IME 入力中のキーボードショートカット干渉 | `keyboard-shortcuts.md §2-4` に `isComposing` ガードの実装方針と注意点を追記 |
+| 課題J | プラットフォーム別フォント定義の欠如 | `theme-design.md §2.5` にプラットフォーム別フォントスタック（Windows / macOS / Linux / Android / iOS）と実装コードを追加 |
+| 課題K | ワークスペース全文検索への ripgrep 依存の曖昧さ | `search-design.md §1`・`§3.2` と `performance-design.md §6.2` に「Rust 内製（walkdir + regex）、外部 ripgrep 不使用」の方針と理由を明記 |
+| 課題L | スマートクォーテーション・オートコレクト設計の不足 | 本ドキュメント §2 の状態を 🔶 のまま維持し、macOS WKWebView 抑制策（cross-platform-design.md §2.4）への参照と「エディタ UX 詳細（Undo 対応）は未作成」の旨を明記 |

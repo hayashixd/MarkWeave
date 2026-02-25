@@ -593,7 +593,8 @@ export function incrementalSerialize(
 }
 ```
 
-**Phase 1 での方針**: 全文シリアライズを維持。500ms デバウンスで体感は問題ない。
+**Phase 1 での方針**: 全文シリアライズを維持。500ms デバウンス（100KB 未満の小ファイル基準）で体感は問題ない。
+ファイルサイズ別の正式なデバウンス値は `window-tab-session-design.md §9` が SoT（100KB〜1MB は 1000ms、1MB〜3MB は 2000ms）。
 300KB ファイルでの `tiptapToMarkdown` が 100ms を超えるようなら Web Worker への移行を検討する。
 
 ### 4.3 Web Worker へのシリアライズ移行（必要に応じて）
@@ -732,7 +733,9 @@ editor.commands.goToNextSearchResult();
 
 ### 6.2 フォルダ内全文検索（Phase 4）
 
-複数ファイルをまたぐ全文検索は **Rust バックエンド** で実行する。
+複数ファイルをまたぐ全文検索は **Rust バックエンド（walkdir + regex クレート）** で実行する。
+外部 ripgrep バイナリには依存しない（バイナリサイズ・クロスコンパイルの複雑さを避けるため）。
+詳細な方針は `search-design.md §1` および `§3.2` を参照。
 
 ```rust
 // src-tauri/src/commands/search.rs

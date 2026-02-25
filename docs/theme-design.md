@@ -95,6 +95,7 @@ Phase 1 では `light` / `dark` / `system` のみ実装。追加テーマは Pha
   --color-danger:       #cf222e;
 
   /* ── タイポグラフィ ──────────────── */
+  /* プラットフォーム別フォントスタックは §2.5 参照 */
   --font-sans:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono:   "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --font-size-base: 16px;
@@ -117,6 +118,55 @@ Phase 1 では `light` / `dark` / `system` のみ実装。追加テーマは Pha
   --transition-normal: 160ms ease;
 }
 ```
+
+### 2.5 プラットフォーム別フォントスタック
+
+CJK 文字（日本語・中国語・韓国語）を含むコンテンツを正しく表示するため、
+プラットフォームごとに適切なフォールバックフォントを定義する。
+JavaScript で実行時に `platform()` を取得し、`:root` の CSS 変数を上書きする。
+
+```typescript
+// src/themes/platform-fonts.ts
+import { platform } from '@tauri-apps/plugin-os';
+
+const PLATFORM_FONT_STACKS: Record<string, { sans: string; mono: string }> = {
+  // Windows: 游ゴシック（Win8.1+）→ メイリオ → システム sans-serif
+  windows: {
+    sans: '"Yu Gothic UI", "游ゴシック UI", "Meiryo UI", メイリオ, "Segoe UI", sans-serif',
+    mono: '"Cascadia Code", "BIZ UDゴシック", Consolas, "Courier New", monospace',
+  },
+  // macOS: ヒラギノ角ゴ（macOS 10.11+）→ システム
+  macos: {
+    sans: '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "ヒラギノ角ゴシック", sans-serif',
+    mono: '"SF Mono", "Osaka-Mono", "Hiragino Kaku Gothic ProN", Menlo, monospace',
+  },
+  // Linux: Noto Sans CJK JP（Google Noto フォント推奨）→ IPAex ゴシック
+  linux: {
+    sans: '"Noto Sans CJK JP", "IPAexGothic", "IPA Pゴシック", "Droid Sans Japanese", sans-serif',
+    mono: '"Noto Sans Mono CJK JP", "IPAGothic", "Courier New", monospace',
+  },
+  // Android/iOS: OS デフォルト（CJK は自動的に適切なフォントを選択）
+  android: {
+    sans: '"Noto Sans CJK JP", sans-serif',
+    mono: '"Noto Sans Mono CJK JP", monospace',
+  },
+  ios: {
+    sans: '-apple-system, "Hiragino Sans", sans-serif',
+    mono: '"SF Mono", Menlo, monospace',
+  },
+};
+
+export async function applyPlatformFonts(): Promise<void> {
+  const os = await platform(); // 'windows' | 'macos' | 'linux' | 'android' | 'ios'
+  const fonts = PLATFORM_FONT_STACKS[os] ?? PLATFORM_FONT_STACKS.linux;
+  const root = document.documentElement;
+  root.style.setProperty('--font-sans', fonts.sans);
+  root.style.setProperty('--font-mono', fonts.mono);
+}
+```
+
+**実装タイミング**: `applyPlatformFonts()` をアプリ起動時（`main.tsx` の初期化処理）で呼び出す。
+ユーザーがカスタムテーマで `--font-sans` を上書きした場合はそちらが優先される（CSS カスケード）。
 
 ### 2.3 エディタ UI 層変数
 
