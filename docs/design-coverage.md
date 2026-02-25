@@ -1,8 +1,8 @@
 # 設計検討済み項目一覧
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 1.3
-> 更新日: 2026-02-24
+> バージョン: 1.4
+> 更新日: 2026-02-25
 
 本ドキュメントは、プロジェクト全体の設計トピックを網羅した索引である。
 各項目について「検討済み（設計ドキュメントあり）」「未検討」「部分的に言及あり」を示す。
@@ -346,8 +346,69 @@
 |------|--------|------|
 | 国際化（i18n）設計 | 低 | UI テキストの多言語対応（Phase 5 以降） |
 | RTL（右から左）言語対応（Arabic / Hebrew 等） | 低 | CSS `direction: rtl` + BiDi テキスト処理 |
-| Git 統合 | 低 | Typora 分析で差別化候補として言及 |
 | マルチウィンドウ独立動作設計（デスクトップ専用、Phase 7 以降） | 低 | タブ→ウィンドウ切り出し後の状態同期 |
+
+---
+
+---
+
+## 25. 新規追加機能（2026-02-25）の設計ドキュメント
+
+> PKM（パーソナルナレッジ管理）・執筆生産性の向上を目的として追加設計した機能群。
+
+### 25.1 エディタ UX 強化
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| スラッシュコマンド（`/` による要素挿入ポップアップ）| ✅ | [slash-commands-design.md](./slash-commands-design.md) |
+| 双方向リンク（Wikiリンク `[[...]]` 記法）| ✅ | [wikilinks-backlinks-design.md](./wikilinks-backlinks-design.md) §1〜§9 |
+| バックリンクパネル（被リンク一覧・コンテキスト表示）| ✅ | [wikilinks-backlinks-design.md](./wikilinks-backlinks-design.md) §4 |
+| Wikiリンクのオートコンプリート（`[[` 入力でファジー候補）| ✅ | [wikilinks-backlinks-design.md](./wikilinks-backlinks-design.md) §3 |
+| Wikiリンクインデックス設計（Rust バックエンド差分更新）| ✅ | [wikilinks-backlinks-design.md](./wikilinks-backlinks-design.md) §5 |
+| ファイルリネーム時の Wikiリンク自動更新 | ✅ | [wikilinks-backlinks-design.md](./wikilinks-backlinks-design.md) §7 |
+
+### 25.2 ペイン分割エディタ
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| Split Editor（左右/上下ペイン分割）| ✅ | [split-editor-design.md](./split-editor-design.md) |
+| ペイン間フォーカス移動・タブ操作 | ✅ | [split-editor-design.md](./split-editor-design.md) §4 |
+| スプリッタのドラッグリサイズ | ✅ | [split-editor-design.md](./split-editor-design.md) §8 |
+| 同一ファイル分割時のスクロール同期 | ✅ | [split-editor-design.md](./split-editor-design.md) §6 |
+| ペイン状態のセッション保存・復元 | ✅ | [split-editor-design.md](./split-editor-design.md) §5.2 |
+
+### 25.3 Git / バージョン管理統合
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| ファイルツリーの Git 状態バッジ（M/U/A/D/C）| ✅ | [git-integration-design.md](./git-integration-design.md) §3 |
+| エディタガターの差分インジケーター（行追加/変更/削除）| ✅ | [git-integration-design.md](./git-integration-design.md) §5 |
+| インライン Diff ポップアップ | ✅ | [git-integration-design.md](./git-integration-design.md) §5.2 |
+| 簡易コミット UI（Git パネル・ステージング操作）| ✅ | [git-integration-design.md](./git-integration-design.md) §6 |
+| コミット履歴表示 | ✅ | [git-integration-design.md](./git-integration-design.md) §7 |
+| ステータスバーのブランチ名・変更件数表示 | ✅ | [git-integration-design.md](./git-integration-design.md) §4 |
+| Rust `git2` クレートによるバックエンド実装 | ✅ | [git-integration-design.md](./git-integration-design.md) §8 |
+
+### 25.4 画像アノテーション
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| 画像アノテーション機能（赤枠・矢印・モザイク等）| ✅ | [image-annotation-design.md](./image-annotation-design.md) |
+| アノテーションツール一覧（矩形・楕円・矢印・テキスト・ぼかし）| ✅ | [image-annotation-design.md](./image-annotation-design.md) §2・§5 |
+| Canvas API による描画実装方針 | ✅ | [image-annotation-design.md](./image-annotation-design.md) §7 |
+| アノテーション後の画像保存（元画像バックアップ）| ✅ | [image-annotation-design.md](./image-annotation-design.md) §6 |
+
+### 25.5 Zen モード（集中モード）強化
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| Zen モード（フルスクリーン + UI 完全非表示）| ✅ | [zen-mode-design.md](./zen-mode-design.md) |
+| 環境音（アンビエントサウンド）再生機能 | ✅ | [zen-mode-design.md](./zen-mode-design.md) §4 |
+| タイプライター打鍵音フィードバック | ✅ | [zen-mode-design.md](./zen-mode-design.md) §4.5 |
+| タイプライターモード統合（カーソル行常時中央固定）| ✅ | [zen-mode-design.md](./zen-mode-design.md) §5 |
+| フォーカスモード統合（現在段落強調）| ✅ | [zen-mode-design.md](./zen-mode-design.md) §2 |
+| Zen モード用 CSS スタイリング（コンテンツ幅・行間設定）| ✅ | [zen-mode-design.md](./zen-mode-design.md) §3 |
+| ホバーでツールバー一時表示 | ✅ | [zen-mode-design.md](./zen-mode-design.md) §3.4 |
 
 ---
 
