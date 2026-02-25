@@ -1,8 +1,24 @@
-# AI連携機能 設計ドキュメント
+# AI 連携機能設計ドキュメント
 
-> プロジェクト: Markdown / HTML Editor - AI連携機能
-> バージョン: 0.1
-> 更新日: 2026-02-23
+> プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
+> バージョン: 1.1
+> 更新日: 2026-02-25
+
+---
+
+## 目次
+
+1. [背景と目的](#1-背景と目的)
+2. [機能一覧](#2-機能一覧)
+3. [AI 最適化ロジック詳細](#3-ai-最適化ロジック詳細)
+4. [テンプレートシステム詳細](#4-テンプレートシステム詳細)
+5. [ユーザーフロー](#5-ユーザーフロー)
+6. [技術選定](#6-技術選定)
+7. [設計課題と解決方針](#7-設計課題と解決方針)
+8. [エディタ統合 API（AI パネル ↔ エディタ）](#8-エディタ統合-apiai-パネル--エディタ)
+9. [言語検出精度改善](#9-言語検出精度改善)
+10. [カスタムテンプレート管理 UI](#10-カスタムテンプレート管理-ui)
+11. [AI 文章支援機能（将来拡張）](#11-ai-文章支援機能将来拡張)
 
 ---
 
@@ -71,7 +87,7 @@ AI生成Markdown → エディタで編集 → HTMLエクスポート → Webサ
 
 ---
 
-## 3. AI最適化ロジック詳細
+## 3. AI 最適化ロジック詳細
 
 ### 3.1 「AIが最も理解しやすい構造」とは
 
@@ -357,33 +373,6 @@ $APP_DATA/
 ```
 
 ```typescript
-// テンプレートのメタデータ（YAML フロントマター）
----
-title: "コードレビュー依頼"
-category: "development"
-description: "コードレビューを AI に依頼するためのテンプレート"
-placeholders:
-  - key: LANGUAGE
-    type: select
-    label: "プログラミング言語"
-    options: ["TypeScript", "Rust", "Python", "Go"]
-  - key: CODE
-    type: code
-    label: "レビュー対象コード"
----
-
-# 役割 (Role)
-あなたはシニアの {{LANGUAGE}} エンジニアです。
-
-# タスク (Task)
-以下のコードをレビューしてください。
-
-```{{LANGUAGE}}
-{{CODE}}
-```
-```
-
-```typescript
 // src/core/ai/template-manager.ts
 
 export class TemplateManager {
@@ -418,79 +407,31 @@ export class TemplateManager {
 ```typescript
 // 正しい順序と依存関係
 const pipeline: OptimizationStep[] = [
-  // Step 1: 見出し正規化（最初に実行: 以降のステップが見出し構造に依存するため）
-  normalizeHeadings,
-
-  // Step 2: コードブロック言語タグ付与（Step 1 後: 見出し下のコードブロックをコンテキストで判定）
-  annotateCodeBlocks,
-
-  // Step 3: リスト記号統一（Step 1/2 に依存しないが早めに実行）
-  normalizeListMarkers,
-
-  // Step 4: 空行の正規化（コードブロック内の空行は保護する必要があるため Step 2 後）
-  normalizeBlankLines,
-
-  // Step 5: テキスト修飾（最後: 構造が確定した後でインライン処理）
-  normalizeInlineFormatting,
-
-  // Step 6: プロンプト構造の提案（最後: 全体構造が確定した後で提案する）
-  suggestPromptStructure,
+  normalizeHeadings,       // Step 1: 見出し正規化（最初に実行）
+  annotateCodeBlocks,      // Step 2: コードブロック言語タグ付与（Step 1 後）
+  normalizeListMarkers,    // Step 3: リスト記号統一
+  normalizeBlankLines,     // Step 4: 空行の正規化（コードブロック内保護のため Step 2 後）
+  normalizeInlineFormatting, // Step 5: テキスト修飾（構造確定後）
+  suggestPromptStructure,  // Step 6: プロンプト構造の提案（全体確定後）
 ];
 ```
-
-**順序を変えると壊れるケース**:
-
-| 順序違反 | 問題 |
-|---|---|
-| Step 4（空行正規化）を Step 2 より先に実行 | コードブロック内の空行が除去されてしまう |
-| Step 5（インライン修飾）を Step 1 より先に実行 | `# **太字見出し**` の `**` が誤処理される |
-| Step 6（構造提案）を Step 1 より先に実行 | 見出し正規化前の「壊れた構造」を提案の入力にしてしまう |
 
 ---
 
 ## 8. エディタ統合 API（AI パネル ↔ エディタ）
 
 AI パネルとエディタは **イベントバス** 経由で疎結合に通信する。
-直接インスタンス参照は避ける（テスタビリティとモジュール独立性のため）。
 
 ### 8.1 AI パネルからエディタへの操作
 
 ```typescript
 // src/core/ai/editor-bridge.ts
 
-/**
- * AI パネルがエディタを操作するためのブリッジ。
- * TipTap の editor インスタンスを直接持ち回らず、コマンドとして定義する。
- */
 export interface EditorAiBridge {
-  /**
-   * 現在のドキュメントを最適化済み Markdown 文字列として取得する。
-   * IME composition 中は null を返す（markdown-tiptap-conversion.md §9 参照）。
-   */
   getOptimizedMarkdown(): string | null;
-
-  /**
-   * Markdown 文字列をカーソル位置（または末尾）に挿入する。
-   * TipTap の markdownToTipTap() でパースして挿入する。
-   */
   insertMarkdown(markdown: string, position?: 'cursor' | 'end'): void;
-
-  /**
-   * 現在の選択範囲のテキストを取得する。
-   * 選択なしの場合は空文字列を返す。
-   */
   getSelectedText(): string;
-
-  /**
-   * 現在の選択範囲を指定した Markdown で置換する。
-   * 選択なしの場合は何もしない。
-   */
   replaceSelection(markdown: string): void;
-
-  /**
-   * AI 処理中であることをエディタに通知する。
-   * エディタは入力を一時的に無効化しない（楽観的 UI を維持）。
-   */
   setAiProcessing(isProcessing: boolean): void;
 }
 ```
@@ -500,31 +441,20 @@ export interface EditorAiBridge {
 ```typescript
 // src/renderer/wysiwyg/ai-bridge-impl.ts
 
-import { Editor } from '@tiptap/react';
-import { markdownToTipTap } from '../../core/converter/markdown-to-tiptap';
-import { tiptapToMarkdown } from '../../core/converter/tiptap-to-markdown';
-import { optimizeForAi } from '../../core/ai/optimizer';
-
 export function createEditorAiBridge(editor: Editor): EditorAiBridge {
   return {
     getOptimizedMarkdown(): string | null {
-      // IME 中は null（markdown-tiptap-conversion.md §9 参照）
       if (editor.storage.compositionGuard?.isComposing) return null;
-
       const raw = tiptapToMarkdown(editor.getJSON());
       return optimizeForAi(raw);
     },
 
     insertMarkdown(markdown: string, position: 'cursor' | 'end' = 'cursor'): void {
       const json = markdownToTipTap(markdown);
-      const content = json.content ?? [];
-
       if (position === 'end') {
-        // 末尾に追加
         editor.commands.setTextSelection(editor.state.doc.content.size);
       }
-      // insertContentAt でカーソル位置に挿入
-      editor.commands.insertContent(content);
+      editor.commands.insertContent(json.content ?? []);
     },
 
     getSelectedText(): string {
@@ -536,13 +466,11 @@ export function createEditorAiBridge(editor: Editor): EditorAiBridge {
     replaceSelection(markdown: string): void {
       const { empty } = editor.state.selection;
       if (empty) return;
-
       const json = markdownToTipTap(markdown);
       editor.commands.insertContent(json.content ?? []);
     },
 
     setAiProcessing(isProcessing: boolean): void {
-      // AI 処理中のビジュアルフィードバック（ツールバーのスピナー等）
       editor.emit('aiProcessing', { isProcessing });
     },
   };
@@ -561,49 +489,14 @@ export function AiPanel({ bridge }: { bridge: EditorAiBridge }) {
       toast.warning('日本語入力確定後に操作してください');
       return;
     }
-
     await navigator.clipboard.writeText(md);
     toast.success('AIコピー完了');
   };
-
-  const handleInsertTemplate = async (template: Template) => {
-    const filled = await openPlaceholderDialog(template);
-    if (filled === null) return; // キャンセル
-
-    bridge.setAiProcessing(true);
-    bridge.insertMarkdown(filled, 'cursor');
-    bridge.setAiProcessing(false);
-  };
-
-  // AI API を直接呼ぶ場合（Phase 3 以降）
-  const handleAiComplete = async () => {
-    bridge.setAiProcessing(true);
-    try {
-      const selected = bridge.getSelectedText();
-      const response = await callAiApi({
-        provider: 'anthropic',
-        model: 'claude-haiku-4-5-20251001',
-        prompt: selected,
-        maxTokens: 2048,
-      });
-      bridge.replaceSelection(response.content);
-    } finally {
-      bridge.setAiProcessing(false);
-    }
-  };
-
-  return (
-    <aside className="ai-panel">
-      <button onClick={handleCopyClick}>AIコピー</button>
-      {/* ... */}
-    </aside>
-  );
+  // ...
 }
 ```
 
 ### 8.4 テスト可能性の確保
-
-`EditorAiBridge` インターフェースを介することで、AI パネルの単体テストが容易になる。
 
 ```typescript
 // tests/unit/AiPanel.test.tsx
@@ -616,12 +509,6 @@ const mockBridge: EditorAiBridge = {
   setAiProcessing: vi.fn(),
 };
 
-test('AIコピーボタンでクリップボードにコピーされる', async () => {
-  render(<AiPanel bridge={mockBridge} />);
-  await userEvent.click(screen.getByText('AIコピー'));
-  expect(navigator.clipboard.writeText).toHaveBeenCalledWith('# Test\n\nContent\n');
-});
-
 test('IME composition 中はコピーをブロックする', async () => {
   mockBridge.getOptimizedMarkdown = vi.fn().mockReturnValue(null);
   render(<AiPanel bridge={mockBridge} />);
@@ -632,4 +519,228 @@ test('IME composition 中はコピーをブロックする', async () => {
 
 ---
 
-*このドキュメントはAI連携機能の設計方針を示すものであり、実装進行に伴い更新される。*
+## 9. 言語検出精度改善
+
+### 9.1 現状と課題
+
+現在の実装（`franc` ライブラリ）では CJK（中国語・日本語・韓国語）の区別精度が低い。
+日本語テキストを中国語と誤検出するケースがある。
+
+### 9.2 改善方針
+
+**Unicode スクリプト分析による優先判定:**
+
+```typescript
+// src/i18n/language-detector.ts
+
+export function detectLanguage(text: string): string {
+  // ひらがな・カタカナが含まれていれば日本語確定
+  if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) {
+    return 'ja';
+  }
+
+  // ハングルが含まれていれば韓国語確定
+  if (/[\uAC00-\uD7A3\u1100-\u11FF]/.test(text)) {
+    return 'ko';
+  }
+
+  // 漢字のみの場合は文字頻度で中国語 / 日本語を判定
+  const cjkCount = (text.match(/[\u4E00-\u9FFF]/g) ?? []).length;
+  const totalCount = text.replace(/\s/g, '').length;
+  if (cjkCount / totalCount > 0.5) {
+    const { franc } = await import('franc');
+    const detected = franc(text, { minLength: 10 });
+    return detected === 'cmn' || detected === 'yue' ? 'zh' : 'ja';
+  }
+
+  const { franc } = await import('franc');
+  const iso3 = franc(text, { minLength: 10 });
+  return iso3ToIso1(iso3) ?? 'en';
+}
+
+function iso3ToIso1(iso3: string): string | null {
+  const map: Record<string, string> = {
+    eng: 'en', jpn: 'ja', zho: 'zh', cmn: 'zh',
+    kor: 'ko', deu: 'de', fra: 'fr', spa: 'es',
+  };
+  return map[iso3] ?? null;
+}
+```
+
+### 9.3 言語検出の用途
+
+| 機能 | 言語検出の利用方法 |
+|------|-----------------|
+| スペルチェック | 検出言語に対応した辞書を自動ロード |
+| 数字・日付フォーマット | ロケール設定の参照 |
+| AI 支援（将来）| プロンプト言語の自動設定 |
+| ステータスバー | 「言語: 日本語」表示 |
+
+### 9.4 手動言語設定
+
+```
+ステータスバー → 言語表示クリック → メニュー:
+  ● 自動検出（現在: 日本語）
+  ─────────────────
+  ○ 日本語
+  ○ 英語
+  ○ 中国語（簡体）
+  ○ 韓国語
+```
+
+---
+
+## 10. カスタムテンプレート管理 UI
+
+### 10.1 テンプレートの種類
+
+| テンプレート種類 | 説明 |
+|----------------|------|
+| ドキュメントテンプレート | 新規ファイル作成時の初期コンテンツ（YAML Front Matter + ボイラープレート） |
+| AI プロンプトテンプレート | AI 支援機能で使用するカスタムプロンプト文字列 |
+| エクスポートテンプレート | Word/LaTeX 向けの reference.docx / .tex テンプレート |
+
+### 10.2 ドキュメントテンプレート管理
+
+#### テンプレート一覧画面
+
+```
+設定 → テンプレート
+
+┌─────────────────────────────────────────────────────┐
+│  ドキュメントテンプレート                             │
+├─────────────────────────────────────────────────────┤
+│  📄 ブログ記事             [編集] [削除]             │
+│  📄 技術仕様書             [編集] [削除]             │
+│  📄 会議議事録             [編集] [削除]             │
+│  ─────────────────────────────────────────────────  │
+│  [+ 新規テンプレート]                                │
+└─────────────────────────────────────────────────────┘
+```
+
+#### テンプレート編集ダイアログ
+
+```
+┌─────────────────────────────────────────────────────┐
+│  テンプレートを編集: ブログ記事                       │
+├─────────────────────────────────────────────────────┤
+│  名前: [ ブログ記事                              ]   │
+│                                                     │
+│  内容:                                              │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ ---                                          │   │
+│  │ title: タイトル                              │   │
+│  │ date: {{date}}                               │   │
+│  │ tags: []                                     │   │
+│  │ ---                                          │   │
+│  └──────────────────────────────────────────────┘   │
+│  使用可能な変数: {{date}}, {{filename}}, {{cursor}} │
+│                                                     │
+│            [キャンセル]  [保存]                      │
+└─────────────────────────────────────────────────────┘
+```
+
+#### テンプレート変数
+
+| 変数 | 展開値 |
+|------|--------|
+| `{{date}}` | 現在日付（YYYY-MM-DD） |
+| `{{datetime}}` | 現在日時（ISO 8601） |
+| `{{filename}}` | ファイル名（拡張子なし） |
+| `{{cursor}}` | カーソル位置（テンプレート展開後にここにカーソル移動） |
+
+### 10.3 テンプレートの永続化
+
+```typescript
+interface DocumentTemplate {
+  id: string;          // UUID
+  name: string;
+  content: string;
+  createdAt: string;   // ISO 8601
+  updatedAt: string;
+}
+
+import { Store } from '@tauri-apps/plugin-store';
+const store = new Store('templates.json');
+
+export async function saveTemplate(template: DocumentTemplate): Promise<void> {
+  const templates = await store.get<DocumentTemplate[]>('documentTemplates') ?? [];
+  const index = templates.findIndex(t => t.id === template.id);
+  if (index >= 0) {
+    templates[index] = { ...template, updatedAt: new Date().toISOString() };
+  } else {
+    templates.push(template);
+  }
+  await store.set('documentTemplates', templates);
+  await store.save();
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  const templates = await store.get<DocumentTemplate[]>('documentTemplates') ?? [];
+  await store.set('documentTemplates', templates.filter(t => t.id !== id));
+  await store.save();
+}
+```
+
+### 10.4 テンプレートからの新規ファイル作成
+
+```
+Ctrl+N 長押し または メニュー → ファイル → テンプレートから新規作成
+
+→ テンプレート選択ポップアップ:
+  ┌─────────────────────────────────┐
+  │  テンプレートを選択              │
+  │  📄 ブログ記事                  │
+  │  📄 技術仕様書                  │
+  │  📄 会議議事録                  │
+  │  📄 空のファイル（テンプレートなし）│
+  └─────────────────────────────────┘
+```
+
+---
+
+## 11. AI 文章支援機能（将来拡張）
+
+### 11.1 Phase 7 以降の AI 機能候補
+
+> **Note:** Phase 6 以前では実装しない。API キー管理とプライバシーポリシーの整備が前提。
+
+| 機能 | 概要 |
+|------|------|
+| 文章校正 | 選択テキストの誤字・文法チェック |
+| 要約生成 | ドキュメント全体の要約をサイドパネルに表示 |
+| タイトル/見出し提案 | セクション内容から見出しを自動提案 |
+| 翻訳 | 選択テキストを指定言語に翻訳して挿入 |
+
+### 11.2 AI 機能の設計方針
+
+- **オプトイン**: AI 機能は明示的に有効化が必要
+- **API キー管理**: OS キーチェーン（Tauri Keyring プラグイン）に暗号化保存
+- **プロンプトの透明性**: 使用するプロンプトをユーザーが確認・編集可能
+- **オフライン優先**: ネットワーク不要な機能（スペルチェック等）を優先
+
+### 11.3 API キー設定 UI（Phase 7 設計案）
+
+```
+設定 → AI 機能
+
+┌─────────────────────────────────────────────────────┐
+│  AI 文章支援                                         │
+├─────────────────────────────────────────────────────┤
+│  □ AI 文章支援を有効にする                           │
+│  API プロバイダー: [OpenAI ▼]                        │
+│  API キー: [ ****************************  ] [変更]  │
+│  □ 選択テキストに右クリックメニューで AI オプション表示│
+│  プライバシー: テキストは処理のため外部 API に送信    │
+│  されます。機密情報の取り扱いにご注意ください。        │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+## 関連ドキュメント
+
+- [user-settings-design.md](../07_Platform_Settings/user-settings-design.md) — 設定の保存・管理
+- [text-statistics-design.md](../../02_Core_Editor/text-statistics-design.md) — スペルチェック・統計機能
+- [community-design.md](../07_Platform_Settings/community-design.md) — プライバシーポリシー・テレメトリ
+- [export-interop-design.md](../../06_Export_Interop/export-interop-design.md) — HTML/PDF エクスポートパイプライン

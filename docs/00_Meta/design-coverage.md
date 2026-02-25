@@ -28,7 +28,7 @@
 | Typora式カーソル位置計算 | ✅ | [system-design.md](./system-design.md) §3 |
 | Markdown ↔ TipTap JSON 変換設計 | ✅ | [markdown-tiptap-conversion.md](./markdown-tiptap-conversion.md) |
 | サポートする Markdown 要素マトリクス | ✅ | [markdown-tiptap-conversion.md](./markdown-tiptap-conversion.md) §2 |
-| ラウンドトリップテスト戦略 | ✅ | [tiptap-roundtrip-test-strategy.md](./tiptap-roundtrip-test-strategy.md) |
+| ラウンドトリップテスト戦略 | ✅ | [tiptap-roundtrip-test-strategy.md](../02_Core_Editor/tiptap-roundtrip-test-strategy.md) |
 | HTML ↔ Markdown 変換（turndown） | 🔶 | [system-design.md](./system-design.md) §4、[markdown-tiptap-conversion.md](./markdown-tiptap-conversion.md) |
 
 ---
@@ -98,17 +98,17 @@
 | ファイル関連付け・シングルインスタンス制御 | ✅ | [window-tab-session-design.md](./window-tab-session-design.md) §5 |
 | クラッシュリカバリ | ✅ | [window-tab-session-design.md](./window-tab-session-design.md) §10 |
 | 自動保存（Debounce 設計） | ✅ | [window-tab-session-design.md](./window-tab-session-design.md) §9、[performance-design.md](./performance-design.md) §5 |
-| フォルダ/ワークスペース管理 | ✅ | [workspace-design.md](./workspace-design.md) |
-| 新規ファイル作成フロー（ダイアログ / インライン命名・デフォルト保存先） | ✅ | [file-operations-design.md](./file-operations-design.md) §1 |
-| ファイルエンコーディング対応（UTF-8 / UTF-8 BOM / Shift-JIS 等の判定・変換） | ✅ | [file-operations-design.md](./file-operations-design.md) §2 |
-| 改行コード対応（CRLF / LF 自動検出・設定・保存時の扱い） | ✅ | [file-operations-design.md](./file-operations-design.md) §3 |
-| ファイル削除・ゴミ箱移動の UX（確認ダイアログ・操作取り消し手段） | ✅ | [file-operations-design.md](./file-operations-design.md) §4 |
-| バックアップ設計（定期バックアップの仕組み・保存先・世代数） | ✅ | [file-operations-design.md](./file-operations-design.md) §5 |
-| 印刷機能（ネイティブ印刷ダイアログ・印刷用 CSS 設計） | ✅ | [file-operations-design.md](./file-operations-design.md) §6 |
-| ウィンドウへのドラッグ&ドロップによるファイルオープン | ✅ | [file-operations-design.md](./file-operations-design.md) §7 |
+| フォルダ/ワークスペース管理 | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §1〜§8 |
+| 新規ファイル作成フロー（ダイアログ / インライン命名・デフォルト保存先） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §9 |
+| ファイルエンコーディング対応（UTF-8 / UTF-8 BOM / Shift-JIS 等の判定・変換） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §10 |
+| 改行コード対応（CRLF / LF 自動検出・設定・保存時の扱い） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §11 |
+| ファイル削除・ゴミ箱移動の UX（確認ダイアログ・操作取り消し手段） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §12 |
+| バックアップ設計（定期バックアップの仕組み・保存先・世代数） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §13 |
+| 印刷機能（ネイティブ印刷ダイアログ・印刷用 CSS 設計） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §14 |
+| ウィンドウへのドラッグ&ドロップによるファイルオープン | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §15 |
 | セッション復元と LRU タブ上限の整合性（超過タブの扱い） | ✅ | [window-tab-session-design.md](./window-tab-session-design.md) §2.5 |
 | 3MB 超ファイルのクラッシュリカバリ制約とユーザー警告 | ✅ | [window-tab-session-design.md](./window-tab-session-design.md) §10.7 |
-| 外部ファイル変更時の競合解決 UX（マージ選択ダイアログ・カーソル復元） | ✅ | [workspace-design.md](./workspace-design.md) §4.2.1 |
+| 外部ファイル変更時の競合解決 UX（マージ選択ダイアログ・カーソル復元） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §4.2.1 |
 
 ---
 
@@ -116,14 +116,14 @@
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| 画像保存先モード（4種） | ✅ | [image-storage-design.md](./image-storage-design.md) §1 |
-| ファイル命名戦略 | ✅ | [image-storage-design.md](./image-storage-design.md) §1.2 |
-| ハッシュによる重複排除 | ✅ | [image-storage-design.md](./image-storage-design.md) §2 |
-| 外部 URL 画像のキャッシュ | ✅ | [image-storage-design.md](./image-storage-design.md) §4 |
-| モバイル（Android/iOS）対応 | ✅ | [image-storage-design.md](./image-storage-design.md) §5 |
-| クリップボードからの画像貼り付けフロー詳細（スクリーンショット・data URI → ファイル保存） | ✅ | [image-operations-design.md](./image-operations-design.md) §1 |
-| 画像の最適化・圧縮設定（リサイズ・品質調整・WebP 変換） | ✅ | [image-operations-design.md](./image-operations-design.md) §2 |
-| alt テキスト（画像キャプション）の編集 UX | ✅ | [image-operations-design.md](./image-operations-design.md) §3 |
+| 画像保存先モード（4種） | ✅ | [image-design.md](../05_Features/Image/image-design.md) §1 |
+| ファイル命名戦略 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §1.2 |
+| ハッシュによる重複排除 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §2 |
+| 外部 URL 画像のキャッシュ | ✅ | [image-design.md](../05_Features/Image/image-design.md) §4 |
+| モバイル（Android/iOS）対応 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §5 |
+| クリップボードからの画像貼り付けフロー詳細（スクリーンショット・data URI → ファイル保存） | ✅ | [image-design.md](../05_Features/Image/image-design.md) §6 |
+| 画像の最適化・圧縮設定（リサイズ・品質調整・WebP 変換） | ✅ | [image-design.md](../05_Features/Image/image-design.md) §7 |
+| alt テキスト（画像キャプション）の編集 UX | ✅ | [image-design.md](../05_Features/Image/image-design.md) §8 |
 
 ---
 
@@ -148,7 +148,7 @@
 | Tauri CSP 設定 | ✅ | [security-design.md](./security-design.md) §3 |
 | `plugin-fs` スコープ制限 | ✅ | [security-design.md](./security-design.md) §4 |
 | スクリプトタグ分離 | ✅ | [security-design.md](./security-design.md) §5 |
-| iframe / 埋め込みコンテンツのサンドボックス設計 | ✅ | [security-design.md](./security-design.md) §1.2、[html-editing-advanced-design.md](./html-editing-advanced-design.md) §4 |
+| iframe / 埋め込みコンテンツのサンドボックス設計 | ✅ | [security-design.md](./security-design.md) §1.2、[html-editing-design.md](../05_Features/HTML/html-editing-design.md) §11 |
 | アップデートパッケージの整合性検証（署名確認フロー詳細） | ✅ | [security-design.md](./security-design.md) §4.7 |
 | プラグインのコードレビュー・公開ポリシー | ✅ | [security-design.md](./security-design.md) §4.8 |
 
@@ -158,13 +158,13 @@
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| HTML 編集の UX 分析（3モード：WYSIWYG/ソース/スプリット）| ✅ | [html-editor-analysis.md](./html-editor-analysis.md) |
-| HTML 専用ツールバー | ✅ | [html-editor-analysis.md](./html-editor-analysis.md) §3 |
-| メタデータ編集パネル | ✅ | [html-editor-analysis.md](./html-editor-analysis.md) §4 |
-| `<style>` タグ内 CSS 編集の範囲設計（インライン編集 / 外部エディタへの委譲） | ✅ | [html-editing-advanced-design.md](./html-editing-advanced-design.md) §1 |
-| HTML 編集時の相対パス解決設計（img / CSS / JS の相対 URL 解決ルール） | ✅ | [html-editing-advanced-design.md](./html-editing-advanced-design.md) §2 |
-| HTML → MD 変換ロスの許容範囲定義（変換できない要素の扱いポリシー） | ✅ | [html-editing-advanced-design.md](./html-editing-advanced-design.md) §3 |
-| JavaScript / iframe 埋め込みコンテンツの WYSIWYG 表示設計 | ✅ | [html-editing-advanced-design.md](./html-editing-advanced-design.md) §4 |
+| HTML 編集の UX 分析（3モード：WYSIWYG/ソース/スプリット）| ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §3 |
+| HTML 専用ツールバー | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §7.3 |
+| メタデータ編集パネル | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §4.3 |
+| `<style>` タグ内 CSS 編集の範囲設計（インライン編集 / 外部エディタへの委譲） | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §8 |
+| HTML 編集時の相対パス解決設計（img / CSS / JS の相対 URL 解決ルール） | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §9 |
+| HTML → MD 変換ロスの許容範囲定義（変換できない要素の扱いポリシー） | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §10 |
+| JavaScript / iframe 埋め込みコンテンツの WYSIWYG 表示設計 | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §11 |
 
 ---
 
@@ -172,13 +172,13 @@
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| Markdown → HTML エクスポート（パイプライン）| ✅ | [export-design.md](./export-design.md) §2 |
-| HTML テーマ CSS | ✅ | [export-design.md](./export-design.md) §5、[theme-design.md](./theme-design.md) |
-| PDF エクスポート | ✅ | [export-design.md](./export-design.md) §3 |
-| エクスポートオプション UI（ダイアログ設計）| ✅ | [export-design.md](./export-design.md) §4 |
-| Word（.docx）エクスポート（Pandoc 連携） | ✅ | [pandoc-integration-design.md](./pandoc-integration-design.md) §1 |
-| LaTeX / epub エクスポート（Pandoc 連携） | ✅ | [pandoc-integration-design.md](./pandoc-integration-design.md) §2 |
-| 外部ツール連携設計（Pandoc パス設定・インストール確認 UX） | ✅ | [pandoc-integration-design.md](./pandoc-integration-design.md) §3 |
+| Markdown → HTML エクスポート（パイプライン）| ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §2 |
+| HTML テーマ CSS | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §5、[theme-design.md](./theme-design.md) |
+| PDF エクスポート | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §3 |
+| エクスポートオプション UI（ダイアログ設計）| ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §4 |
+| Word（.docx）エクスポート（Pandoc 連携） | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §7 |
+| LaTeX / epub エクスポート（Pandoc 連携） | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §8 |
+| 外部ツール連携設計（Pandoc パス設定・インストール確認 UX） | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §9 |
 
 ---
 
@@ -186,11 +186,11 @@
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| AI コピーボタン（最適化パイプライン） | ✅ | [ai-features.md](./ai-features.md) §2.1、§3 |
-| AI テンプレートシステム | ✅ | [ai-features.md](./ai-features.md) §2.2 |
-| RTICCO 構造解析 | ✅ | [ai-features.md](./ai-features.md) §3.3 |
-| AI コピーの言語推定精度向上設計（linguist-languages 連携・ヒューリスティック改善） | ✅ | [ai-enhancements-design.md](./ai-enhancements-design.md) §1 |
-| カスタムテンプレートの永続化・管理 UI 設計（保存・編集・削除・インポート/エクスポート） | ✅ | [ai-enhancements-design.md](./ai-enhancements-design.md) §2 |
+| AI コピーボタン（最適化パイプライン） | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §2.1、§3 |
+| AI テンプレートシステム | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §2.2 |
+| RTICCO 構造解析 | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §3.3 |
+| AI コピーの言語推定精度向上設計（linguist-languages 連携・ヒューリスティック改善） | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §9 |
+| カスタムテンプレートの永続化・管理 UI 設計（保存・編集・削除・インポート/エクスポート） | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §10 |
 
 ---
 
@@ -269,9 +269,9 @@
 | ユーザー設定/プリファレンス（設定 UI・スキーマ・マイグレーション） | ✅ | [user-settings-design.md](./user-settings-design.md) |
 | スマートペースト（HTML → MD 自動変換） | ✅ | [smart-paste-design.md](./smart-paste-design.md) |
 | 配布・自動アップデート（tauri-plugin-updater・コード署名）| ✅ | [distribution-design.md](./distribution-design.md) |
-| フォルダ/ワークスペース管理（ファイルツリー・外部変更検知）| ✅ | [workspace-design.md](./workspace-design.md) |
+| フォルダ/ワークスペース管理（ファイルツリー・外部変更検知）| ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) |
 | エラーハンドリング・診断ログ（tauri-plugin-log・Error Boundary）| ✅ | [error-handling-design.md](./error-handling-design.md) |
-| エクスポート（HTML/PDF パイプライン・オプション UI）| ✅ | [export-design.md](./export-design.md) |
+| エクスポート（HTML/PDF パイプライン・オプション UI）| ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) |
 | テーマシステム（CSS変数体系・ライト/ダーク・カスタムテーマ）| ✅ | [theme-design.md](./theme-design.md) |
 | 検索・置換 UX（ファイル内検索・ワークスペース横断）| ✅ | [search-design.md](./search-design.md) |
 | プラグイン API（型定義・サンドボックス・ライフサイクル）| ✅ | [plugin-api-design.md](./plugin-api-design.md) |
@@ -393,10 +393,10 @@
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| 画像アノテーション機能（赤枠・矢印・モザイク等）| ✅ | [image-annotation-design.md](./image-annotation-design.md) |
-| アノテーションツール一覧（矩形・楕円・矢印・テキスト・ぼかし）| ✅ | [image-annotation-design.md](./image-annotation-design.md) §2・§5 |
-| Canvas API による描画実装方針 | ✅ | [image-annotation-design.md](./image-annotation-design.md) §7 |
-| アノテーション後の画像保存（元画像バックアップ）| ✅ | [image-annotation-design.md](./image-annotation-design.md) §6 |
+| 画像アノテーション機能（赤枠・矢印・モザイク等）| ✅ | [image-design.md](../05_Features/Image/image-design.md) §9 |
+| アノテーションツール一覧（矩形・楕円・矢印・テキスト・ぼかし）| ✅ | [image-design.md](../05_Features/Image/image-design.md) §9 |
+| Canvas API による描画実装方針 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §9 |
+| アノテーション後の画像保存（元画像バックアップ）| ✅ | [image-design.md](../05_Features/Image/image-design.md) §9 |
 
 ### 25.5 Zen モード（集中モード）強化
 
@@ -440,7 +440,7 @@
 | 課題C | Pandoc インストール確認・フェーズ未定義 | `roadmap.md Phase 7` に Pandoc 統合タスク（インストール確認 UX・Word/LaTeX/epub エクスポート）を追加 |
 | 課題D | セッション復元と LRU タブ上限の整合性 | `window-tab-session-design.md §2.5` に LRU 超過時の復元フローと「任意復元リスト」提示の仕様を追加 |
 | 課題E | 3MB 超ファイルのクラッシュリカバリ欠如 | `window-tab-session-design.md §10.7` に 3MB 超ファイルの警告表示方針と将来的な差分チェックポイント案を追記 |
-| 課題F | 外部ファイル変更時の競合解決 UX 詳細不足 | `workspace-design.md §4.2.1` に競合解決ダイアログ（再読込 / 保持 / 差分表示）・カーソル復元・自動保存競合の設計を追加 |
+| 課題F | 外部ファイル変更時の競合解決 UX 詳細不足 | `file-workspace-design.md §4.2.1` に競合解決ダイアログ（再読込 / 保持 / 差分表示）・カーソル復元・自動保存競合の設計を追加 |
 | 課題G | モバイルプラットフォームでの Shift-JIS 対応 | `cross-platform-design.md §4.3.1` にモバイルでのエンコーディング検出制約と対応方針（ベストエフォート + 手動指定 UI）を追記 |
 | 課題H | プラグイン更新メカニズムの未設計 | `plugin-api-design.md §7.4` にバージョン比較・API 互換性チェック・ロールバック・manifest フィールド拡張を追加 |
 | 課題I | IME 入力中のキーボードショートカット干渉 | `keyboard-shortcuts.md §2-4` に `isComposing` ガードの実装方針と注意点を追記 |
