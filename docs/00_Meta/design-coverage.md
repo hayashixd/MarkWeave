@@ -44,6 +44,12 @@
 | オートフォーマット（`# ` → 見出し等） | 🔶 | [system-design.md](./system-design.md)、[roadmap.md](./roadmap.md) Phase 1 |
 | フォーカスモード・タイプライターモード | 🔶 | [typora-analysis.md](./typora-analysis.md) §2.3、[roadmap.md](./roadmap.md) Phase 7 |
 | スマートペースト（HTML → MD 自動変換） | ✅ | [smart-paste-design.md](./smart-paste-design.md) |
+| 矩形選択（Alt+ドラッグ）ハイブリッド設計 | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §11 |
+| テキスト整形コマンド（ソート・重複削除・空白除去・大文字/小文字・全角/半角）| ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §12 |
+| 行ブックマークと F2 ジャンプ | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §13 |
+| 単語の自動補完（Ctrl+Space・文書内単語リスト）| ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §14 |
+| エンコーディング明示的 Reload / Convert UI | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §10.3 |
+| 改行コード明示的 Convert and Save / Change Setting UI | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §11.3 |
 | YAML Front Matter 編集 UI（専用パネル / インライン折りたたみ表示） | ✅ | [editor-ux-design.md](./editor-ux-design.md) §1 |
 | フローティング数式プレビュー（`$` 入力後 Esc でレンダリングプレビュー表示） | ✅ | [editor-ux-design.md](./editor-ux-design.md) §2 |
 | アウトラインパネル設計（見出しジャンプ・フィルタ・フローティング vs サイドバー） | ✅ | [editor-ux-design.md](./editor-ux-design.md) §3 |

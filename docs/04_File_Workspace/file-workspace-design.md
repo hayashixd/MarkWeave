@@ -488,17 +488,56 @@ export async function readFileWithEncoding(
 }
 ```
 
-### 10.3 エンコーディング変更
+### 10.3 エンコーディング操作 UI（ステータスバークリック）
 
-ステータスバーのエンコーディング表示をクリック → ダイアログ:
+ステータスバーの「UTF-8」などのエンコーディング表示をクリックすると、**2 つのアクション**を提供するポップオーバーを表示する。
 
 ```
-現在のエンコーディング: Shift-JIS
+┌─────────────────────────────────────────────────────┐
+│  エンコーディング操作                                │
+├─────────────────────────────────────────────────────┤
+│  現在: Shift-JIS                                     │
+│                                                      │
+│  変換先:                                             │
+│  ● UTF-8（推奨）  ○ UTF-8 BOM                       │
+│  ○ Shift-JIS     ○ EUC-JP                           │
+├─────────────────────────────────────────────────────┤
+│  🔄 このエンコーディングで再読み込み（Reload）        │
+│     ※ 未保存の変更は失われます                        │
+│                                                      │
+│  💾 このエンコーディングに変換して保存（Convert）     │
+│     ※ ファイルの文字コードを変換して上書き保存します  │
+├─────────────────────────────────────────────────────┤
+│                                   [キャンセル]       │
+└─────────────────────────────────────────────────────┘
+```
 
-再読み込みのエンコーディング:
-○ UTF-8（推奨）  ○ UTF-8 BOM  ● Shift-JIS  ○ EUC-JP
+| アクション | 動作 |
+|-----------|------|
+| **Reload（再読み込み）** | 選択エンコーディングでファイルをディスクから再読み込みする。未保存の変更がある場合は「変更を破棄しますか？」確認ダイアログを表示する |
+| **Convert（変換保存）** | 現在の編集内容を選択エンコーディングに変換してファイルに上書き保存する。UTF-16 系はすべて UTF-8 に変換して保存する |
 
-[このエンコーディングで再読み込み]  [キャンセル]
+```typescript
+// src/file/encoding-operations.ts
+
+export async function reloadWithEncoding(filePath: string, encoding: FileEncoding) {
+  const bytes = await readBinaryFile(filePath);
+  const decoder = new TextDecoder(encoding);
+  const content = decoder.decode(bytes);
+  useTabStore.getState().updateContent(filePath, content);
+  useFileStore.getState().setEncoding(filePath, encoding);
+}
+
+export async function convertAndSave(filePath: string, encoding: FileEncoding, content: string) {
+  const encoder = new TextEncoder(); // JS の TextEncoder は UTF-8 固定
+  // UTF-8 以外は Rust 側の encode コマンドに委譲
+  if (encoding !== 'UTF-8') {
+    await invoke('save_with_encoding', { path: filePath, content, encoding });
+  } else {
+    await writeFile(filePath, encoder.encode(content));
+  }
+  useFileStore.getState().setEncoding(filePath, encoding);
+}
 ```
 
 ---
@@ -527,6 +566,34 @@ export function detectLineEnding(content: string): 'LF' | 'CRLF' | 'CR' {
 | `'lf'` | 常に LF で保存 |
 | `'crlf'` | 常に CRLF で保存 |
 | `'os'` | OS ネイティブ（Windows: CRLF / macOS・Linux: LF） |
+
+### 11.3 改行コード操作 UI（ステータスバークリック）
+
+ステータスバーの「LF」/「CRLF」表示をクリックすると、**2 つのアクション**を提供するポップオーバーを表示する。
+
+```
+┌─────────────────────────────────────────────────────┐
+│  改行コード操作                                      │
+├─────────────────────────────────────────────────────┤
+│  現在: LF                                            │
+│                                                      │
+│  変換先:  ● LF（Unix / macOS）  ○ CRLF（Windows）  │
+├─────────────────────────────────────────────────────┤
+│  💾 変換して保存（Convert and Save）                 │
+│     ※ 現在のファイルの改行コードを変換して上書き保存  │
+│                                                      │
+│  ⚙ 設定を変更（Change Setting）                     │
+│     ※ 以降の保存で使う改行コードを設定するのみ        │
+│        （現在のファイルは変換しない）                 │
+├─────────────────────────────────────────────────────┤
+│                                   [キャンセル]       │
+└─────────────────────────────────────────────────────┘
+```
+
+| アクション | 動作 |
+|-----------|------|
+| **Convert and Save** | 現在のファイル内の改行コードを変換して即座に上書き保存する |
+| **Change Setting** | `AppSettings.lineEnding` の設定値のみを変更する。次回保存から適用される |
 
 ---
 

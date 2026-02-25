@@ -206,6 +206,9 @@ docs/
 | 新しいキーボードショートカット | `03_UI_UX/keyboard-shortcuts.md` |
 | 新しいツールバーボタン・メニュー項目 | `03_UI_UX/app-shell-design.md` |
 | エディタ内の細かい UX 改善 | `03_UI_UX/editor-ux-design.md` |
+| 矩形選択・テキスト整形・行ブックマーク・単語補完 | `03_UI_UX/editor-ux-design.md` §11〜§14 |
+| エンコーディング Reload / Convert UI | `04_File_Workspace/file-workspace-design.md` §10.3 |
+| 改行コード Convert and Save / Change Setting UI | `04_File_Workspace/file-workspace-design.md` §11.3 |
 | 新しい Tauri Capability・CSP ルール | `01_Architecture/security-design.md` |
 | 新しい Tauri Capability・ファイルアクセス | `04_File_Workspace/file-workspace-design.md` |
 | 新しいユーザー設定項目（`AppSettings`） | `07_Platform_Settings/user-settings-design.md` |

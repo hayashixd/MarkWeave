@@ -18,6 +18,10 @@
 8. [ファイルツリーからの Markdown リンク挿入](#8-ファイルツリーからの-markdown-リンク挿入)
 9. [スプリットビューのスクロール同期](#9-スプリットビューのスクロール同期)
 10. [空ドキュメントのプレースホルダー表示](#10-空ドキュメントのプレースホルダー表示)
+11. [矩形選択（Alt+ドラッグ）](#11-矩形選択altドラッグ)
+12. [テキスト整形コマンド](#12-テキスト整形コマンド)
+13. [行ブックマークと F2 ジャンプ](#13-行ブックマークと-f2-ジャンプ)
+14. [単語の自動補完（Ctrl+Space）](#14-単語の自動補完ctrlspace)
 
 ---
 
@@ -486,6 +490,237 @@ Placeholder.configure({
 | `**太字**` | 太字テキスト |
 | ` ``` ` + Enter | コードブロック |
 | `Ctrl+P` | ファイルを開く |
+
+---
+
+## 11. 矩形選択（Alt+ドラッグ）
+
+### 11.1 モード別の可否
+
+| エディタモード | 矩形選択 | 理由 |
+|-------------|---------|------|
+| WYSIWYG（TipTap/ContentEditable） | **無効**（通常の行選択にフォールバック） | ContentEditable は矩形選択の概念を持たず、ブラウザ API でも実現不可 |
+| ソースモード（CodeMirror 6） | **有効** | `@codemirror/rectangular-selection` で完全サポート |
+
+### 11.2 ソースモードでの矩形選択
+
+CodeMirror 6 の公式拡張 `rectangularSelection()` を使用する。
+
+```typescript
+// src/renderer/source/source-editor.ts
+import { rectangularSelection, crosshairCursor } from '@codemirror/rectangular-selection';
+
+const extensions = [
+  // ...既存の拡張
+  rectangularSelection(),   // Alt+ドラッグで矩形選択を有効化
+  crosshairCursor(),        // Alt キー押下中にカーソルをクロスヘア表示
+];
+```
+
+**操作方法（ソースモード限定）:**
+
+| 操作 | 動作 |
+|------|------|
+| `Alt+ドラッグ` | 矩形範囲をマウスで選択 |
+| `Alt+Shift+↑↓←→` | キーボードで矩形選択を拡張 |
+| `Ctrl+Alt+↑` / `Ctrl+Alt+↓` | カーソルを上/下行に複製（マルチカーソル）|
+
+### 11.3 WYSIWYG モードでの代替 UI
+
+WYSIWYG モードで `Alt+ドラッグ` を行った場合は、ブラウザデフォルトの行選択を維持し、
+ステータスバーに「矩形選択はソースモードでのみ利用可能です」とツールチップ表示する。
+
+---
+
+## 12. テキスト整形コマンド
+
+### 12.1 機能概要
+
+選択範囲のテキストに対して一括変換処理を行うコマンド群。コマンドパレット（`Ctrl+Shift+P`）または右クリックメニューの「テキスト整形 ▶」サブメニューから呼び出す。
+
+**選択範囲がない場合**: ドキュメント全体を対象として処理する。
+
+### 12.2 コマンド一覧
+
+| コマンド ID | 表示名 | 処理内容 |
+|-----------|--------|---------|
+| `text.sortAsc` | 行を昇順ソート | 選択行を辞書順昇順に並び替え |
+| `text.sortDesc` | 行を降順ソート | 選択行を辞書順降順に並び替え |
+| `text.removeDuplicates` | 重複行を削除 | 連続・非連続の重複行を除去（初回出現を残す）|
+| `text.trimLeading` | 行頭の空白・タブを削除 | 各行の先頭にある半角スペース・タブを除去 |
+| `text.trimTrailing` | 行末の空白・タブを削除 | 各行の末尾にある半角スペース・タブを除去 |
+| `text.toUpperCase` | 大文字に変換 | ASCII 英字を大文字化（日本語は不変）|
+| `text.toLowerCase` | 小文字に変換 | ASCII 英字を小文字化（日本語は不変）|
+| `text.toFullWidth` | 半角→全角変換 | ASCII 半角英数字・記号を全角に変換 |
+| `text.toHalfWidth` | 全角→半角変換 | 全角英数字・記号を半角に変換 |
+
+### 12.3 実装方針
+
+```typescript
+// src/core/text-transform.ts
+
+export function sortLines(text: string, order: 'asc' | 'desc'): string {
+  const lines = text.split('\n');
+  lines.sort((a, b) => order === 'asc' ? a.localeCompare(b, 'ja') : b.localeCompare(a, 'ja'));
+  return lines.join('\n');
+}
+
+export function removeDuplicateLines(text: string): string {
+  const seen = new Set<string>();
+  return text.split('\n').filter(line => {
+    if (seen.has(line)) return false;
+    seen.add(line);
+    return true;
+  }).join('\n');
+}
+
+export function toFullWidth(text: string): string {
+  // ASCII 0x21〜0x7E → 全角 0xFF01〜0xFF5E
+  return text.replace(/[\x21-\x7E]/g, c =>
+    String.fromCharCode(c.charCodeAt(0) + 0xFEE0)
+  );
+}
+```
+
+処理はすべて **Undo 可能**な TipTap コマンドとして実装し、`editor.commands.insertContent()` でテキストを置換する。
+
+### 12.4 コンテキストメニューへの統合
+
+テキスト選択時の右クリックメニューに「テキスト整形 ▶」サブメニューを追加する（[app-shell-design.md](./app-shell-design.md) §3.1 参照）。
+
+---
+
+## 13. 行ブックマークと F2 ジャンプ
+
+### 13.1 UX 概要
+
+長大な文書内の特定行をマークし、`F2` / `Shift+F2` で次/前のブックマークへ素早くジャンプする機能。
+
+```
+行番号ガター（左端）のレイアウト:
+
+  3 │   ## はじめに
+🔖 4 │   この文書は...           ← ブックマーク行（青い旗アイコン）
+  5 │
+  6 │   詳細については...
+🔖 7 │   参照先: §3.2             ← ブックマーク行
+  8 │
+```
+
+### 13.2 トグル操作
+
+| 操作 | 動作 |
+|------|------|
+| 行番号ガターのクリック | その行のブックマークをトグル（追加/削除） |
+| `Ctrl+F2` | カーソル行のブックマークをトグル |
+| `F2` | 次のブックマークへジャンプ（末尾に達したら先頭に戻る）|
+| `Shift+F2` | 前のブックマークへジャンプ |
+
+### 13.3 実装方針（WYSIWYG モード）
+
+TipTap の **Decoration API** を使用してハイライト表示する。
+
+```typescript
+// src/renderer/wysiwyg/plugins/bookmark.ts
+import { Plugin, PluginKey, Decoration, DecorationSet } from '@tiptap/pm/state';
+
+const bookmarkKey = new PluginKey('bookmark');
+
+export const BookmarkPlugin = new Plugin({
+  key: bookmarkKey,
+  state: {
+    init: () => ({ bookmarks: new Set<number>() }),  // Set of ProseMirror doc positions
+    apply(tr, prev) {
+      // ブックマーク位置をドキュメント変更に追従して更新
+      const mapped = new Set([...prev.bookmarks].map(pos => tr.mapping.map(pos)));
+      return { bookmarks: mapped };
+    },
+  },
+  props: {
+    decorations(state) {
+      const { bookmarks } = bookmarkKey.getState(state)!;
+      const decorations: Decoration[] = [];
+      bookmarks.forEach(pos => {
+        decorations.push(Decoration.node(pos, pos + 1, { class: 'bookmark-line' }));
+      });
+      return DecorationSet.create(state.doc, decorations);
+    },
+  },
+});
+```
+
+```css
+/* src/themes/editor.css */
+.bookmark-line {
+  background-color: rgba(59, 130, 246, 0.08);  /* 薄いブルー */
+  border-left: 3px solid #3b82f6;
+}
+```
+
+### 13.4 ソースモードでの対応
+
+CodeMirror 6 では `@codemirror/gutter` と `@codemirror/state` の `StateField` を使用してガターマーカーとハイライトを実装する。
+
+### 13.5 永続化
+
+ブックマーク情報はファイルパスをキーとして `@tauri-apps/plugin-store` に保存し、セッション間で維持する。ファイル行番号で記録するため、ファイル編集によるズレは許容する（完全な位置追跡は将来課題）。
+
+---
+
+## 14. 単語の自動補完（Ctrl+Space）
+
+### 14.1 機能概要
+
+現在のドキュメント内に存在する単語を抽出し、入力中の文字列に対してサジェストを表示する機能。外部 AI や辞書サーバーは使用せず、すべてクライアントサイドで完結する。
+
+```
+ユーザーが「アーキ」と入力した場合のサジェスト:
+
+  アーキ|          ← カーソル位置
+  ┌─────────────────────────┐
+  │ アーキテクチャ  (×3)    │  ← 文書内出現回数
+  │ アーキビスト    (×1)    │
+  └─────────────────────────┘
+  Tab/Enter で確定  Esc で閉じる
+```
+
+### 14.2 単語リスト構築
+
+```typescript
+// src/core/word-completer.ts
+
+export function buildWordList(text: string): Map<string, number> {
+  const wordMap = new Map<string, number>();
+  // Unicode 対応の単語境界で分割（日本語は文字単位、英語はスペース区切り）
+  const words = text.match(/[\p{L}\p{N}ー々〆〇]+/gu) ?? [];
+  for (const word of words) {
+    if (word.length < 2) continue;  // 1 文字は除外
+    wordMap.set(word, (wordMap.get(word) ?? 0) + 1);
+  }
+  return wordMap;
+}
+```
+
+更新タイミング: 入力変化から **500ms デバウンス** でバックグラウンド更新（メインスレッドをブロックしない）。
+
+### 14.3 サジェスト UI
+
+| 項目 | 仕様 |
+|------|------|
+| トリガー | `Ctrl+Space`（手動）、または 2 文字以上入力で自動表示（設定でオフ可）|
+| 候補数 | 最大 10 件 |
+| ソート | 出現頻度降順 → アルファベット順 |
+| 確定 | `Tab` または `Enter` |
+| キャンセル | `Esc` または他のキー入力 |
+| 位置 | カーソルの直下にフローティング表示（ビューポート端では上方向に反転）|
+
+### 14.4 設定項目
+
+| 設定キー | 型 | デフォルト | 説明 |
+|---------|-----|-----------|------|
+| `wordComplete.enabled` | `boolean` | `true` | 補完機能の有効/無効 |
+| `wordComplete.autoTrigger` | `boolean` | `true` | 2 文字以上で自動表示 |
+| `wordComplete.minWordLength` | `number` | `2` | 補完候補に含む最小文字数 |
 
 ---
 
