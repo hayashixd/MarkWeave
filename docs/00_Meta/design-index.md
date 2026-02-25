@@ -157,6 +157,7 @@ docs/
 | ファイル | 役割 | 追記すべき情報 |
 |---------|------|--------------|
 | `user-settings-design.md` | `AppSettings` 型定義・設定 UI・`settingsStore`・設定マイグレーション | 新設定項目追加、設定 UI 変更、マイグレーション関数追加 |
+| `i18n-design.md` | 多言語対応（i18n）設計・i18next 初期化・名前空間構造・OS 言語検出・Tauri ネイティブメニュー対応・コーディングルール | 新言語追加、名前空間追加、OS 言語検出ロジック変更 |
 | `cross-platform-design.md` | Windows/macOS/Linux/Android/iOS の対応方針・フォントフォールバック・CI 設定・エンコーディング検出制約 | 新 OS バージョン対応、プラットフォーム固有バグの対処方針 |
 | `mobile-advanced-design.md` | ソフトキーボード対応・Android SAF 統合・iCloud Drive 連携 | モバイル固有の新機能設計 |
 | `distribution-design.md` | GitHub Actions リリース・tauri-plugin-updater・コード署名・バージョン管理スクリプト | リリースフロー変更、署名方法変更 |
@@ -208,6 +209,7 @@ docs/
 | 新しい Tauri Capability・CSP ルール | `01_Architecture/security-design.md` |
 | 新しい Tauri Capability・ファイルアクセス | `04_File_Workspace/file-workspace-design.md` |
 | 新しいユーザー設定項目（`AppSettings`） | `07_Platform_Settings/user-settings-design.md` |
+| 多言語対応・i18n・言語切り替え設定 | `07_Platform_Settings/i18n-design.md` |
 | 新しいエクスポート形式（Pandoc 以外） | `06_Export_Interop/export-interop-design.md` |
 | 新しい画像処理・フォーマット | `05_Features/Image/image-design.md` |
 | 新しい AI 最適化ステップ・テンプレート | `05_Features/AI/ai-design.md` |

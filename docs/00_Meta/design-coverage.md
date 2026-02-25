@@ -346,9 +346,20 @@
 
 | 項目 | 優先度 | 備考 |
 |------|--------|------|
-| 国際化（i18n）設計 | 低 | UI テキストの多言語対応（Phase 5 以降） |
 | RTL（右から左）言語対応（Arabic / Hebrew 等） | 低 | CSS `direction: rtl` + BiDi テキスト処理 |
 | マルチウィンドウ独立動作設計（デスクトップ専用、Phase 7 以降） | 低 | タブ→ウィンドウ切り出し後の状態同期 |
+
+## 27. 国際化（i18n）設計（2026-02-25）
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| i18n 基盤導入方針・フェーズ分け | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §1 |
+| 技術選定（i18next + react-i18next） | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §2 |
+| 辞書ファイル名前空間構造（`src/locales/`） | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §3 |
+| i18next 初期化設定（fallbackLng・名前空間・XSS設定） | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §4 |
+| `AppSettings.language` フィールド・OS 言語自動検出 | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §5 |
+| Tauri ネイティブメニューの i18n 対応方針 | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §6 |
+| Phase 1 コーディングルール（ハードコード禁止・文字列結合禁止・エラーコード化） | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §7 |
 
 ---
 

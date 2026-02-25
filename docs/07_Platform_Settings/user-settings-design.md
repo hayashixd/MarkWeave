@@ -45,6 +45,7 @@
 | 設定キー | 型 | デフォルト | 説明 |
 |---------|-----|-----------|------|
 | `theme` | `'light' \| 'dark' \| 'system'` | `'system'` | カラーテーマ。`system` はOS設定に追従 |
+| `language` | `'auto' \| 'ja' \| 'en'` | `'auto'` | UI 表示言語。`auto` はOS ロケールに自動追従（詳細: [i18n-design.md](./i18n-design.md)）|
 | `editorFontFamily` | `string` | `''` | エディタのフォント（空文字 = テーマデフォルト）|
 | `editorFontSize` | `number` | `16` | エディタのフォントサイズ（px）|
 | `editorLineHeight` | `number` | `1.7` | エディタの行間 |
@@ -113,6 +114,8 @@ import type { ImageStorageSettings } from '../file/imageStorage';
 
 export interface AppearanceSettings {
   theme: 'light' | 'dark' | 'system';
+  /** UI 表示言語。'auto' は OS ロケールに自動追従（詳細: i18n-design.md） */
+  language: 'auto' | 'ja' | 'en';
   editorFontFamily: string;
   editorFontSize: number;
   editorLineHeight: number;
