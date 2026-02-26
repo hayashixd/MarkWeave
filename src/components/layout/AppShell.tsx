@@ -16,10 +16,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { TabBar } from '../tabs/TabBar';
 import { Sidebar } from '../sidebar/Sidebar';
 import { MarkdownEditor } from '../editor/Editor';
+import { PreferencesDialog } from '../preferences/PreferencesDialog';
 import { useTabStore } from '../../store/tabStore';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab, markSaved } =
     useTabStore();
 
@@ -77,6 +79,13 @@ export function AppShell() {
     const handler = (e: KeyboardEvent) => {
       // IME 変換中はショートカットを無視
       if (e.isComposing || e.keyCode === 229) return;
+
+      // Ctrl+,: 設定ダイアログを開く
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+        e.preventDefault();
+        setPreferencesOpen(true);
+        return;
+      }
 
       // Ctrl+N: 新しいタブ
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
@@ -154,6 +163,12 @@ export function AppShell() {
 
       {/* ステータスバー */}
       <StatusBar tab={activeTab ?? null} />
+
+      {/* プリファレンスダイアログ */}
+      <PreferencesDialog
+        isOpen={preferencesOpen}
+        onClose={() => setPreferencesOpen(false)}
+      />
     </div>
   );
 }
