@@ -9,22 +9,22 @@
 
 ### セットアップ
 
-- [ ] Vite + React + TypeScript プロジェクト初期化
-- [ ] ESLint / Prettier 設定
-- [ ] Vitest テスト環境
+- [x] Vite + React + TypeScript プロジェクト初期化
+- [x] ESLint / Prettier 設定
+- [x] Vitest テスト環境
 - [ ] Playwright E2Eテスト環境
-- [ ] Rust / Tauri CLI のインストール
-- [ ] Tauri 2.0 プロジェクト初期化（`src-tauri/` 構成: `commands/`, `db/`, `fs/`, `menu/`, `models/`）
-- [ ] Tauri Capabilities 初期設定（`capabilities/default.json`）
-- [ ] CSP 設定（`tauri.conf.json`: `script-src 'self'`, `connect-src 'none'`）
+- [x] Rust / Tauri CLI のインストール
+- [x] Tauri 2.0 プロジェクト初期化（`src-tauri/` 構成: `commands/`, `db/`, `fs/`, `menu/`, `models/`）
+- [x] Tauri Capabilities 初期設定（`capabilities/default.json`）
+- [x] CSP 設定（`tauri.conf.json`: `script-src 'self'`, `connect-src 'none'`）
 
 ### コア機能
 
-- [ ] ProseMirror 基本セットアップ
-- [ ] マークダウンパーサ統合（remark）
-- [ ] ASTシリアライザ（remark-stringify）
-- [ ] ファイル読み書き（@tauri-apps/plugin-fs）
-- [ ] Zustand ストアセットアップ（`settingsStore`, `tabStore`）
+- [x] ProseMirror 基本セットアップ（TipTap v3 + @tiptap/starter-kit）
+- [x] マークダウンパーサ統合（remark + remark-gfm → `src/lib/markdown-to-tiptap.ts`）
+- [x] ASTシリアライザ（remark-stringify → `src/lib/tiptap-to-markdown.ts`）
+- [x] ファイル読み書き（@tauri-apps/plugin-fs + `src-tauri/src/commands/fs_commands.rs`）
+- [x] Zustand ストアセットアップ（`settingsStore`, `tabStore`）
 
 ### ユーザー設定
 
@@ -58,11 +58,11 @@
 
 詳細設計: [window-tab-session-design.md](./window-tab-session-design.md)
 
-- [ ] タブバー UI（開く・閉じる・切り替え）
-- [ ] Zustand タブストア（`addTab` / `removeTab` / `updateContent` / `markSaved`）
-- [ ] タブタイトルへの未保存マーカー表示（`● filename.md`）
+- [x] タブバー UI（開く・閉じる・切り替え）`src/components/tabs/TabBar.tsx`
+- [x] Zustand タブストア（`addTab` / `removeTab` / `updateContent` / `markSaved`）`src/store/tabStore.ts`
+- [x] タブタイトルへの未保存マーカー表示（`● filename.md`）StatusBar実装済み
 - [ ] タイトルバーへの未保存マーカー反映（Rustコマンド経由）
-- [ ] タブ閉じる時の未保存確認ダイアログ
+- [x] タブ閉じる時の未保存確認ダイアログ（window.confirm。Phase 3でTauriダイアログに置換）
 - [ ] `onCloseRequested` によるウィンドウクローズ時の未保存ガード
 - [ ] セッション保存・復元（@tauri-apps/plugin-store）
 - [ ] ファイル関連付け設定（tauri.conf.json の `fileAssociations`）
@@ -71,32 +71,33 @@
 
 ### WYSIWYG要素
 
-- [ ] 見出し（H1〜H6）
-- [ ] 段落
-- [ ] 太字・斜体・取り消し線
-- [ ] インラインコード
-- [ ] リンク
-- [ ] 引用ブロック
-- [ ] 順序なし・順序付きリスト
-- [ ] タスクリスト
-- [ ] コードブロック（シンタックスハイライト）
-- [ ] 水平線
+- [x] 見出し（H1〜H6）StarterKit heading
+- [x] 段落 StarterKit
+- [x] 太字・斜体 StarterKit bold/italic
+- [ ] 取り消し線（@tiptap/extension-strike 要追加）
+- [x] インラインコード StarterKit code
+- [x] リンク @tiptap/extension-link
+- [x] 引用ブロック StarterKit blockquote
+- [x] 順序なし・順序付きリスト StarterKit
+- [ ] タスクリスト（@tiptap/extension-task-list 要追加）
+- [ ] コードブロック（シンタックスハイライト）※コードブロック自体はStarterKitで表示可。lowlight統合が未実装
+- [x] 水平線 StarterKit
 - [ ] ソースモード切替（Ctrl+/）
 
 ### オートフォーマット
 
-- [ ] `# ` → 見出し変換
-- [ ] `- ` → リスト変換
-- [ ] `> ` → 引用変換
-- [ ] ` ``` ` → コードブロック変換
+- [x] `# ` → 見出し変換（StarterKit InputRule）
+- [x] `- ` → リスト変換（StarterKit InputRule）
+- [x] `> ` → 引用変換（StarterKit InputRule）
+- [x] ` ``` ` → コードブロック変換（StarterKit InputRule）
 
 ### キーボードショートカット
 
-- [ ] Ctrl+B（太字）
-- [ ] Ctrl+I（斜体）
-- [ ] Ctrl+K（リンク）
-- [ ] Ctrl+Z / Ctrl+Shift+Z（Undo/Redo）
-- [ ] Ctrl+S（保存）
+- [x] Ctrl+B（太字）StarterKit 組み込み
+- [x] Ctrl+I（斜体）StarterKit 組み込み
+- [ ] Ctrl+K（リンク挿入ダイアログ）
+- [x] Ctrl+Z / Ctrl+Shift+Z（Undo/Redo）StarterKit History
+- [x] Ctrl+S（保存）AppShell.tsx
 - [ ] Ctrl+1〜6（見出しレベル）
 
 ---
