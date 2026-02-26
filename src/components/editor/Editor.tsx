@@ -23,6 +23,7 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useCallback, useEffect, useRef } from 'react';
 import { useIMEComposition } from './useIMEComposition';
+import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
 import { markdownToTipTap } from '../../lib/markdown-to-tiptap';
 import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
@@ -67,6 +68,7 @@ export function MarkdownEditor({
       Placeholder.configure({
         placeholder,
       }),
+      SmartPasteExtension,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
