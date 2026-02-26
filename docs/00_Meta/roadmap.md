@@ -41,7 +41,7 @@
 
 - [x] `htmlToMarkdown()`（turndown + DOMPurify）
 - [x] `SmartPasteExtension`（TipTap プラグイン）
-- [ ] `Ctrl+Shift+V` でプレーンテキスト貼り付け
+- [x] `Ctrl+Shift+V` でプレーンテキスト貼り付け
 
 ### エラーハンドリング・診断ログ
 

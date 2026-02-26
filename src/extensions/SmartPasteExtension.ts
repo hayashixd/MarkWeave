@@ -1,14 +1,13 @@
 /**
  * スマートペースト TipTap 拡張。
  *
- * smart-paste-design.md §8.2 に準拠。
+ * smart-paste-design.md §8.2, §4.3 に準拠。
  *
- * クリップボードに text/html が含まれる場合、
- * Markdown に変換してエディタに挿入する。
- * 動作は editor.smartPasteMode 設定で制御:
- * - 'auto': 即時変換（Phase 1 で実装）
- * - 'ask': 確認バー表示（Phase 3 で実装）
- * - 'never': スマートペースト無効
+ * Ctrl+V: クリップボードに text/html が含まれる場合、
+ *   Markdown に変換してエディタに挿入する。
+ *   動作は editor.smartPasteMode 設定で制御。
+ *
+ * Ctrl+Shift+V: 常にプレーンテキストとして貼り付け（Typora 互換）。
  */
 
 import { Extension } from '@tiptap/core';
@@ -19,6 +18,20 @@ import { useSettingsStore } from '../store/settingsStore';
 
 export const SmartPasteExtension = Extension.create({
   name: 'smartPaste',
+
+  addKeyboardShortcuts() {
+    return {
+      // Ctrl+Shift+V: プレーンテキストとして貼り付け
+      'Mod-Shift-v': () => {
+        navigator.clipboard.readText().then((text) => {
+          if (text) {
+            this.editor.commands.insertContent(text);
+          }
+        });
+        return true;
+      },
+    };
+  },
 
   addProseMirrorPlugins() {
     const editorInstance = this.editor;
@@ -37,37 +50,18 @@ export const SmartPasteExtension = Extension.create({
             const html = event.clipboardData?.getData('text/html');
             if (!html) return false;
 
-            // 'auto' モード: 即時変換
-            if (smartPasteMode === 'auto') {
-              const md = htmlToMarkdown(html);
-              const doc = markdownToTipTap(md);
+            // auto / ask モード: Markdown に変換して挿入
+            // ask モードの確認バー UI は Phase 3 で実装
+            const md = htmlToMarkdown(html);
+            const doc = markdownToTipTap(md);
 
-              // 変換結果の content を現在位置に挿入
-              if (doc.content && doc.content.length > 0) {
-                editorInstance.commands.insertContent(
-                  doc.content as unknown as Record<string, unknown>[],
-                );
-              }
-
-              return true;
+            if (doc.content && doc.content.length > 0) {
+              editorInstance.commands.insertContent(
+                doc.content as unknown as Record<string, unknown>[],
+              );
             }
 
-            // 'ask' モード: Phase 3 で確認バー UI を実装予定
-            // Phase 1 では auto と同じ動作にフォールバック
-            if (smartPasteMode === 'ask') {
-              const md = htmlToMarkdown(html);
-              const doc = markdownToTipTap(md);
-
-              if (doc.content && doc.content.length > 0) {
-                editorInstance.commands.insertContent(
-                  doc.content as unknown as Record<string, unknown>[],
-                );
-              }
-
-              return true;
-            }
-
-            return false;
+            return true;
           },
         },
       }),
