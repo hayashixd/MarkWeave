@@ -39,7 +39,7 @@
 
 詳細設計: [smart-paste-design.md](./smart-paste-design.md)
 
-- [ ] `htmlToMarkdown()`（turndown + DOMPurify）
+- [x] `htmlToMarkdown()`（turndown + DOMPurify）
 - [ ] `SmartPasteExtension`（TipTap プラグイン）
 - [ ] `Ctrl+Shift+V` でプレーンテキスト貼り付け
 
