@@ -278,9 +278,114 @@ function Splitter({ direction, onRatioChange }: SplitterProps) {
 
 ---
 
+## 10. 同一ファイル分割時の EditorState 共有・同期設計
+
+### 10.1 課題：2 インスタンス間の履歴破壊リスク
+
+同一ファイルを 2 ペインで開いた場合、TipTap（ProseMirror）インスタンスを **それぞれ独立して生成すると** 以下の問題が発生する:
+
+| 問題 | 発生メカニズム |
+|------|--------------|
+| Undo 履歴の不整合 | ペイン A で編集した操作をペイン B 側の Undo で元に戻せない（履歴が別々） |
+| 競合上書き | 両ペインが同じ `tabId` の内容を保持するが、入力内容が一致しないまま保存される |
+| スクロール同期の基準ズレ | §6 のスクロール同期がドキュメント変更後に位置計算を誤る |
+
+> `window-tab-session-design.md` §5 の「複数ウィンドウでの排他制御（1 ウィンドウのみ書き込み権限）」は **異なるウィンドウ間** の話であり、同一ウィンドウ内のペイン分割は別問題である。
+
+### 10.2 解決策：単一 EditorState + dispatch 共有方式
+
+同一ファイルを 2 ペインで表示する場合、TipTap インスタンスは **1 つだけ** 生成し、React コンテキスト経由で両ペインが共有する。
+
+```
+                ┌─────────────────────────────────────────┐
+                │   useEditorInstance(tabId)              │
+                │   → TipTap Editor インスタンス (1個)    │
+                │   → ProseMirror State (共通)            │
+                │   → History (Undo/Redo) (共通)          │
+                └────────────┬──────────────┬─────────────┘
+                             │              │
+              ┌──────────────▼──┐    ┌──────▼──────────────┐
+              │  ペイン A View   │    │  ペイン B View       │
+              │  EditorView(A)  │    │  EditorView(B)       │
+              │  独立スクロール  │    │  独立スクロール       │
+              └─────────────────┘    └─────────────────────┘
+```
+
+**実装方針**:
+
+```typescript
+// src/hooks/useEditorInstance.ts
+
+/**
+ * tabId が示すファイルの TipTap エディタインスタンスを返す。
+ * 同じ tabId に対して複数回呼ばれても同一インスタンスを返す（キャッシュ済み）。
+ * ProseMirror の EditorView は呼び出し元が独立して生成し、同一の EditorState を参照する。
+ */
+const editorCache = new Map<string, Editor>();
+
+export function useEditorInstance(tabId: string): Editor {
+  if (!editorCache.has(tabId)) {
+    const editor = new Editor({
+      extensions: [...sharedExtensions],
+      content: tabStore.getContent(tabId),
+    });
+    editorCache.set(tabId, editor);
+  }
+  return editorCache.get(tabId)!;
+}
+
+// ペインが全て閉じられたらインスタンスを破棄
+export function releaseEditorInstance(tabId: string): void {
+  const editor = editorCache.get(tabId);
+  if (editor) {
+    editor.destroy();
+    editorCache.delete(tabId);
+  }
+}
+```
+
+### 10.3 各ペインは独立した EditorView を持つ
+
+TipTap の `Editor` は内部的に ProseMirror `EditorView` を持つが、
+同一ファイル分割では **1 つの Editor インスタンスの State** を両ペインで共有しつつ、
+各ペインは独自の **スクロール位置・カーソル位置** を管理する。
+
+ただし TipTap API が単一の EditorView 前提であるため、実装上は以下の代替方式を採用する:
+
+| 方式 | 採用可否 | 理由 |
+|------|---------|------|
+| 単一 Editor + 単一 EditorView（ペイン A のみ実エディタ、ペイン B は読み取り専用ミラー） | **採用（Phase 3）** | 実装コストが低い。ペイン B での編集時は B にフォーカスを移してフォールバック |
+| 2 つの EditorView が同一 EditorState を共有（ProseMirror 低レベル API を直接使用） | 将来検討 | 複雑だが最も正確。ProseMirror 本体のドキュメントに記載あり |
+| Yjs CRDT による 2 インスタンス間インメモリ同期 | 将来検討 | リアルタイム共同編集と共通基盤が使えるが、オーバースペック |
+
+**Phase 3 での採用方式 — アクティブ/ミラー方式**:
+- 同一ファイル分割時、フォーカスのあるペインが「アクティブ（実 EditorView）」となる
+- フォーカスのないペインは EditorState のスナップショットを `contenteditable="false"` で表示（ミラー）
+- ペイン B をクリックするとフォーカスが切り替わり、B が実 EditorView、A がミラーに変わる
+- Undo/Redo 履歴は実 EditorView に集約されるため破壊されない
+
+```
+フォーカスがペイン A にある場合:
+  ペイン A: EditorView (実・編集可)
+  ペイン B: ミラービュー (最新スナップショット・クリックでフォーカス奪取)
+
+→ ペイン B をクリック:
+  ペイン B: EditorView (実・編集可)  ← フォーカス切り替え
+  ペイン A: ミラービュー
+```
+
+### 10.4 設計の注意事項
+
+- ミラービューは TipTap の `editable: false` モードで実装し、Undo 履歴には影響しない
+- フォーカス切り替え時に実 EditorView のカーソル位置をミラー側のクリック位置に近い位置に移動する
+- §6 のスクロール同期は、実 EditorView のスクロールイベントを基準に行う
+
+---
+
 ## 関連ドキュメント
 
 - [editor-ux-design.md](./editor-ux-design.md) §9 — ソース ↔ プレビュー スプリットビュー設計
-- [window-tab-session-design.md](./window-tab-session-design.md) — タブ・セッション管理設計
+- [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) — タブ・セッション管理設計
 - [keyboard-shortcuts.md](./keyboard-shortcuts.md) — ペイン操作のキーボードショートカット
 - [accessibility-design.md](./accessibility-design.md) — ペイン間のフォーカス管理・ARIA
+- [undo-redo-design.md](../02_Core_Editor/undo-redo-design.md) — TipTap 履歴プラグイン設計

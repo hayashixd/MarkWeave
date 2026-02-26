@@ -1196,11 +1196,140 @@ export function SplitView() {
 
 ---
 
+## 9. バックグラウンド非同期処理アーキテクチャ（入力レイテンシ保護）
+
+### 9.1 問題：非同期処理が入力レイテンシに与える影響
+
+§1.1 のパフォーマンスバジェットでは「通常キー入力レイテンシ < 16ms」を掲げているが、
+以下の処理がメインスレッドをブロックするとこの目標値を達成できない:
+
+| 処理 | 発生タイミング | ブロック懸念 |
+|------|-------------|-----------|
+| SQLite メタデータインデックス更新 | ファイル保存（デバウンス後） | Rust 側処理が Tauri IPC 応答を待つ場合 |
+| Wikiリンク・双方向リンクグラフ再計算 | ファイル保存 / 編集時 | D3.js レイアウト計算がメインスレッドで実行される場合 |
+| 全文検索インデックス再構築 | 保存後バックグラウンド | ファイル数が多い場合に長時間化 |
+| 画像圧縮・WebP 変換 | 画像ペースト後 | CPU 集中処理 |
+
+### 9.2 完全非同期アーキテクチャの設計原則
+
+**フロントエンド（React）はイベント通知のみを受け取る**
+
+Rust バックエンドで実行されるすべてのバックグラウンド処理は、完全に非同期で動作し、
+フロントエンドへの通知には Tauri の `emit` イベントのみを使用する。
+
+```
+フロントエンド (React / TipTap)
+  │
+  │  ① Tauri invoke（fire-and-forget）
+  │     例: invoke('save_file', { content, tabId })
+  │
+  ▼
+Rust バックエンド（Tauri）
+  │
+  ├── ファイル書き込み（tokio::spawn → 非同期 I/O）
+  │     完了後: emit('file_saved', { tabId, timestamp })
+  │
+  ├── SQLite メタデータ更新（tokio::spawn → 別タスク）
+  │     完了後: emit('metadata_updated', { tabId })
+  │
+  └── Wikiリンクインデックス更新（tokio::spawn → 別タスク）
+        完了後: emit('links_indexed', { tabId })
+
+フロントエンド (React)
+  │
+  └── listen('metadata_updated', () => { /* UI を必要に応じて更新 */ })
+```
+
+**設計原則**:
+
+| 原則 | 内容 |
+|------|------|
+| **Fire-and-forget** | `invoke()` の結果を `await` で待たない。保存完了は emit イベントで非同期に受け取る |
+| **Rust 側は `tokio::spawn`** | DB 処理・AST 解析はすべて `tokio::spawn` でバックグラウンドタスクとして実行 |
+| **フロントエンドは never block** | IPC 呼び出し後はメインスレッドを即座に解放し、次の keydown イベントを受け付ける |
+| **優先度付きキュー** | 保存・インデックス更新は低優先度キューで実行。UI 操作（ペイン切り替え等）を先行させる |
+
+### 9.3 D3.js グラフ計算の非同期化
+
+Wikiリンクグラフ（[wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11）の
+D3.js フォースレイアウト計算は CPU 集中型であり、メインスレッドで実行すると
+入力レイテンシを悪化させる可能性がある。
+
+**対策: Web Worker への委譲**
+
+```typescript
+// src/workers/graph-layout.worker.ts
+// Web Worker で D3.js フォースシミュレーションを実行
+
+import * as d3 from 'd3-force';
+
+self.onmessage = (event: MessageEvent<GraphData>) => {
+  const { nodes, edges } = event.data;
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id((d: any) => d.id))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(400, 300));
+
+  // tick を同期的に実行（Worker 内なので UI をブロックしない）
+  simulation.tick(300);
+
+  self.postMessage({ nodes: simulation.nodes() });
+};
+```
+
+```typescript
+// src/components/GraphView.tsx
+const worker = new Worker(new URL('../workers/graph-layout.worker.ts', import.meta.url));
+
+function GraphView({ graphData }: { graphData: GraphData }) {
+  const [layout, setLayout] = useState<LayoutResult | null>(null);
+
+  useEffect(() => {
+    worker.postMessage(graphData); // Worker に委譲（ノンブロッキング）
+    worker.onmessage = (e) => setLayout(e.data);
+  }, [graphData]);
+
+  // layout が null の間はローディング表示
+  if (!layout) return <GraphSkeleton />;
+  return <GraphCanvas layout={layout} />;
+}
+```
+
+### 9.4 自動保存デバウンスと非同期処理のシーケンス
+
+```
+ユーザーがキー入力
+  │ (< 16ms でイベント処理、メインスレッドを解放)
+  ▼
+TipTap が EditorState を更新
+  │
+  ▼
+debounce タイマー開始（500ms 小ファイル / 1000ms 大ファイル）
+  │
+  ▼ タイマー満了
+invoke('save_file', ...) → 即座に return（await しない）
+  │
+  ▼
+[Rust バックグラウンドタスク群が並行実行]
+  ├── ファイル書き込み
+  ├── SQLite インデックス更新
+  └── リンクグラフ更新
+
+  → 各処理完了時に emit イベント
+  → フロントエンドが UI を更新（ダーティマーカー解除等）
+```
+
+> **SoT（真の自動保存デバウンス仕様）**: `window-tab-session-design.md §9` を参照。
+> 本ドキュメントは非同期アーキテクチャのパフォーマンス面のみを扱う。
+
+---
+
 ## 関連ドキュメント
 
 - [system-design.md](./system-design.md) — システム全体設計（§2.2 ファイルサイズ閾値）
-- [window-tab-session-design.md](./window-tab-session-design.md) — 自動保存の詳細仕様（§9）
-- [image-storage-design.md](./image-storage-design.md) — 外部URL画像キャッシュ設計（§4）
+- [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) — 自動保存の詳細仕様（§9）
+- [metadata-query-design.md](../05_Features/metadata-query-design.md) — SQLite インデックス更新設計
+- [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) — リンクグラフ計算設計（§11）
 
 ---
 

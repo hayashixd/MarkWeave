@@ -905,7 +905,213 @@ export function QueryBlockView({ node }: QueryBlockViewProps) {
 
 ---
 
-## 7. 実装フェーズ
+## 7. SQLite データベースマイグレーション戦略
+
+### 7.1 課題：アプリアップデートによるスキーマ変更
+
+Phase 2, 3, ... とアプリがアップデートされるにつれて SQLite スキーマが変更される可能性がある。
+ユーザーのローカル `metadata.db` を破壊せずに安全にスキーマを移行する仕組みが必要である。
+
+### 7.2 スキーマバージョン管理
+
+SQLite の `user_version` プラグマを使ってスキーマバージョンを管理する:
+
+```sql
+-- アプリ起動時にバージョンを確認
+PRAGMA user_version;
+
+-- バージョンを設定（マイグレーション後に実行）
+PRAGMA user_version = 3;
+```
+
+**スキーマバージョン対応表**:
+
+| `user_version` | 対応 Phase | 変更内容 |
+|---------------|-----------|---------|
+| 0 | 初期状態（DB 未作成） | — |
+| 1 | Phase 7.5 | 初期スキーマ（§2 の files / frontmatter / tags / tasks / links テーブル） |
+| 2 | Phase 8 | `tasks` テーブルに `priority` カラム追加 / `links` に `link_type` カラム追加 |
+| 3 | 以降 | 今後追加 |
+
+### 7.3 マイグレーション実装（Rust）
+
+```rust
+// src-tauri/src/db/migrations.rs
+
+use rusqlite::{Connection, Result};
+
+/// 現在の DB バージョンを取得
+fn get_db_version(conn: &Connection) -> Result<u32> {
+    conn.pragma_query_value(None, "user_version", |row| row.get(0))
+}
+
+/// DB バージョンを設定
+fn set_db_version(conn: &Connection, version: u32) -> Result<()> {
+    conn.pragma_update(None, "user_version", version)
+}
+
+/// アプリ起動時に呼ぶマイグレーションランナー
+/// 現在の DB バージョンから最新バージョンまで順番にマイグレーションを適用する。
+pub fn run_migrations(conn: &mut Connection) -> Result<()> {
+    let current_version = get_db_version(conn)?;
+    let target_version = MIGRATIONS.len() as u32;
+
+    if current_version >= target_version {
+        return Ok(()); // 最新バージョン、マイグレーション不要
+    }
+
+    log::info!(
+        "DB マイグレーション開始: version {} → {}",
+        current_version, target_version
+    );
+
+    // トランザクション内で全マイグレーションを適用（途中失敗時はロールバック）
+    let tx = conn.transaction()?;
+
+    for (i, migration) in MIGRATIONS.iter().enumerate() {
+        let migration_version = (i + 1) as u32;
+        if migration_version > current_version {
+            log::info!("  マイグレーション v{} を適用中...", migration_version);
+            tx.execute_batch(migration.sql)?;
+        }
+    }
+
+    set_db_version(&tx, target_version)?;
+    tx.commit()?;
+
+    log::info!("DB マイグレーション完了: version {}", target_version);
+    Ok(())
+}
+
+/// マイグレーション定義リスト（バージョン順）
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        description: "初期スキーマ作成",
+        sql: include_str!("sql/migration_v1.sql"),
+    },
+    Migration {
+        version: 2,
+        description: "tasks.priority カラム追加 / links.link_type カラム追加",
+        sql: include_str!("sql/migration_v2.sql"),
+    },
+];
+
+struct Migration {
+    version: u32,
+    description: &'static str,
+    sql: &'static str,
+}
+```
+
+**マイグレーション SQL ファイルの例**:
+
+```sql
+-- src-tauri/src/db/sql/migration_v2.sql
+
+-- tasks テーブルに priority カラムを追加（既存行は DEFAULT 値で埋まる）
+ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;
+
+-- links テーブルに link_type カラムを追加
+ALTER TABLE links ADD COLUMN link_type TEXT NOT NULL DEFAULT 'wiki';
+
+-- 既存の Wikiリンクを link_type='wiki' で更新（migration_v1 からの移行時）
+UPDATE links SET link_type = 'wiki' WHERE link_type = '';
+```
+
+### 7.4 DB バックアップ戦略（マイグレーション前）
+
+スキーマ変更が失敗するリスクに備え、マイグレーション前に DB をバックアップする:
+
+```rust
+// src-tauri/src/db/backup.rs
+
+pub async fn backup_db_before_migration(db_path: &Path) -> Result<PathBuf, BackupError> {
+    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+    let backup_path = db_path.with_file_name(
+        format!("metadata.backup_{}.db", timestamp)
+    );
+
+    tokio::fs::copy(db_path, &backup_path).await?;
+    log::info!("DB バックアップ作成: {:?}", backup_path);
+
+    Ok(backup_path)
+}
+```
+
+バックアップは最新 3 件のみ保持し、古いものは自動削除する。
+
+### 7.5 マイグレーション失敗時のフォールバック
+
+```
+アプリ起動時の DB 初期化フロー:
+  │
+  ▼
+[DB ファイル存在確認]
+  │
+  ├─ 存在しない → 新規作成（最新スキーマで初期化）
+  │
+  └─ 存在する
+       │
+       ▼
+     [マイグレーション前バックアップ作成]
+       │
+       ▼
+     [run_migrations() 実行]
+       │
+       ├─ 成功 → 通常起動
+       │
+       └─ 失敗
+             │
+             ▼
+           [バックアップから復元]
+             │
+             ▼
+           [エラー通知ダイアログ]
+           「データベースの更新に失敗しました。
+            前回の状態に復元しました。
+            メタデータインデックスを再構築しますか？」
+           [再構築する] [スキップ]
+             │
+             └─ [再構築する] → metadata.db を削除して新規作成
+                              → build_metadata_index() をバックグラウンドで実行
+```
+
+### 7.6 再インデックス（完全再構築）
+
+マイグレーション失敗時や DB 破損時は、ワークスペース全体を再スキャンして
+メタデータインデックスを一から再構築できる:
+
+```rust
+// src-tauri/src/db/index.rs
+
+#[tauri::command]
+pub async fn rebuild_metadata_index(
+    workspace_path: String,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    // 既存 DB を削除
+    let db_path = get_db_path(&app_handle);
+    if db_path.exists() {
+        tokio::fs::remove_file(&db_path).await.map_err(|e| e.to_string())?;
+    }
+
+    // 新規作成 + 最新スキーマで初期化
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+    run_migrations(&mut conn.into()).map_err(|e| e.to_string())?;
+
+    // ワークスペース全体を再スキャン（バックグラウンドタスク）
+    tokio::spawn(async move {
+        build_metadata_index(workspace_path, app_handle).await;
+    });
+
+    Ok(())
+}
+```
+
+---
+
+## 8. 実装フェーズ
 
 | フェーズ | 内容 |
 |---------|------|

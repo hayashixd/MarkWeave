@@ -724,9 +724,190 @@ export function buildWordList(text: string): Map<string, number> {
 
 ---
 
+## 15. ブロック境界カーソル脱出設計（カーソルトラップ回避）
+
+### 15.1 問題：TipTap/ProseMirror 特有のカーソルトラップ現象
+
+TipTap（ProseMirror）では、**アイランド型ノード**（コードブロック・テーブル・数式ブロック等）
+の末尾でカーソルが「閉じ込められる」現象が発生する。矢印キー（↓ / →）だけでは
+ブロックの外の新しい段落に抜け出せず、キーボードのみの操作が困難になる。
+
+**影響を受けるノードタイプ**:
+
+| ノードタイプ | カーソルトラップが発生しやすい箇所 |
+|------------|--------------------------------|
+| コードブロック（`codeBlock`） | 最終行の末尾 |
+| テーブル（`table`）| 最終セル（右下）の末尾 |
+| 数式ブロック（`mathBlock`） | ブロック全体（カーソルがブロック内に固定される） |
+| カスタムコンテナ / Callout | コンテナ内の最終段落末尾 |
+| 引用ブロック（`blockquote`） | ネストが深い引用の末尾（比較的軽微） |
+
+### 15.2 脱出キーボードショートカットの設計
+
+**メインの脱出手段: `Ctrl+Enter`（全プラットフォーム共通）**
+
+| 操作 | 動作 |
+|------|------|
+| `Ctrl+Enter`（ブロック内にフォーカスがある場合） | ブロックの **直後** に新しい空段落を挿入し、カーソルを移動 |
+| `Ctrl+Enter`（テーブル最終セルにフォーカスがある場合） | テーブルの **直後** に新しい空段落を挿入 |
+| `Alt+↓`（ブロック末尾） | 補助手段: ブロック直後に移動（段落挿入なし） |
+
+> **Typora との互換性**: Typora では `Ctrl+Enter` がコードブロック脱出に使われており、
+> 既存ユーザーの習慣とも一致する。
+
+### 15.3 TipTap プラグインによる実装
+
+```typescript
+// src/plugins/block-escape.ts
+
+import { Extension } from '@tiptap/core';
+import { TextSelection } from 'prosemirror-state';
+
+/**
+ * ブロックノードからカーソルを脱出させるキーボードショートカットプラグイン。
+ *
+ * Ctrl+Enter: ブロック直後に新しい段落を挿入してカーソルを移動する。
+ */
+export const BlockEscapeExtension = Extension.create({
+  name: 'blockEscape',
+
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Enter': ({ editor }) => {
+        const { state, view } = editor;
+        const { $from } = state.selection;
+
+        // カーソルのブロック祖先ノードを探す
+        const blockNodeTypes = [
+          'codeBlock', 'table', 'mathBlock', 'blockquote',
+          'bulletList', 'orderedList',
+        ];
+
+        // depth 0（doc）まで遡って最も外側のブロックを探す
+        let targetDepth = -1;
+        for (let depth = $from.depth; depth >= 1; depth--) {
+          const node = $from.node(depth);
+          if (blockNodeTypes.includes(node.type.name)) {
+            targetDepth = depth;
+            break;
+          }
+        }
+
+        if (targetDepth < 0) {
+          // ブロック内でない場合はデフォルト動作（段落内改行）
+          return false;
+        }
+
+        // ブロックの終端位置を取得
+        const blockEnd = $from.after(targetDepth);
+
+        // ブロック直後に段落を挿入してカーソルを移動
+        const { tr } = state;
+        const paragraphNode = state.schema.nodes.paragraph.create();
+
+        tr.insert(blockEnd, paragraphNode);
+        tr.setSelection(TextSelection.create(tr.doc, blockEnd + 1));
+        view.dispatch(tr);
+
+        return true; // イベントを消費（デフォルト動作をキャンセル）
+      },
+    };
+  },
+});
+```
+
+### 15.4 テーブル固有の脱出処理
+
+テーブルは `table > tableRow > tableCell > paragraph` という深いネスト構造を持つため、
+最終セルの判定が必要:
+
+```typescript
+// blockEscapeExtension 内の追加ハンドラ
+
+'Tab': ({ editor }) => {
+  const { state } = editor;
+  const { $from } = state.selection;
+
+  // テーブル最終セルかどうかを判定
+  if ($from.node(-1)?.type.name === 'tableCell') {
+    const tableNode = findParentNodeOfType(state.schema.nodes.table)(state.selection);
+    if (!tableNode) return false;
+
+    const lastCell = getLastCellPos(tableNode, state.doc);
+    if ($from.pos >= lastCell) {
+      // 最終セルで Tab → テーブル直後に新しい行を追加
+      // （通常 Tab は次セルに移動するが、最終セルでは動作が必要）
+      return editor.commands.addRowAfter(); // テーブル最終行を追加
+    }
+  }
+
+  return false; // テーブル外では通常の Tab 動作
+},
+```
+
+### 15.5 UI による視覚的ヒント
+
+カーソルがトラップ発生しやすいブロックにある場合、ヒントを表示する:
+
+```
+コードブロック内でカーソルが最終行末尾にある時:
+
+┌─────────────────────────────────────────────────────────┐
+│ ```rust                                                 │
+│ fn main() {                                             │
+│     println!("Hello");                                  │
+│ }█  ← カーソルがここにある時                            │
+└─────────────────────────────────────────────────────────┘
+                                     [Ctrl+Enter で脱出]  ← ツールチップ
+```
+
+```typescript
+// src/components/editor/BlockEscapeHint.tsx
+
+import { useEditorContext } from '../../hooks/useEditorContext';
+
+export function BlockEscapeHint() {
+  const editor = useEditorContext();
+  const [visible, setVisible] = useState(false);
+  const [hintPos, setHintPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const checkCursorPosition = () => {
+      const { $from } = editor.state.selection;
+      const isInBlock = ['codeBlock', 'table', 'mathBlock']
+        .some(t => editor.isActive(t));
+      setVisible(isInBlock);
+    };
+
+    editor.on('selectionUpdate', checkCursorPosition);
+    return () => editor.off('selectionUpdate', checkCursorPosition);
+  }, [editor]);
+
+  if (!visible) return null;
+
+  return (
+    <div className="block-escape-hint" aria-label="ブロック脱出ヒント">
+      <kbd>Ctrl+Enter</kbd> で脱出
+    </div>
+  );
+}
+```
+
+### 15.6 キーボードショートカット一覧への追記
+
+`keyboard-shortcuts.md §1` のアプリ全体ショートカット表に以下を追加すること:
+
+| ショートカット | 動作 | 対象 |
+|-------------|------|------|
+| `Ctrl+Enter` | ブロック直後に新しい段落を挿入してカーソルを移動 | コードブロック・テーブル・数式ブロック・カスタムコンテナ内 |
+
+---
+
 ## 関連ドキュメント
 
-- [system-design.md](./system-design.md) — Typora 式カーソル位置計算・NodeView 設計
-- [workspace-design.md](./workspace-design.md) — ファイルツリー・クロスファイルリンク解決
-- [user-settings-design.md](./user-settings-design.md) — showLineNumbers・smartQuotes 等の設定
-- [keyboard-shortcuts.md](./keyboard-shortcuts.md) — Ctrl+P・Ctrl+クリック等のショートカット
+- [system-design.md](../01_Architecture/system-design.md) — Typora 式カーソル位置計算・NodeView 設計
+- [keyboard-shortcuts.md](./keyboard-shortcuts.md) — Ctrl+Enter 等のショートカット定義
+- [user-settings-design.md](../07_Platform_Settings/user-settings-design.md) — showLineNumbers・smartQuotes 等の設定
+- [accessibility-design.md](./accessibility-design.md) — キーボードのみの操作フロー（roving tabindex）

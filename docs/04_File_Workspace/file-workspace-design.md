@@ -727,7 +727,161 @@ export function useDropListener() {
 
 ---
 
-## 16. 実装フェーズ
+## 16. 外部クラウドストレージ同期競合のエッジケース対応
+
+### 16.1 問題定義
+
+多くのユーザーはワークスペースを Dropbox・Google Drive・OneDrive・iCloud Drive などの
+クラウド同期フォルダ内に置く。このような環境では以下のエッジケースが発生する:
+
+| ケース | 発生状況 | 問題 |
+|--------|---------|------|
+| **競合ファイルの自動生成** | 同一ファイルを別デバイスで同時編集し、クラウドが競合を検知 | `report (1).md` のような競合コピーが突然ファイルツリーに出現する |
+| **高速上書き（Git ブランチ切り替え）** | `git checkout` 等でワークスペース内のファイルが大量置換される | エディタで開いていたファイルの内容が外部から高速上書きされ、編集中の変更が失われる |
+| **ファイルの瞬間消滅・再出現** | 同期ツールがファイルを一時削除してから再配置するパターン | `watch` イベントが delete → create と連続発火し、誤ってファイルクローズ処理が走る |
+| **ロックファイルによる書き込み失敗** | 同期ツールがファイルを排他ロック中（アップロード中等） | `writeTextFile` が `EBUSY` 等のエラーで失敗する |
+
+### 16.2 競合ファイル（`filename (1).md`）の検知と UX
+
+Dropbox は `filename (1).md`、Google Drive は `filename - Conflict.md` といった命名規則で
+競合コピーを生成する。
+
+**検知ルール**:
+
+```rust
+// src-tauri/src/file_watch.rs
+
+/// 競合ファイルのパターン（各クラウドサービスの命名規則）
+const CONFLICT_PATTERNS: &[&str] = &[
+    r"\(\d+\)\.",                   // Dropbox: "file (1).md"
+    r"- Conflict \d{4}-\d{2}-\d{2}",// Google Drive: "file - Conflict 2026-02-26.md"
+    r"\.conflicted copy \d{4}-\d{2}-\d{2}", // Dropbox 旧形式
+    r" \(Case Conflict\)",           // macOS ファイルシステム
+];
+
+pub fn is_conflict_file(filename: &str) -> bool {
+    CONFLICT_PATTERNS.iter().any(|pat| {
+        regex::Regex::new(pat).unwrap().is_match(filename)
+    })
+}
+```
+
+**UX フロー**:
+
+```
+[ファイルツリーに競合ファイルが出現（watch イベント）]
+  │
+  ▼
+[is_conflict_file() チェック]
+  │
+  ├─ 競合ファイルでない → 通常の新規ファイル表示
+  │
+  └─ 競合ファイルと判定
+       │
+       ▼
+     [ファイルツリーで競合ファイルを黄色アイコン ⚠ で強調表示]
+       │
+       ▼
+     [ステータスバーにトースト通知]
+       「"report (1).md" が競合ファイルとして検出されました。」
+       [元ファイルと比較] [競合ファイルを削除]
+       │
+       ├─ [元ファイルと比較] → Split Editor で両ファイルを並べて開く
+       └─ [競合ファイルを削除] → ゴミ箱へ移動（確認ダイアログなし、Undo 可）
+```
+
+### 16.3 高速上書き（Git ブランチ切り替え等）の対処
+
+Git の `checkout`・`rebase`・`stash pop` 等の操作でワークスペース内のファイルが
+大量に書き換えられる場合の対応:
+
+**ファイル変更の「バースト」検知**:
+
+```rust
+// src-tauri/src/file_watch.rs
+
+// 直近 1 秒以内に 5 件以上のファイル変更イベントが発生した場合を「バースト」と判定
+const BURST_THRESHOLD_COUNT: usize = 5;
+const BURST_WINDOW_MS: u64 = 1000;
+
+// バースト検知時の動作:
+// 1. 個別の変更通知を抑制（UI フラッドを防ぐ）
+// 2. 2 秒待機後に一括通知
+// 3. エディタで開いているファイルのみ競合チェックを実行
+```
+
+**エディタで開いているファイルが外部変更された場合のフロー**（既存 §4.2.1 の拡張）:
+
+```
+Git チェックアウトによるファイル変更検知
+  │
+  ▼
+[エディタで開いているファイルか確認]
+  │
+  ├─ 未保存変更あり → §4.2.1 の競合解決ダイアログを表示
+  │                   （再読込 / 保持 / 差分表示の選択肢）
+  │
+  └─ 未保存変更なし → 自動的にファイルを再読込
+                      ステータスバー: 「ファイルが外部で変更されました。再読込しました。」
+```
+
+### 16.4 ロックファイル・書き込み失敗のリトライ設計
+
+クラウド同期ツールがファイルをアップロード中（排他ロック中）に `save_file` が呼ばれると
+書き込みが失敗する場合がある。
+
+**リトライ戦略**:
+
+```rust
+// src-tauri/src/file_ops.rs
+
+pub async fn write_file_with_retry(
+    path: &Path,
+    content: &str,
+    max_retries: u32,
+) -> Result<(), FileError> {
+    let mut attempt = 0;
+    let delays_ms = [100, 300, 1000]; // 指数バックオフ
+
+    loop {
+        match tokio::fs::write(path, content).await {
+            Ok(_) => return Ok(()),
+            Err(e) if is_lock_error(&e) && attempt < max_retries => {
+                attempt += 1;
+                let delay = delays_ms.get(attempt as usize - 1).copied().unwrap_or(1000);
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+                continue;
+            }
+            Err(e) => return Err(FileError::WriteFailed { path: path.to_owned(), source: e }),
+        }
+    }
+}
+
+fn is_lock_error(e: &std::io::Error) -> bool {
+    matches!(e.kind(),
+        std::io::ErrorKind::PermissionDenied |
+        std::io::ErrorKind::WouldBlock |
+        std::io::ErrorKind::TimedOut
+    )
+}
+```
+
+**リトライ失敗時の UX**:
+- 3 回リトライ後も失敗 → エラートースト「ファイルの保存に失敗しました。クラウド同期が完了するまでお待ちください。」
+- `Ctrl+S` による手動保存は即座にフィードバック（リトライなしで即失敗通知）
+
+### 16.5 実装フェーズ
+
+| フェーズ | 内容 |
+|---------|------|
+| Phase 3 | 外部ファイル変更検知（§4.2.1）の実装と同時に `is_conflict_file` チェックを追加 |
+| Phase 3 | バースト検知ロジックと自動再読込を実装 |
+| Phase 5 | 競合ファイルの Split Editor 比較 UI を実装 |
+| Phase 7 | ロックファイルのリトライロジックを実装（ユーザー報告に基づき優先度調整） |
+
+---
+
+## 17. 実装フェーズ
 
 | フェーズ | 実装内容 |
 |---------|---------|

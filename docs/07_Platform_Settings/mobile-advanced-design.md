@@ -626,6 +626,117 @@ export function AccessoryToolbar({ editor, onImageInsert }: Props) {
 }
 ```
 
+### 5.6 スラッシュコマンド（`/`）の代替 UI 設計（モバイル向け）
+
+デスクトップでは `/` を入力するとスラッシュコマンドポップアップが表示されるが、
+ソフトキーボード環境では `/` の入力自体に手間がかかり、UX が低下する。
+
+**モバイルでの代替導線: アクセサリービューに「＋」ボタンを追加**
+
+```
+┌────────────────────────────────────────────────────────┐  ← アクセサリービュー
+│ **B** _I_ ~~S~~ `C` │ H1 H2 H3 │ [≡] [🖼] │ [＋] ↵   │
+└────────────────────────────────────────────────────────┘
+                                            ↑
+                                     要素挿入ボタン
+```
+
+**「＋」ボタンを押すと下から要素挿入パネル（モーダルシート）が表示される**:
+
+```
+┌────────────────────────────────────────────────────────┐
+│  要素を挿入                                   [✕]     │
+├───────────────┬───────────────┬───────────────┬────────┤
+│ 📋 コードブロック│ 📊 テーブル   │ ➗ 数式(KaTeX)  │ 🔗 リンク│
+├───────────────┼───────────────┼───────────────┼────────┤
+│ ──区切り線    │ 💬 引用       │ ☑ タスクリスト │ 📌 脚注 │
+├───────────────┼───────────────┼───────────────┼────────┤
+│ 🖼 画像       │ 📁 ファイルリンク│ 🗓 日付       │ [[]] リンク│
+└───────────────┴───────────────┴───────────────┴────────┘
+```
+
+**実装**:
+
+```typescript
+// src/components/mobile/ElementInsertSheet.tsx
+import { useState } from 'react';
+import { Editor } from '@tiptap/react';
+import { useMobileStore } from '../../store/mobileStore';
+
+interface InsertItem {
+  label: string;
+  icon: string;
+  command: (editor: Editor) => void;
+}
+
+const INSERT_ITEMS: InsertItem[] = [
+  { label: 'コードブロック', icon: '📋', command: (e) => e.chain().focus().toggleCodeBlock().run() },
+  { label: 'テーブル', icon: '📊', command: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3 }).run() },
+  { label: '数式', icon: '➗', command: (e) => e.chain().focus().insertContent({ type: 'mathBlock' }).run() },
+  { label: 'リンク', icon: '🔗', command: (e) => { /* リンク挿入ダイアログを開く */ } },
+  { label: '区切り線', icon: '──', command: (e) => e.chain().focus().setHorizontalRule().run() },
+  { label: '引用', icon: '💬', command: (e) => e.chain().focus().toggleBlockquote().run() },
+  { label: 'タスクリスト', icon: '☑', command: (e) => e.chain().focus().toggleTaskList().run() },
+  { label: '脚注', icon: '📌', command: (e) => e.chain().focus().insertContent({ type: 'footnote' }).run() },
+  { label: '画像', icon: '🖼', command: (e) => { /* SAF / PhotoLibrary 起動 */ } },
+  { label: 'Wikiリンク', icon: '[[]]', command: (e) => e.chain().focus().insertContent('[[').run() },
+];
+
+export function ElementInsertSheet({ editor }: { editor: Editor }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        className="accessory-btn accessory-insert"
+        onClick={() => setIsOpen(true)}
+        aria-label="要素を挿入"
+      >
+        ＋
+      </button>
+
+      {isOpen && (
+        <div className="element-insert-sheet" role="dialog" aria-label="要素を挿入">
+          <div className="sheet-backdrop" onClick={() => setIsOpen(false)} />
+          <div className="sheet-content">
+            <div className="sheet-header">
+              <span>要素を挿入</span>
+              <button onClick={() => setIsOpen(false)}>✕</button>
+            </div>
+            <div className="insert-grid">
+              {INSERT_ITEMS.map(({ label, icon, command }) => (
+                <button
+                  key={label}
+                  className="insert-item"
+                  onClick={() => {
+                    command(editor);
+                    setIsOpen(false);
+                  }}
+                >
+                  <span className="insert-icon">{icon}</span>
+                  <span className="insert-label">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+```
+
+**デスクトップとの機能対応関係**:
+
+| デスクトップ（スラッシュコマンド） | モバイル代替 |
+|----------------------------------|------------|
+| `/` → ポップアップ → コマンド選択 | アクセサリービューの `＋` ボタン → シート選択 |
+| スラッシュコマンドのキーワードフィルタリング | シート内の固定グリッドレイアウト（スクロール対応） |
+| スラッシュ入力の途中でエスケープ可 | シートは `backdrop` タップで閉じる |
+
+> **注意**: モバイルでも `/` を入力してスラッシュコマンドを使うことは可能（無効化はしない）。
+> ただし UX 的にはアクセサリービューの `＋` ボタンを主要な導線とする。
+
 ---
 
 ## 6. SAF / iCloud エッジケースと例外処理フロー

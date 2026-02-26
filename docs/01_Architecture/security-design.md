@@ -141,6 +141,121 @@ export function SplitPreview({ htmlContent, useSandbox }: SplitPreviewProps) {
 **採用決定**: **デフォルトは DOMPurify のみ**で実装し、`<iframe sandbox>` はオプション設定として提供する。
 Markdown エディタとしての主要ユースケースでは DOMPurify で十分なセキュリティレベルが保てる。
 
+### 1.3 TipTap カスタムノード向け DOMPurify ホワイトリスト拡張
+
+TipTap のカスタムノード（KaTeX 数式・Mermaid ダイアグラム・脚注・カスタムコンテナ等）が
+生成する DOM 要素を DOMPurify がサニタイズ時に誤って除去する事故が発生しやすい。
+以下のホワイトリスト拡張ルールを `renderSanitizedHtml` に適用する。
+
+#### 対象カスタムノードと必要な許可要素
+
+| TipTap ノード | 生成される要素 / 属性 | 除去リスク |
+|-------------|-------------------|----------|
+| KaTeX 数式（インライン・ブロック） | `<math>`, `<semantics>`, `<mrow>`, `<mi>`, `<mo>`, `<mn>`, `<mfrac>`, `<msup>`, `<msub>` など MathML タグ / `class="katex"` | **高** — DOMPurify デフォルトでは `<math>` 等を除去する |
+| Mermaid ダイアグラム | `<svg>`, `<path>`, `<g>`, `<rect>`, `<text>`, `<circle>` など / `viewBox`, `d`, `fill` 等 | **高** — SVG タグがデフォルトで除去される |
+| カスタムコンテナ（callout） | `<div data-type="callout" data-callout-type="warning">` | **低** — `data-*` は許可済みだが `data-type` の値フィルタが問題になりうる |
+| 脚注（footnote） | `<sup data-footnote-id="1">` / `<section data-footnotes>` | **低** — `data-*` は許可済み |
+| コードブロック | `<code data-language="rust">`, `<span class="hljs-keyword">` | **低** — `class` / `data-*` は許可済み |
+
+#### 修正版 DOMPurify 設定
+
+```typescript
+// src/renderer/html/live-preview.ts（拡張版）
+
+import DOMPurify from 'dompurify';
+
+/**
+ * TipTap カスタムノードの出力を DOMPurify に通す際の設定。
+ *
+ * ⚠ 注意: 新しいカスタムノードを TipTap に追加した場合は、
+ *   以下の ADD_TAGS / ADD_ATTR にも登録すること。
+ */
+const DOMPURIFY_CONFIG: DOMPurify.Config = {
+  ALLOWED_TAGS: [
+    // ... 基本タグ（§1.2 と同じ）
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'p', 'br', 'hr',
+    'strong', 'em', 'del', 'code', 'pre',
+    'ul', 'ol', 'li',
+    'blockquote',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'a', 'img',
+    'div', 'span', 'section', 'article', 'header', 'footer',
+    'details', 'summary',
+    'figure', 'figcaption',
+    'sup', 'sub', 'mark',
+  ],
+  // TipTap カスタムノード向け追加タグ
+  ADD_TAGS: [
+    // KaTeX / MathML
+    'math', 'semantics', 'mrow', 'mi', 'mo', 'mn',
+    'mfrac', 'msup', 'msub', 'msubsup', 'msqrt', 'mroot',
+    'mtext', 'mspace', 'mtable', 'mtr', 'mtd', 'mover', 'munder',
+    'annotation', 'annotation-xml',
+    // Mermaid SVG
+    'svg', 'path', 'g', 'rect', 'text', 'circle', 'ellipse',
+    'line', 'polyline', 'polygon', 'use', 'defs', 'marker',
+    'linearGradient', 'stop', 'clipPath', 'mask',
+  ],
+  ALLOWED_ATTR: [
+    'href', 'src', 'alt', 'title', 'class', 'id',
+    'width', 'height', 'align', 'colspan', 'rowspan',
+    'data-*', 'target', 'rel', 'type', 'start', 'checked', 'disabled',
+  ],
+  // TipTap カスタムノード向け追加属性
+  ADD_ATTR: [
+    // MathML 属性
+    'mathvariant', 'mathsize', 'mathcolor', 'mathbackground',
+    'display',          // <math display="block">
+    'fence', 'form',    // <mo fence="true">
+    'stretchy', 'largeop',
+    'xmlns',            // <math xmlns="http://www.w3.org/1998/Math/MathML">
+    // SVG 属性
+    'viewBox', 'd', 'fill', 'stroke', 'stroke-width',
+    'transform', 'cx', 'cy', 'rx', 'ry', 'x', 'y',
+    'x1', 'y1', 'x2', 'y2', 'points', 'marker-end',
+    'refX', 'refY', 'orient', 'markerWidth', 'markerHeight',
+    'clip-path', 'mask', 'opacity', 'font-size', 'text-anchor',
+    'preserveAspectRatio',
+    // カスタムコンテナ / その他
+    'aria-label', 'aria-hidden', 'role',
+    'tabindex', 'contenteditable',
+  ],
+  FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'button'],
+  FORCE_BODY: true,
+  USE_PROFILES: { html: true, svg: true, mathMl: true }, // MathML と SVG プロファイルを有効化
+};
+
+export function renderSanitizedHtml(container: HTMLElement, rawHtml: string): void {
+  const clean = DOMPurify.sanitize(rawHtml, DOMPURIFY_CONFIG);
+  container.innerHTML = clean;
+}
+```
+
+#### Mermaid ダイアグラムの特別扱い
+
+Mermaid は `<svg>` を直接生成するが、`sandbox iframe` を使う場合は DOMPurify を介さない。
+DOMPurify を通す場合でも、Mermaid の `<foreignObject>` などの高リスク要素は除去し、
+静的な SVG 描画のみを許可する:
+
+```typescript
+// Mermaid 出力用の厳格な SVG 設定（foreignObject を許可しない）
+const MERMAID_DOMPURIFY_CONFIG: DOMPurify.Config = {
+  ...DOMPURIFY_CONFIG,
+  FORBID_TAGS: [...(DOMPURIFY_CONFIG.FORBID_TAGS as string[]), 'foreignObject', 'script'],
+};
+```
+
+#### 新規カスタムノード追加時のチェックリスト
+
+新しい TipTap カスタムノードを実装した際は、以下を確認すること:
+
+- [ ] カスタムノードが生成するタグを `ADD_TAGS` に追加済みか
+- [ ] カスタムノードが使用する属性を `ADD_ATTR` に追加済みか
+- [ ] `data-type` などのカスタムデータ属性が `data-*` で網羅されているか
+- [ ] サニタイズ後にノードの表示が正常か（ローカルで確認）
+- [ ] `FORBID_TAGS` に追加が必要なリスク要素はないか
+
 ---
 
 ## 2. script タグを含む HTML ブロックの分離戦略

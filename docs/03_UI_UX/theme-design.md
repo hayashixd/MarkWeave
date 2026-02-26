@@ -16,6 +16,7 @@
 6. [テーマ切り替えの実装](#6-テーマ切り替えの実装)
 7. [ファイル構成](#7-ファイル構成)
 8. [実装フェーズ](#8-実装フェーズ)
+9. [カスタムフォント管理設計](#9-カスタムフォント管理設計)
 
 ---
 
@@ -906,3 +907,317 @@ export function ThemeCustomizer() {
     </div>
   );
 }
+
+---
+
+## 9. カスタムフォント管理設計
+
+### 9.1 設計目標
+
+Typora が支持される大きな理由のひとつは「文字の美しさ」である。本エディタでも以下を実現する。
+
+| 目標 | 詳細 |
+|------|------|
+| ローカルフォント利用 | OS にインストール済みの任意のフォントをエディタ・プレビュー・PDF 出力に適用 |
+| リガチャ制御 | プログラミングフォント（Fira Code など）の合字を有効/無効化 |
+| フォントスタック管理 | 本文・コード・見出し・UI の 4 スロットを独立して設定 |
+| エクスポート反映 | PDF・印刷出力にも同一フォント指定を適用（ブラウザ依存を回避） |
+
+---
+
+### 9.2 OS ローカルフォントの列挙
+
+#### Tauri コマンド: `list_system_fonts`
+
+```rust
+// src-tauri/src/font.rs
+use std::process::Command;
+
+#[tauri::command]
+pub async fn list_system_fonts() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        // fc-list または system_profiler を使用
+        let output = Command::new("fc-list")
+            .args([":", "family"])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut fonts: Vec<String> = stdout
+            .lines()
+            .flat_map(|l| l.split(','))
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        fonts.sort();
+        fonts.dedup();
+        Ok(fonts)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        // HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts
+        use winreg::{RegKey, enums::HKEY_LOCAL_MACHINE};
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let fonts_key = hklm
+            .open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts")
+            .map_err(|e| e.to_string())?;
+        let mut names: Vec<String> = fonts_key
+            .enum_values()
+            .filter_map(|r| r.ok())
+            .map(|(name, _)| {
+                // "Font Name (TrueType)" → "Font Name"
+                name.trim_end_matches(" (TrueType)")
+                    .trim_end_matches(" (OpenType)")
+                    .to_string()
+            })
+            .collect();
+        names.sort();
+        names.dedup();
+        Ok(names)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let output = Command::new("fc-list")
+            .args([":", "family"])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut fonts: Vec<String> = stdout
+            .lines()
+            .flat_map(|l| l.split(','))
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        fonts.sort();
+        fonts.dedup();
+        Ok(fonts)
+    }
+}
+```
+
+**注意**: `list_system_fonts` はアプリ起動時に 1 回だけ呼び出し、結果を React state にキャッシュする。フォント追加後は再起動が必要（動的更新は Phase 後続対応）。
+
+---
+
+### 9.3 フォント適用メカニズム
+
+#### CSS Custom Properties による適用
+
+```css
+/* src/themes/base.css */
+:root {
+  --font-sans:  "Helvetica Neue", Arial, sans-serif;   /* 本文 */
+  --font-mono:  "Courier New", monospace;               /* コード */
+  --font-head:  var(--font-sans);                       /* 見出し（デフォルトは本文と同じ） */
+  --font-ui:    system-ui, sans-serif;                  /* UI 要素 */
+}
+
+.editor-content { font-family: var(--font-sans); }
+.editor-content code,
+.editor-content pre  { font-family: var(--font-mono); }
+.editor-content h1,
+.editor-content h2,
+.editor-content h3   { font-family: var(--font-head); }
+```
+
+#### ユーザー指定フォントの動的注入
+
+フォントが OS にインストール済みの場合、`@font-face` は不要。CSS Custom Properties を上書きするだけで適用できる。
+
+```ts
+// src/themes/font-manager.ts
+export function applyUserFonts(fonts: FontSettings): void {
+  const { sans, mono, heading } = fonts;
+
+  // <style id="user-font-override"> を置き換え
+  let styleEl = document.getElementById('user-font-override') as HTMLStyleElement | null;
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'user-font-override';
+    document.head.appendChild(styleEl);
+  }
+
+  styleEl.textContent = `
+    :root {
+      ${sans    ? `--font-sans: "${sans}", sans-serif;`    : ''}
+      ${mono    ? `--font-mono: "${mono}", monospace;`     : ''}
+      ${heading ? `--font-head: "${heading}", sans-serif;` : ''}
+    }
+  `;
+}
+```
+
+`AppSettings` の `fonts` フィールドが変更されるたびに `applyUserFonts()` を呼び出す。
+
+---
+
+### 9.4 フォント設定スキーマ
+
+`user-settings-design.md §4.1` の `AppSettings` に以下を追加する。
+
+```ts
+// src/settings/schema.ts（追記）
+export interface FontSettings {
+  /** 本文フォント（空文字 = テーマ既定） */
+  sans:    string;
+  /** コード・等幅フォント */
+  mono:    string;
+  /** 見出しフォント（空文字 = sans と同一） */
+  heading: string;
+  /** リガチャ（合字）を有効化するか */
+  ligatures: boolean;
+}
+
+// AppSettings に追加
+export interface AppSettings {
+  // ... 既存フィールド ...
+  fonts: FontSettings;
+}
+
+export const DEFAULT_FONT_SETTINGS: FontSettings = {
+  sans:      '',
+  mono:      '',
+  heading:   '',
+  ligatures: false,
+};
+```
+
+---
+
+### 9.5 リガチャ（合字）の制御
+
+リガチャはコードブロックのプログラミングフォント（Fira Code、JetBrains Mono 等）で特に重要。
+
+```css
+/* リガチャ有効時 */
+.editor-content code,
+.editor-content pre {
+  font-variant-ligatures: common-ligatures contextual discretionary-ligatures;
+  font-feature-settings: "calt" 1, "liga" 1, "dlig" 1;
+}
+
+/* リガチャ無効時 */
+.editor-content code,
+.editor-content pre {
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0, "liga" 0, "dlig" 0;
+}
+```
+
+```ts
+// src/themes/font-manager.ts（追記）
+export function applyLigatures(enabled: boolean): void {
+  document.documentElement.dataset.ligatures = enabled ? 'on' : 'off';
+}
+```
+
+```css
+/* src/themes/base.css に追記 */
+[data-ligatures="on"] code,
+[data-ligatures="on"] pre {
+  font-variant-ligatures: common-ligatures contextual;
+  font-feature-settings: "calt" 1, "liga" 1;
+}
+[data-ligatures="off"] code,
+[data-ligatures="off"] pre {
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0, "liga" 0;
+}
+```
+
+---
+
+### 9.6 PDF / 印刷出力へのフォント反映
+
+PDF 出力は Tauri の `webview.print()` を使用する。ブラウザの印刷エンジンはシステムフォントを参照するため、**OS にインストール済みであれば追加設定なしで反映される**。
+
+エクスポート用 CSS には `@media print` スコープで変数をリセットし、`--export-font-sans` 等の明示的な変数を使用する。
+
+```css
+/* src/themes/export.css */
+@media print {
+  :root {
+    /* ユーザー設定の --font-sans をエクスポート層に引き継ぐ */
+    --export-font-sans: var(--font-sans, "Helvetica Neue", Arial, sans-serif);
+    --export-font-mono: var(--font-mono, "Courier New", monospace);
+  }
+
+  body { font-family: var(--export-font-sans); }
+  code, pre { font-family: var(--export-font-mono); }
+}
+```
+
+**Web フォント（Google Fonts 等）を PDF に使う場合**は、`@font-face` を埋め込んだ HTML を Tauri の `webview.load_html()` に渡し印刷する。オフライン環境でのフォールバックを必ず定義すること。
+
+---
+
+### 9.7 フォント選択 UI（`FontSelectorField` コンポーネント）
+
+既存の `ThemeCustomizer` §8 の「フォント」セクションで使用する `FontSelectorField` の完全実装。
+
+```tsx
+// src/components/settings/FontSelectorField.tsx
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+
+interface Props {
+  label:       string;
+  cssVariable: string;
+  value:       string;
+  onChange:    (cssVar: string, fontName: string) => void;
+}
+
+export function FontSelectorField({ label, cssVariable, value, onChange }: Props) {
+  const [systemFonts, setSystemFonts] = useState<string[]>([]);
+  const [filter, setFilter] = useState('');
+
+  useEffect(() => {
+    invoke<string[]>('list_system_fonts').then(setSystemFonts);
+  }, []);
+
+  const filtered = systemFonts.filter(f =>
+    f.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  return (
+    <div className="font-selector-field">
+      <label>{label}</label>
+      <input
+        type="text"
+        placeholder="フォント名を入力 or 選択…"
+        value={value}
+        onChange={e => onChange(cssVariable, e.target.value)}
+      />
+      {filter.length > 0 && (
+        <ul className="font-dropdown">
+          {filtered.slice(0, 20).map(f => (
+            <li
+              key={f}
+              style={{ fontFamily: f }}
+              onClick={() => { onChange(cssVariable, f); setFilter(''); }}
+            >
+              {f}
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        className="font-filter"
+        placeholder="絞り込み…"
+        value={filter}
+        onChange={e => setFilter(e.target.value)}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+### 9.8 実装フェーズ
+
+| フェーズ | 内容 |
+|----------|------|
+| **Phase 3** | `list_system_fonts` Tauri コマンド実装・`FontSelectorField` 実装・本文/コードフォント変更 |
+| **Phase 5** | 見出しフォント独立設定・リガチャ切り替え・設定永続化 |
+| **Phase 7** | PDF/印刷エクスポートへのフォント完全反映・Web フォント埋め込みオプション |

@@ -1,8 +1,8 @@
 # 設計検討済み項目一覧
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 1.5
-> 更新日: 2026-02-25
+> バージョン: 1.6
+> 更新日: 2026-02-26
 
 本ドキュメントは、プロジェクト全体の設計トピックを網羅した索引である。
 各項目について「検討済み（設計ドキュメントあり）」「未検討」「部分的に言及あり」を示す。
@@ -51,6 +51,7 @@
 | テキスト整形コマンド（ソート・重複削除・空白除去・大文字/小文字・全角/半角）| ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §12 |
 | 行ブックマークと F2 ジャンプ | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §13 |
 | 単語の自動補完（Ctrl+Space・文書内単語リスト）| ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §14 |
+| ブロック境界カーソル脱出設計（Ctrl+Enter で次段落移動・`BlockEscapeExtension`）| ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §15 |
 | エンコーディング明示的 Reload / Convert UI | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §10.3 |
 | 改行コード明示的 Convert and Save / Change Setting UI | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §11.3 |
 | YAML Front Matter 編集 UI（専用パネル / インライン折りたたみ表示） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §1 |
@@ -117,6 +118,7 @@
 | バックアップ設計（定期バックアップの仕組み・保存先・世代数） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §13 |
 | 印刷機能（ネイティブ印刷ダイアログ・印刷用 CSS 設計） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §14 |
 | ウィンドウへのドラッグ&ドロップによるファイルオープン | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §15 |
+| 外部クラウドストレージ同期競合対応（Dropbox/Google Drive 競合ファイル検出・バースト抑制・書き込みリトライ） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §16 |
 | セッション復元と LRU タブ上限の整合性（超過タブの扱い） | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §2.5 |
 | 3MB 超ファイルのクラッシュリカバリ制約とユーザー警告 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §10.7 |
 | 外部ファイル変更時の競合解決 UX（マージ選択ダイアログ・カーソル復元） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §4.2.1 |
@@ -148,6 +150,7 @@
 | バックグラウンド保存・非同期 I/O | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §5 |
 | フォルダ内全文検索のパフォーマンス | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §6 |
 | メモリ管理設計 | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §7 |
+| バックグラウンド非同期処理アーキテクチャ（tokio::spawn + Tauri emit による入力レイテンシ保護） | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §9 |
 
 ---
 
@@ -162,6 +165,7 @@
 | iframe / 埋め込みコンテンツのサンドボックス設計 | ✅ | [security-design.md](../01_Architecture/security-design.md) §1.2、[html-editing-design.md](../05_Features/HTML/html-editing-design.md) §11 |
 | アップデートパッケージの整合性検証（署名確認フロー詳細） | ✅ | [security-design.md](../01_Architecture/security-design.md) §4.7 |
 | プラグインのコードレビュー・公開ポリシー | ✅ | [security-design.md](../01_Architecture/security-design.md) §4.8 |
+| TipTap カスタムノード向け DOMPurify ホワイトリスト拡張（KaTeX MathML・Mermaid SVG・data-* 属性） | ✅ | [security-design.md](../01_Architecture/security-design.md) §1.3 |
 
 ---
 
@@ -215,6 +219,9 @@
 | ユーザー定義テーマ（JSON カスタムテーマ）| ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5 |
 | コードハイライトテーマの自動切り替え | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §4.3 |
 | プラットフォーム別フォントスタック（Windows / macOS / Linux / Android / iOS） | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §2.5 |
+| OS ローカルフォント列挙・適用設計（`list_system_fonts` Tauri コマンド・CSS Custom Properties 注入） | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §9 |
+| リガチャ（合字）有効/無効切り替え設計（`font-feature-settings`・`data-ligatures` 属性） | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §9.5 |
+| PDF/印刷エクスポートへのカスタムフォント反映設計 | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §9.6 |
 
 ---
 
@@ -230,6 +237,7 @@
 | Android SAF（ドキュメントプロバイダー）統合設計 | ✅ | [mobile-advanced-design.md](../07_Platform_Settings/mobile-advanced-design.md) §2 |
 | iCloud Drive 連携設計（iOS ファイルアクセス） | ✅ | [mobile-advanced-design.md](../07_Platform_Settings/mobile-advanced-design.md) §3 |
 | モバイル（Android SAF / iOS）でのエンコーディング検出制約と対応方針 | ✅ | [cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) §4.3.1 |
+| モバイル向けスラッシュコマンド代替 UI（「＋」ボタン → `ElementInsertSheet` モーダル） | ✅ | [mobile-advanced-design.md](../07_Platform_Settings/mobile-advanced-design.md) §5.6 |
 
 ---
 
@@ -388,6 +396,7 @@
 | Tauri コマンド（build_metadata_index / execute_metadata_query）| ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §5 |
 | テーブルビュー・リストビュー・カレンダービュー | ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §6 |
 | `QueryBlockView` NodeView（クエリブロックのインライン表示）| ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §6.4 |
+| SQLite スキーママイグレーション戦略（`user_version` pragma・rusqlite トランザクション・バックアップ・フォールバック） | ✅ | [metadata-query-design.md](../05_Features/metadata-query-design.md) §7 |
 
 ### 26.2 グラフビュー（リンクグラフ可視化）
 
@@ -449,6 +458,7 @@
 | スプリッタのドラッグリサイズ | ✅ | [split-editor-design.md](../03_UI_UX/split-editor-design.md) §8 |
 | 同一ファイル分割時のスクロール同期 | ✅ | [split-editor-design.md](../03_UI_UX/split-editor-design.md) §6 |
 | ペイン状態のセッション保存・復元 | ✅ | [split-editor-design.md](../03_UI_UX/split-editor-design.md) §5.2 |
+| 同一ファイル分割時の EditorState 共有・同期設計（アクティブ/ミラー方式・`useEditorInstance` フック） | ✅ | [split-editor-design.md](../03_UI_UX/split-editor-design.md) §10 |
 
 ### 25.3 Git / バージョン管理統合
 
@@ -520,3 +530,27 @@
 | 課題J | プラットフォーム別フォント定義の欠如 | `theme-design.md §2.5` にプラットフォーム別フォントスタック（Windows / macOS / Linux / Android / iOS）と実装コードを追加 |
 | 課題K | ワークスペース全文検索への ripgrep 依存の曖昧さ | `search-design.md §1`・`§3.2` と `performance-design.md §6.2` に「Rust 内製（walkdir + regex）、外部 ripgrep 不使用」の方針と理由を明記 |
 | 課題L | スマートクォーテーション・オートコレクト設計の不足 | 本ドキュメント §2 の状態を 🔶 のまま維持し、macOS WKWebView 抑制策（cross-platform-design.md §2.4）への参照と「エディタ UX 詳細（Undo 対応）は未作成」の旨を明記 |
+
+---
+
+## 28. 整合性レビュー（2026-02-26）で対応した矛盾・設計不足
+
+> 設計ドキュメント全体の整合性レビュー結果を受け、以下の 8 項目を既存ファイルへ追記した。
+
+### 28.1 整合性問題（矛盾の解消）
+
+| # | 問題内容 | 対応内容 |
+|---|---------|---------|
+| 矛盾1 | スプリットエディタ + Undo/Redo 競合（同一ファイル分割時に EditorState が 2 つ存在する問題） | `split-editor-design.md §10` に アクティブ/ミラー方式による EditorState 共有・同期設計を追加。`useEditorInstance(tabId)` フック仕様・ミラーペインの `readOnly` 化・リリース時のクリーンアップを定義 |
+| 矛盾2 | 非同期バックグラウンド処理と入力レイテンシの関係が不明確 | `performance-design.md §9` に 「バックグラウンド非同期処理アーキテクチャ（入力レイテンシ保護）」を追加。`tokio::spawn` + Tauri `emit` による fire-and-forget IPC パターン・D3.js グラフ計算の Web Worker 分離・オートセーブ非同期シーケンス図を定義 |
+| 矛盾3 | キーボード前提 UI（スラッシュコマンド）とモバイル UX の乖離 | `mobile-advanced-design.md §5.6` にスラッシュコマンド代替 UI を追加。アクセサリビューの「＋」ボタンから `ElementInsertSheet` モーダルを開く設計・10 種の挿入アイテム定義・デスクトップとの比較表を追加 |
+| 矛盾4 | HTML 編集（DOMPurify）と TipTap カスタムノード出力の競合（KaTeX MathML・Mermaid SVG が誤って除去される） | `security-design.md §1.3` に「TipTap カスタムノード向け DOMPurify ホワイトリスト拡張」を追加。KaTeX/Mermaid/WikiLink/TaskList/Footnote の各リスクレベルと `ADD_TAGS`/`ADD_ATTR` 拡張設定・新規カスタムノード追加時のチェックリストを定義 |
+
+### 28.2 設計不足の補完
+
+| # | 不足内容 | 対応内容 |
+|---|---------|---------|
+| 不足1 | 外部クラウドストレージ同期競合の解決設計が未定義 | `file-workspace-design.md §16` に「外部クラウドストレージ同期競合のエッジケース対応」を追加。Dropbox/Google Drive の競合ファイル検出 Rust 関数・バースト検出（1 秒 5 変更）・`write_file_with_retry()` 指数バックオフ（100ms→300ms→1000ms）を定義 |
+| 不足2 | SQLite スキーママイグレーション戦略が未定義 | `metadata-query-design.md §7` に「SQLite データベースマイグレーション戦略」を追加。`user_version` pragma によるバージョン管理・`run_migrations()` トランザクション安全な実行関数・マイグレーション前バックアップ（最大 3 世代）・インデックス再構築コマンドを定義 |
+| 不足3 | TipTap カーソルトラップ（ブロック末尾でカーソルが出られない）UX 設計が未定義 | `editor-ux-design.md §15` に「ブロック境界カーソル脱出設計（カーソルトラップ回避）」を追加。`Ctrl+Enter`（`Mod-Enter`）で次段落挿入する `BlockEscapeExtension` TipTap Extension・テーブル最終セルの `Tab` → 行追加・`BlockEscapeHint` ツールチップコンポーネントを定義 |
+| 不足4 | OS ローカルフォント・リガチャ管理設計が未定義 | `theme-design.md §9` に「カスタムフォント管理設計」を追加。`list_system_fonts` Tauri コマンド（Windows レジストリ / macOS・Linux fc-list）・CSS Custom Properties 上書きによる動的フォント適用・`FontSettings` スキーマ・リガチャ制御（`font-feature-settings`）・PDF 印刷への反映設計・`FontSelectorField` 完全実装を定義 |
