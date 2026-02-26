@@ -335,27 +335,198 @@ class PluginBridge {
 
 ### 4.4 ファイルシステムアクセスの制限
 
-`fs:read` / `fs:write` 権限を持つプラグインでも、アクセスできるパスは**現在のワークスペースフォルダ内のみ**に制限する。Tauri バックエンド側の `plugin-fs` スコープ制限を使用する。
+#### デフォルトアクセスモデル（Default-Deny）
+
+> **設計原則**: プラグインはデフォルトでファイルシステムへのアクセス権を持たない。
+> アクセス可能な情報源は「現在アクティブなエディタの AST（ドキュメント内容）」のみである。
+
+| アクセス対象 | デフォルト権限 | 権限付与後の制限 |
+|------------|-------------|----------------|
+| アクティブエディタの AST（ドキュメント内容） | ✅ `editor:read` で可能 | 権限不要（デフォルト公開情報） |
+| ワークスペース内ファイルの読み取り | ❌ 不可 | `fs:read` を manifest に宣言 + ユーザー承認で解除。ワークスペース内のみ |
+| ワークスペース内ファイルへの書き込み | ❌ 不可 | `fs:write` を manifest に宣言 + ユーザー承認で解除。ワークスペース内のみ |
+| ワークスペース外の任意パス | ❌ **永久に不可** | いかなる権限でも解除できない |
+| システムディレクトリ（/etc, C:\Windows 等） | ❌ **永久に不可** | いかなる権限でも解除できない |
+| Tauri IPC への直接アクセス | ❌ **永久に不可** | iframe sandbox により物理的に不可 |
+
+#### 権限スコープの詳細
+
+```
+[ワークスペースルート]  例: /Users/alice/Documents/notes/
+  ├── project-a/
+  │   ├── design.md           ← fs:read で読み取り可能 ✅
+  │   └── assets/
+  │       └── diagram.png     ← fs:read で読み取り可能 ✅
+  ├── project-b/
+  │   └── todo.md             ← fs:read で読み取り可能 ✅
+  └── .md-editor/
+      └── metadata.db         ← ❌ プラグインからのアクセス不可（内部 DB）
+
+[ワークスペース外]
+  /Users/alice/Documents/     ← ❌ 常に不可
+  /Users/alice/.ssh/          ← ❌ 常に不可
+  /etc/passwd                 ← ❌ 常に不可
+```
+
+#### Rust バックエンドによる厳格なパス検証
 
 ```rust
-// src-tauri/src/lib.rs（プラグイン向け fs コマンド）
+// src-tauri/src/plugins/fs_access.rs
 
+use std::path::{Path, PathBuf};
+
+/// プラグインがアクセスを要求するパスを検証する。
+/// ワークスペース外へのアクセスはすべて拒否する（パストラバーサル攻撃対策を含む）。
+fn validate_plugin_path(
+    requested_path: &str,
+    workspace_root: &Path,
+) -> Result<PathBuf, String> {
+    // ① パスを絶対パスに正規化（シンボリックリンク・".." を解決）
+    let abs_path = workspace_root
+        .join(requested_path)
+        .canonicalize()
+        .map_err(|e| format!("パスが解決できません: {e}"))?;
+
+    // ② ワークスペースルートも正規化
+    let canonical_workspace = workspace_root
+        .canonicalize()
+        .map_err(|e| format!("ワークスペースパスが無効: {e}"))?;
+
+    // ③ パストラバーサル検証: 正規化後もワークスペース内にあるか確認
+    if !abs_path.starts_with(&canonical_workspace) {
+        return Err(format!(
+            "セキュリティエラー: プラグインはワークスペース外のパスにアクセスできません\n\
+             要求パス: {:?}\n\
+             ワークスペース: {:?}",
+            abs_path, canonical_workspace
+        ));
+    }
+
+    // ④ 内部予約ディレクトリへのアクセスを拒否
+    let relative = abs_path.strip_prefix(&canonical_workspace).unwrap();
+    if relative.starts_with(".md-editor") {
+        return Err("セキュリティエラー: .md-editor ディレクトリへのアクセスは禁止されています".into());
+    }
+
+    Ok(abs_path)
+}
+
+/// プラグインからのファイル読み取りコマンド（Tauri Command）
 #[tauri::command]
 pub async fn plugin_read_file(
     app: AppHandle,
     plugin_id: String,
     path: String,
 ) -> Result<String, String> {
-    // ワークスペースパス内かどうかを検証
-    let workspace_path = get_current_workspace_path(&app)?;
-    let abs_path = resolve_path(&workspace_path, &path)?;
-
-    if !abs_path.starts_with(&workspace_path) {
-        return Err("プラグインはワークスペース外のファイルにアクセスできません".into());
+    // 権限チェック（PluginRegistry から権限リストを取得）
+    let registry = app.state::<PluginRegistry>();
+    if !registry.has_permission(&plugin_id, "fs:read") {
+        return Err(format!("プラグイン '{}' は fs:read 権限を持っていません", plugin_id));
     }
 
-    std::fs::read_to_string(&abs_path).map_err(|e| e.to_string())
+    let workspace_root = get_current_workspace_path(&app)?;
+    let validated_path = validate_plugin_path(&path, &workspace_root)?;
+
+    tokio::fs::read_to_string(&validated_path)
+        .await
+        .map_err(|e| e.to_string())
 }
+
+/// プラグインからのファイル書き込みコマンド（Tauri Command）
+#[tauri::command]
+pub async fn plugin_write_file(
+    app: AppHandle,
+    plugin_id: String,
+    path: String,
+    content: String,
+) -> Result<(), String> {
+    // 権限チェック
+    let registry = app.state::<PluginRegistry>();
+    if !registry.has_permission(&plugin_id, "fs:write") {
+        return Err(format!("プラグイン '{}' は fs:write 権限を持っていません", plugin_id));
+    }
+
+    let workspace_root = get_current_workspace_path(&app)?;
+    // 書き込みでは canonicalize() が存在しないパスで失敗するため、
+    // 親ディレクトリを検証してから書き込む
+    let parent = Path::new(&path).parent()
+        .ok_or("無効なパス: 親ディレクトリが存在しません")?;
+    let validated_parent = validate_plugin_path(
+        &parent.to_string_lossy(),
+        &workspace_root,
+    )?;
+    let validated_path = validated_parent.join(
+        Path::new(&path).file_name()
+            .ok_or("無効なパス: ファイル名がありません")?
+    );
+
+    tokio::fs::write(&validated_path, content)
+        .await
+        .map_err(|e| e.to_string())
+}
+```
+
+#### TypeScript 側 PluginBridge の fs API ラッパー
+
+```typescript
+// src/plugins/plugin-bridge.ts（fs API 処理部分）
+
+/**
+ * プラグインから 'fs.readFile' メソッドが呼ばれた場合の処理。
+ * PluginBridge.executeApiCall() から呼ばれる。
+ */
+private async handleFsReadFile(pluginId: string, args: unknown[]): Promise<string> {
+  const [path] = args as [string];
+
+  if (typeof path !== 'string' || !path) {
+    throw new Error('fs.readFile: path は文字列で指定してください');
+  }
+
+  // Tauri コマンド経由で Rust 側のパス検証 + 読み取り
+  return invoke<string>('plugin_read_file', { pluginId, path });
+}
+
+/**
+ * メソッド名 → 必要権限のマッピング（PluginBridge 内で参照）
+ */
+const API_METHOD_PERMISSION_MAP: Record<string, PluginPermission> = {
+  'editor.getMarkdown':    'editor:read',
+  'editor.insertText':     'editor:write',
+  'editor.chain':          'editor:command',
+  'fs.readFile':           'fs:read',
+  'fs.writeFile':          'fs:write',
+  'fs.listDirectory':      'fs:read',
+  'clipboard.readText':    'clipboard:read',
+  'clipboard.writeText':   'clipboard:write',
+  'network.fetch':         'network:fetch',
+  'ui.showToast':          'ui:toast',
+  'ui.showDialog':         'ui:dialog',
+} as const;
+```
+
+#### プラグイン manifest.json での宣言例
+
+```jsonc
+// fs:read のみ（ワークスペース内を参照するプラグイン例）
+{
+  "id": "com.example.file-linter",
+  "name": "File Linter",
+  "version": "1.0.0",
+  "permissions": ["editor:read", "fs:read"],
+  // ← fs:write は不要な場合は宣言しない（最小権限の原則）
+}
+
+// fs:read + fs:write（ワークスペース内にファイルを生成するプラグイン例）
+{
+  "id": "com.example.note-generator",
+  "name": "Note Generator",
+  "version": "1.0.0",
+  "permissions": ["editor:read", "fs:read", "fs:write"],
+}
+
+// 任意パスアクセスは宣言しても拒否される（永久に不可）
+// ❌ 以下のような権限は存在しない:
+// "permissions": ["fs:read:absolute"]  → 無効な権限名
 ```
 
 ---

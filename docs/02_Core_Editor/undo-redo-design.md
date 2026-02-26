@@ -499,6 +499,209 @@ export function scheduleSave(
 
 ---
 
+## 3.8 ケース7: スプリットエディタ（同一ファイル分割）の Undo クロスペイン問題
+
+### 問題
+
+`split-editor-design.md §10` の設計では、同一ファイルを2ペインで開く場合に
+**単一の EditorState を共有する**（active/mirror パターン）。
+この設計では、ペインBで行った編集に対してペインAで Ctrl+Z を押すと、
+**画面外（ペインB）の変更が取り消される**。
+
+```
+[ペインA] Hello World|               [ペインB] Hello World
+                                              ↓ "World" → "Earth" に編集
+[ペインA] (画面は変わらない)         [ペインB] Hello Earth
+
+ペインAで Ctrl+Z:
+  → EditorState がロールバック
+  → ペインAのビューポート内では何も変わらないように見えるが...
+  → ペインBの "Earth" が "World" に戻る（ユーザーには見えない）
+```
+
+### 設計決定: クロスペイン Undo はスペックとして受け入れる
+
+単一 EditorState 共有は、同期ずれ・競合回避のための意図的な設計選択であり、
+2つの独立した履歴スタックに分割することはしない。
+
+**理由:**
+- 独立スタックにすると「どちらの履歴でどの変更を取り消すか」の判断が複雑になる
+- 同一ファイルである以上、文書の一貫性は1つの EditorState が保証する
+
+### UX 緩和策: Undo 後の自動スクロール
+
+Ctrl+Z 実行後、変更が発生した位置へ自動スクロールすることで
+「どこが変わったか」をユーザーに見せる。
+
+```typescript
+// src/core/undo-with-scroll.ts
+
+import { undo } from 'prosemirror-history'
+import { EditorView } from 'prosemirror-view'
+
+/**
+ * Undo を実行し、変更が発生した最初の位置へスクロールする。
+ * スプリットエディタでのクロスペイン Undo の UX 緩和策。
+ */
+export function undoWithScroll(view: EditorView): boolean {
+  const stateBefore = view.state
+
+  // 標準の Undo を実行
+  const result = undo(view.state, view.dispatch)
+  if (!result) return false
+
+  // Undo 前後のドキュメントを比較して最初の変更位置を探す
+  const changedPos = findFirstChangedPosition(
+    stateBefore.doc,
+    view.state.doc,
+  )
+
+  if (changedPos !== null) {
+    // DOM ノードへスクロール
+    const domNode = view.nodeDOM(changedPos)
+    domNode?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+    // 変更位置にカーソルを移動（オプション）
+    const tr = view.state.tr.setSelection(
+      view.state.selection.constructor.near(view.state.doc.resolve(changedPos))
+    )
+    view.dispatch(tr.setMeta('addToHistory', false))
+  }
+
+  return true
+}
+
+/**
+ * 2つのドキュメントを比較し、最初に差異が生じた位置を返す。
+ */
+function findFirstChangedPosition(
+  docA: ProseMirror.Node,
+  docB: ProseMirror.Node,
+): number | null {
+  const minSize = Math.min(docA.content.size, docB.content.size)
+  for (let pos = 0; pos < minSize; pos++) {
+    if (!docA.resolve(pos).node().eq(docB.resolve(pos).node())) {
+      return pos
+    }
+  }
+  if (docA.content.size !== docB.content.size) {
+    return minSize
+  }
+  return null
+}
+```
+
+### キーバインド登録
+
+```typescript
+// スプリットエディタ用のキーバインドで標準 Undo をラップ
+import { keymap } from 'prosemirror-keymap'
+
+const splitEditorKeymap = keymap({
+  'Mod-z': (state, dispatch, view) => {
+    if (!view) return false
+    return undoWithScroll(view)
+  },
+})
+```
+
+### 初回通知トースト
+
+スプリットエディタ利用時に初めて Undo クロスペインが発生した場合、
+1回だけ教育的トーストを表示する。
+
+```typescript
+// セッション内で1度だけ表示（localStorage で管理）
+const CROSS_PANE_UNDO_SHOWN_KEY = 'split_editor_cross_pane_undo_shown'
+
+if (!localStorage.getItem(CROSS_PANE_UNDO_SHOWN_KEY)) {
+  showToast('Undo は両方のペインの編集履歴に影響します', { duration: 4000 })
+  localStorage.setItem(CROSS_PANE_UNDO_SHOWN_KEY, '1')
+}
+```
+
+---
+
+## 3.9 ケース8: Front Matter（CodeMirror 6）と TipTap の履歴分断
+
+### 問題
+
+YAML Front Matter は TipTap の NodeView 内に **CodeMirror 6 エディタ** として埋め込まれる
+（`editor-ux-design.md §1.2` 参照）。CodeMirror 6 は独自の Undo スタックを持つため、
+**TipTap (ProseMirror) の履歴と CodeMirror 6 の履歴は完全に独立している**。
+
+```
+操作シナリオ:
+  1. Front Matter で "tags: [foo]" → "tags: [foo, bar]" に編集（CodeMirror の履歴に記録）
+  2. 本文で "Hello" → "World" に編集（TipTap の履歴に記録）
+  3. 本文でフォーカスした状態で Ctrl+Z
+     → 「World」→「Hello」に戻る ✅（TipTap の Undo）
+  4. 再度 Ctrl+Z
+     → 本文の前の編集が取り消される（Front Matter の "bar" は戻らない ❌）
+
+Front Matter にフォーカスして Ctrl+Z:
+  → CodeMirror 6 の Undo が実行される（"bar" が消える） ✅
+  → TipTap の履歴には影響しない
+```
+
+### Phase 1 制約: 履歴スタックは独立のままとする
+
+**Front Matter（CodeMirror 6）と本文（TipTap）の Undo スタックは Phase 1 では統合しない。**
+
+| 観点 | 決定 |
+|------|------|
+| Front Matter にフォーカス中の Ctrl+Z | CodeMirror 6 の Undo を実行 |
+| 本文にフォーカス中の Ctrl+Z | TipTap (ProseMirror) の Undo を実行 |
+| 跨いだ Undo（Front Matter → 本文 or 逆） | Phase 1 では未対応 |
+
+**理由:**
+- `prosemirror-codemirror` ブリッジによる統合は実装コストが高い
+- Front Matter の編集頻度は本文より低く、混在 Undo の需要は限定的
+- CodeMirror 6 の独立スタックは「フォーカスが当たっているエディタで Undo」という
+  直感的なルールで十分許容範囲内
+
+### UX 緩和策: Front Matter フォーカス時の視覚フィードバック
+
+フォーカスが Front Matter ブロックにある場合、視覚的に明示することで
+「今どちらのエディタが Undo を受け取るか」を伝える。
+
+```css
+/* Front Matter ブロックがアクティブの場合 */
+.front-matter-node.is-cm-focused {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+```
+
+```typescript
+// CodeMirror 6 の focus/blur イベントで TipTap NodeView にクラスを付与
+class FrontMatterNodeView implements NodeView {
+  private cmView: EditorView  // CodeMirror 6 の EditorView
+
+  constructor(/* ... */) {
+    this.cmView = new CMEditorView({
+      extensions: [
+        // フォーカス状態を外側の DOM に伝える
+        CMEditorView.focusChangeEffect.of((state, focusing) => {
+          this.dom.classList.toggle('is-cm-focused', focusing)
+          return null
+        }),
+      ],
+    })
+  }
+}
+```
+
+### 将来検討 (Phase 7+): 統合 Undo スタック
+
+Phase 7 以降で実装コストが許容できる場合、以下のアプローチを検討する:
+
+- `prosemirror-codemirror` ライブラリによる双方向ブリッジ
+- CodeMirror の各編集を ProseMirror トランザクションとして中継し、単一履歴スタックへ統合
+- ただし IME・変換処理との相互作用に注意が必要
+
+---
+
 ## 4. Typora 式フォーカスモデルと Undo の統合設計
 
 ### 4.1 状態遷移図
@@ -688,6 +891,8 @@ import { yUndoPlugin, undo, redo } from 'y-prosemirror'
 | **ケース4** 複数段落選択削除 | 1回の Ctrl+Z で全復元 | ProseMirror のデフォルト動作（対応不要） |
 | **ケース5** テキスト入力粒度 | 500ms 以内の入力は1グループ | `newGroupDelay: 500` 設定のみ |
 | **ケース6** 自動保存 vs closeHistory | 自動保存は closeHistory を呼ばない | 保存はファイル書き込みのみ（blur 時に委任） |
+| **ケース7** スプリットエディタ クロスペイン Undo | クロスペイン Undo はスペックとして受け入れ; 変更位置へ自動スクロール | `undoWithScroll()` でラップ; 初回トースト通知 |
+| **ケース8** Front Matter / CodeMirror 6 履歴分断 | Phase 1: スタックは独立のまま; フォーカスのあるエディタで Undo | Front Matter フォーカス時のアウトライン強調 |
 | フォーカス切替 | Undo の対象外 | `addToHistory: false` |
 | レンダリング切替 | Undo の対象外 | `addToHistory: false` |
 | プログラム的変換 | Undo の対象外 | `addToHistory: false` |
@@ -699,8 +904,10 @@ import { yUndoPlugin, undo, redo } from 'y-prosemirror'
 高 ② テーブル各操作の個別 dispatch（ケース2）
 中 ③ Input Rule は TipTap のデフォルトで動作（ケース3）
 中 ④ 自動保存で closeHistory を呼ばない（ケース6）
-低 ⑤ History の depth / newGroupDelay チューニング（ケース5）
-低 ⑥ ブロックフォーカス状態のデコレーション管理
+中 ⑤ スプリットエディタで undoWithScroll() を適用（ケース7）
+低 ⑥ History の depth / newGroupDelay チューニング（ケース5）
+低 ⑦ ブロックフォーカス状態のデコレーション管理
+低 ⑧ Front Matter フォーカスアウトライン表示（ケース8）
 ```
 
 ---

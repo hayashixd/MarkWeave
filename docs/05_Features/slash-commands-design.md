@@ -383,6 +383,190 @@ interface EditorSettings {
 
 ---
 
+## 9. IME Composition ガードレール
+
+### 問題
+
+日本語・中国語・韓国語などの IME（Input Method Editor）を使って全角スラッシュ `／` を
+入力しようとすると、IME が確定 Enter を発火する際にスラッシュコマンドポップアップが
+意図せず開く・または選択確定してしまう問題が発生する。
+
+```
+ユーザーが日本語 IME で「/」を入力しようとする操作:
+  1. IME 変換候補として「/」（全角）が表示される
+  2. Enter キーで IME の変換確定
+  3. ← この Enter が SlashCommandExtension の onKeyDown に届いてしまう
+  4. ポップアップが開く、またはコマンドが誤実行される
+```
+
+### 設計決定: isComposing フラグで IME 中をガードする
+
+**すべての KeyboardEvent ハンドラで `event.isComposing` を確認してから処理する。**
+`isComposing === true` の場合は、スラッシュコマンドに関する一切の処理をスキップする。
+
+```typescript
+// src/plugins/slash-commands/SlashCommandExtension.ts
+
+import { Extension } from '@tiptap/core'
+import { Plugin, PluginKey } from 'prosemirror-state'
+
+const slashCommandKey = new PluginKey('slashCommand')
+
+export const SlashCommandExtension = Extension.create({
+  name: 'slashCommand',
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: slashCommandKey,
+
+        props: {
+          handleKeyDown(view, event) {
+            // ① IME 変換中はすべてのスラッシュコマンド処理をスキップ
+            if (event.isComposing) {
+              return false  // イベントを横取りしない
+            }
+
+            const state = slashCommandKey.getState(view.state)
+
+            // ② スラッシュ入力でポップアップを開く
+            if (event.key === '/') {
+              // isComposing チェック済みなので安全に処理
+              openSlashCommandPopup(view)
+              return false
+            }
+
+            // ③ ポップアップが開いている場合のキー操作
+            if (state?.isOpen) {
+              switch (event.key) {
+                case 'Enter':
+                  // isComposing チェック済みなので IME 確定 Enter は届かない
+                  executeSelectedCommand(view, state)
+                  return true
+
+                case 'ArrowDown':
+                  selectNextCommand(view, state)
+                  return true
+
+                case 'ArrowUp':
+                  selectPrevCommand(view, state)
+                  return true
+
+                case 'Escape':
+                  closeSlashCommandPopup(view)
+                  return true
+              }
+            }
+
+            return false
+          },
+        },
+      }),
+    ]
+  },
+})
+```
+
+### React コンポーネント側のガード
+
+スラッシュコマンドポップアップを React コンポーネントで実装している場合も同様に
+`isComposing` を確認する。
+
+```tsx
+// src/components/SlashCommandPopup.tsx
+
+function SlashCommandPopup({ onSelect, onClose }: SlashCommandPopupProps) {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    // IME 変換中はスキップ
+    if (event.nativeEvent.isComposing) return
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      onSelect()
+    } else if (event.key === 'Escape') {
+      onClose()
+    }
+  }
+
+  return (
+    <div
+      role="listbox"
+      aria-label="スラッシュコマンド"
+      onKeyDown={handleKeyDown}
+    >
+      {/* コマンド一覧 */}
+    </div>
+  )
+}
+```
+
+### トリガー検出（`/` 入力時）のガード
+
+スラッシュ文字を検出してポップアップを開くロジックでも同様のガードが必要。
+
+```typescript
+// handleTextInput（ProseMirror Plugin の props）でのガード
+
+props: {
+  handleTextInput(view, from, to, text) {
+    // ① isComposing ガード: DOM イベントから composing 状態を取得
+    //    ProseMirror の handleTextInput は KeyboardEvent を受け取らないため、
+    //    compositionstart / compositionend イベントで状態を追跡する
+    if (isComposingRef.current) {
+      return false
+    }
+
+    // ② 行頭での '/' 入力を検出
+    if (text === '/') {
+      const $from = view.state.doc.resolve(from)
+      const isAtLineStart = $from.parentOffset === 0
+
+      if (isAtLineStart) {
+        openSlashCommandPopup(view)
+        // '/' 自体はドキュメントに挿入しない場合は return true
+        // 挿入してからトリガーする場合は return false
+        return false
+      }
+    }
+
+    return false
+  },
+},
+```
+
+```typescript
+// IME 変換状態を追跡するユーティリティ
+
+let isComposingRef = { current: false }
+
+// ProseMirror Plugin の init で DOM イベントリスナーを登録
+function setupCompositionTracking(view: EditorView): () => void {
+  const onStart = () => { isComposingRef.current = true }
+  const onEnd   = () => { isComposingRef.current = false }
+
+  view.dom.addEventListener('compositionstart', onStart)
+  view.dom.addEventListener('compositionend',   onEnd)
+
+  // クリーンアップ関数を返す
+  return () => {
+    view.dom.removeEventListener('compositionstart', onStart)
+    view.dom.removeEventListener('compositionend',   onEnd)
+  }
+}
+```
+
+### テストケース
+
+| 操作 | 期待動作 |
+|------|---------|
+| 半角 `/` をキーボードから直接入力（IME オフ） | ポップアップが開く ✅ |
+| 日本語 IME で `/` を変換・Enter で確定 | ポップアップが開かない ✅ |
+| 日本語 IME でコマンド名（「見出し」等）を変換中に Enter | コマンドが実行されない ✅ |
+| ポップアップが開いている状態で IME 変換中に Enter | コマンドが実行されない ✅ |
+| ポップアップが開いている状態で通常の Enter | コマンドが実行される ✅ |
+
+---
+
 ## 関連ドキュメント
 
 - [editor-ux-design.md](./editor-ux-design.md) — エディタ全体の UX 設計

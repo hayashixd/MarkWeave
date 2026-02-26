@@ -196,6 +196,49 @@ export async function startWatching(
 | タブで開いているファイルが変更、かつ未編集 | 自動リロード（確認なし）|
 | タブで開いているファイルが変更、かつ編集中（未保存あり）| 競合ダイアログを表示 |
 
+> **設計原則（厳守）: Dirty 状態のファイルは絶対に自動リロードしない**
+>
+> ファイルが Dirty（未保存変更あり）の場合、外部からの変更が検知されても
+> **いかなる条件でも自動リロードを行ってはならない**。
+> 必ず §4.2.1 の競合解決ダイアログを表示してユーザーに選択を委ねる。
+>
+> この原則を破った場合、ユーザーが入力した未保存の変更が**無断で失われる**。
+> データロス防止はエディタの最優先事項である。
+
+```typescript
+// src/file/external-change-handler.ts
+
+/**
+ * 外部ファイル変更イベントのハンドラ。
+ * Dirty 状態チェックを最優先で行う。
+ */
+export function handleExternalFileChange(
+  filePath: string,
+  fileStore: FileStore,
+  dialogService: DialogService,
+): void {
+  const tab = fileStore.getOpenTab(filePath);
+
+  // ① タブで開かれていない → ファイルツリーのみ更新
+  if (!tab) {
+    fileStore.refreshFileTree(filePath);
+    return;
+  }
+
+  // ② Dirty チェック: 未保存変更がある場合は自動リロード禁止
+  if (tab.isDirty) {
+    // ❌ tab.reload() を直接呼んではいけない
+    // ✅ 必ずダイアログを経由する
+    dialogService.showConflictDialog(filePath);
+    return;
+  }
+
+  // ③ Dirty でない（Clean）場合のみ自動リロード
+  tab.reload();
+  showStatusBarMessage(`${path.basename(filePath)} を再読込しました`);
+}
+```
+
 #### 4.2.1 競合解決ダイアログ（未保存変更がある場合）
 
 ```
