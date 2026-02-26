@@ -219,12 +219,17 @@ function useTypewriterScroll(editor: Editor) {
 
 | 操作 | 動作 |
 |------|------|
-| `Ctrl+Shift+Z` (Windows/Linux) / `Cmd+Shift+Z` (macOS) | Zen モードのトグル |
-| `F11` | フルスクリーンのトグル（Zen モードと連動）|
+| `F11` | Zen モードのトグル（フルスクリーン + UI 非表示を同時切り替え） |
+| `Ctrl+Shift+F11` (Windows/Linux) / `Cmd+Shift+F11` (macOS) | Zen モードのトグル（F11 が効かない環境向け代替） |
 | `Esc` | Zen モード終了（フルスクリーンも解除）|
 | メニュー: 表示 → Zen モード | Zen モードのトグル |
 
-> **注記**: `Ctrl+Shift+Z` は通常 Redo のショートカット。Zen モードのトリガーには `Ctrl+Shift+Z` の代わりに専用ショートカットを割り当てる（[keyboard-shortcuts.md](./keyboard-shortcuts.md) §1 と競合しないか要確認）。
+> **ショートカット選定理由** (`keyboard-shortcuts.md §1-5` と整合済み):
+> - `Ctrl+Shift+Z` / `Cmd+Shift+Z` は **Redo** に予約済み（`keyboard-shortcuts.md §1-4`）のため使用禁止。
+> - `F11` は `keyboard-shortcuts.md §1-5` の「フルスクリーン」として既に割り当て済みであり、
+>   Zen モードはフルスクリーンを内包するため、**同一キーで統合**することが自然。
+> - macOS では `F11` が Mission Control/デスクトップ表示（Exposé）に割り当たっている場合があるため、
+>   macOS での主ショートカットは `Ctrl+Cmd+F`（フルスクリーン OS 標準）を代替として案内する。
 
 ### 6.2 Zen モード中に利用可能なショートカット
 

@@ -122,18 +122,26 @@ const extensions = [
 
 ## 3. カスタムコンテナ / Callout ブロック
 
-### 3.1 対応方針
+### 3.1 対応方針と段階的提供計画
 
-**採用方針**: MVP（Phase 1〜4）では未対応とし、Phase 7 以降でプラグインとして実装する。
+Callout（`> [!NOTE]` 形式）は Typora 互換体験において利用頻度が高いため、MVP 以降で段階的に提供する。
 
-理由:
+| フェーズ | 提供内容 | 詳細 |
+|---------|---------|------|
+| Phase 1〜2 | **非対応** | `> [!NOTE]` を通常の blockquote としてレンダリング |
+| Phase 3 | **読み取り専用レンダリング** | GitHub Alerts スタイルの `> [!NOTE/WARNING/TIP/IMPORTANT/CAUTION]` をアイコン付きでスタイリング表示。編集 UX は未実装（引用ブロックとして編集） |
+| Phase 7 | **完全な WYSIWYG 編集 UX** | TipTap カスタム BlockNode + スラッシュコマンドでの挿入・タイプ選択 UI |
+
+> **Phase 3 で読み取り専用レンダリングを提供する理由**: `> [!NOTE]` は GFM に準拠した記法であり、Obsidian・GitHub などから移行したユーザーのドキュメントに多く含まれる。Phase 7 まで全く表示されないとユーザー体験の乖離が生じるため、レンダリングのみ先行提供する。
+
+理由（Phase 7 までフル実装しない理由）:
 - `:::warning` 記法は標準 GFM ではなく、markdown-it-container 等の独自拡張
 - remark での対応には remark-directive または remark-containers プラグインが必要
-- サポートする場合は Obsidian 互換の `> [!NOTE]` 形式を優先採用
+- TipTap カスタム BlockNode の実装はプラグイン API 基盤（Phase 7）に乗せるのが合理的
 
 ### 3.2 採用するコンテナ形式
 
-将来対応時は **GitHub / Obsidian スタイルの callout** を採用する:
+**GitHub / Obsidian スタイルの callout（GFM Alerts）** を採用する:
 
 ```markdown
 > [!NOTE]
@@ -144,9 +152,15 @@ const extensions = [
 
 > [!TIP]
 > これはヒントです。
+
+> [!IMPORTANT]
+> 重要な情報です。
+
+> [!CAUTION]
+> 注意が必要な情報です。
 ```
 
-**レンダリング**:
+**Phase 3 以降のレンダリング**:
 ```
 ╔════════════════════════════════╗
 ║ ℹ️ NOTE                        ║
@@ -159,11 +173,37 @@ const extensions = [
 ╚════════════════════════════════╝
 ```
 
-### 3.3 実装予定（Phase 7 以降）
+### 3.3 Phase 3: 読み取り専用レンダリング実装
 
-- TipTap カスタム BlockNode `callout`（`type: 'note' | 'warning' | 'tip' | 'danger'`）
+Phase 3 では TipTap の `InputRule` を使わず、`remark-gfm` の GFM Alerts パース（GitHub Flavored Markdown 仕様）を利用する。
+
+```typescript
+// src/renderer/wysiwyg/extensions/callout-render.ts（Phase 3 暫定実装）
+// remark-gfm の blockquote パースを拡張し、先頭行が > [!TYPE] の場合に
+// calloutType 属性を付与したブロックとしてレンダリングするのみ。
+// 編集は通常の blockquote として扱う（入力ルール・カスタムノードなし）。
+
+const CALLOUT_TYPES = ['NOTE', 'WARNING', 'TIP', 'IMPORTANT', 'CAUTION'] as const;
+const CALLOUT_ICONS: Record<string, string> = {
+  NOTE:      'ℹ️',
+  WARNING:   '⚠️',
+  TIP:       '💡',
+  IMPORTANT: '❗',
+  CAUTION:   '🔴',
+};
+
+// CSS でスタイリング（テーマ変数活用）
+// .callout-note    { border-left: 4px solid var(--callout-note-color, #58a6ff); }
+// .callout-warning { border-left: 4px solid var(--callout-warning-color, #f0883e); }
+```
+
+### 3.4 完全実装予定（Phase 7 以降）
+
+- TipTap カスタム BlockNode `callout`（`type: 'note' | 'warning' | 'tip' | 'important' | 'caution'`）
 - remark-directive プラグインで Markdown をパース
 - テーマの CSS 変数でカラーを定義
+- スラッシュコマンド（`/note`・`/warning`・`/tip`）でのカスタムコンテナ挿入
+- callout タイプ変更 UI（callout ヘッダークリックで種類を切り替え）
 
 ---
 

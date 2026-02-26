@@ -1295,7 +1295,68 @@ function GraphView({ graphData }: { graphData: GraphData }) {
 }
 ```
 
-### 9.4 自動保存デバウンスと非同期処理のシーケンス
+### 9.4 Yjs CRDT 導入時の Web Worker オフロード戦略（Phase 6 以降向け事前設計）
+
+`window-tab-session-design.md §12.4 / §13.8` で将来オプションとして言及されている **Yjs CRDT** を導入する場合、CRDT のエンコード処理・差分計算がメインスレッドをブロックし、**16ms のパフォーマンスバジェットを破壊するリスク**がある。
+
+**問題のメカニズム**:
+```
+キー入力 → TipTap トランザクション → [16ms 以内に]
+  ├─ DOM 更新                    ≈ 2〜5ms   ← OK
+  ├─ Y.Doc への変換 + エンコード  ≈ 5〜50ms+ ← 問題（大規模ドキュメントで顕著）
+  └─ 合計で 16ms 超過 → コマ落ち
+```
+
+**事前設計の原則**: Yjs を導入する段階で以下を初期設計に組み込む（後付けは困難）。
+
+| 原則 | 具体的手法 |
+|------|-----------|
+| CRDT 処理をメインスレッドから分離 | `@tiptap/extension-collaboration` のアップデートハンドラを Web Worker でラップ |
+| 差分エンコードを非同期化 | `Y.encodeStateAsUpdate()` を Worker 内で実行し、postMessage で結果を受け取る |
+| チェックポイント保存はバックグラウンド | CRDT ドキュメントスナップショット（`Uint8Array`）の書き込みは Rust バックグラウンドタスクで実行 |
+
+```typescript
+// src/workers/crdt-sync.worker.ts（Phase 6 以降の実装スケルトン）
+// CRDT 差分エンコード・チェックポイント保存を Web Worker で実行する雛形
+
+import * as Y from 'yjs';
+
+let ydoc: Y.Doc | null = null;
+
+self.onmessage = (event: MessageEvent) => {
+  const { type, payload } = event.data;
+
+  switch (type) {
+    case 'INIT':
+      // Y.Doc を Worker 内で初期化
+      ydoc = new Y.Doc();
+      if (payload.initialState) {
+        Y.applyUpdate(ydoc, payload.initialState);
+      }
+      break;
+
+    case 'APPLY_UPDATE':
+      // メインスレッドからの変更を適用
+      if (ydoc) Y.applyUpdate(ydoc, payload.update);
+      break;
+
+    case 'ENCODE_CHECKPOINT':
+      // チェックポイント保存用に状態をエンコード
+      if (ydoc) {
+        const state = Y.encodeStateAsUpdate(ydoc);
+        self.postMessage({ type: 'CHECKPOINT_READY', payload: state });
+      }
+      break;
+  }
+};
+```
+
+> **実装タイミング**: Yjs CRDT は Phase 6 以降の将来検討であり、現在実装は不要。
+> ただし Phase 6 以降で Yjs を採用する場合は、**必ず Worker オフロードを前提とした設計**で進めること（後付け対応はアーキテクチャを壊す）。
+
+---
+
+### 9.5 自動保存デバウンスと非同期処理のシーケンス
 
 ```
 ユーザーがキー入力

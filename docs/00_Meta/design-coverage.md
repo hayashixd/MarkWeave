@@ -557,3 +557,27 @@
 | 不足2 | SQLite スキーママイグレーション戦略が未定義 | `metadata-query-design.md §7` に「SQLite データベースマイグレーション戦略」を追加。`user_version` pragma によるバージョン管理・`run_migrations()` トランザクション安全な実行関数・マイグレーション前バックアップ（最大 3 世代）・インデックス再構築コマンドを定義 |
 | 不足3 | TipTap カーソルトラップ（ブロック末尾でカーソルが出られない）UX 設計が未定義 | `editor-ux-design.md §15` に「ブロック境界カーソル脱出設計（カーソルトラップ回避）」を追加。`Ctrl+Enter`（`Mod-Enter`）で次段落挿入する `BlockEscapeExtension` TipTap Extension・テーブル最終セルの `Tab` → 行追加・`BlockEscapeHint` ツールチップコンポーネントを定義 |
 | 不足4 | OS ローカルフォント・リガチャ管理設計が未定義 | `theme-design.md §9` に「カスタムフォント管理設計」を追加。`list_system_fonts` Tauri コマンド（Windows レジストリ / macOS・Linux fc-list）・CSS Custom Properties 上書きによる動的フォント適用・`FontSettings` スキーマ・リガチャ制御（`font-feature-settings`）・PDF 印刷への反映設計・`FontSelectorField` 完全実装を定義 |
+
+---
+
+## 29. 整合性レビュー（2026-02-26 第2回）で対応した矛盾・設計不足
+
+> 40件以上の設計ドキュメントの俯瞰レビューで発見された矛盾・不足事項を解消した。
+
+### 29.1 矛盾・不整合の解消
+
+| # | 問題内容 | 対応内容 |
+|---|---------|---------|
+| 矛盾1 | モバイル対応フェーズが `decision-log.md`（Phase 8 と誤記）と `cross-platform-design.md`（Phase 5 と別系統番号）で不整合 | `cross-platform-design.md §1` のプラットフォームロードマップを `roadmap.md` の Phase 体系に統一（macOS/Linux: Phase 7 以降、Android/iOS: Phase 8 以降）。`decision-log.md §1` の誤ったフェーズ参照を修正 |
+| 矛盾2 | Callout/カスタムコンテナが Phase 7 まで一切提供されず UX 乖離リスク | `markdown-extensions-design.md §3` に段階的提供計画を追加（Phase 3: `> [!NOTE]` 形式の読み取り専用レンダリング、Phase 7: 完全な WYSIWYG 編集 UX） |
+| 矛盾3 | マルチウィンドウ排他制御 × ペイン分割のエッジケースが未設計 | `split-editor-design.md §11` に「マルチウィンドウ × ペイン分割のエッジケース」を新設。クロスウィンドウ・クロスペインシナリオの挙動ルール表・実装チェックリストを定義 |
+| 矛盾4 | `image-design.md §3`（ファイル移動時の画像パス自動更新）と `file-workspace-design.md §5.3`（MVP ではリンク更新しない）の方針が矛盾して見えた | `file-workspace-design.md §5.3` を更新：両ポリシーが「移動ファイル自身の画像パス（Phase 3 で更新）」と「他ファイルからのリンク（Phase 7 で更新）」の別物であることを明記する表を追加。`image-design.md §3.1` に両ポリシーの関係を説明する注記を追加 |
+| 矛盾5 | `zen-mode-design.md §6.1` の Zen モードショートカット `Ctrl+Shift+Z` が `keyboard-shortcuts.md §1-4` の Redo と競合 | `zen-mode-design.md §6.1` のショートカットを `F11`（フルスクリーンと統合）＋ `Ctrl+Shift+F11`（代替）に変更。`keyboard-shortcuts.md §1-5` と `roadmap.md` の Zen モード項目も同期更新 |
+
+### 29.2 設計不足の補完
+
+| # | 不足内容 | 対応内容 |
+|---|---------|---------|
+| 不足1 | Yjs CRDT 導入時に 16ms パフォーマンスバジェットを破壊するリスクの対策設計が未定義 | `performance-design.md §9.4` に「Yjs CRDT 導入時の Web Worker オフロード戦略（Phase 6 以降向け事前設計）」を追加。CRDT エンコード・差分計算を Web Worker で実行するためのアーキテクチャ原則・実装スケルトンを定義 |
+| 不足2 | セーフモードの「起動直後クラッシュ」最悪ケースのユーザーフロー未設計 | `plugin-api-design.md §9.5` を拡張。OS ネイティブダイアログ（`native_dialog` クレート）を使った Phase A/B/C クラッシュ検出・起動失敗カウンター Rust 実装・Shift+ダブルクリックのセーフモード起動フローを設計 |
+| 不足3 | Tauri コマンドの引数・戻り値型が一箇所にまとまっていなかった | `docs/01_Architecture/tauri-ipc-interface.md` を新規作成。ファイル操作・ワークスペース・画像・検索・メタデータ・Git・プラグイン・ウィンドウ管理の全コマンドを型定義形式で網羅 |

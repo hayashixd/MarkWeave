@@ -961,18 +961,97 @@ export const usePluginSettingsStore = create<PluginSettingsStore>((set, get) => 
 
 セーフモードでは全サードパーティプラグインを無効化して起動する。クラッシュループからの回復手段。
 
-```
-セーフモード起動トリガー:
-  1. コマンドラインオプション: mdeditor --safe-mode
-  2. クラッシュリカバリ検出: 連続 3 回起動失敗 → 次回はセーフモード
-  3. 起動時の確認ダイアログ（重篤クラッシュ後）
+#### セーフモード起動トリガー
 
+| トリガー | 詳細 | ユーザーアクション不要 |
+|---------|------|---------------------|
+| コマンドライン | `mdeditor --safe-mode` | ❌（手動） |
+| クラッシュリカバリ自動検出 | 連続 3 回起動失敗 → Rust 側でフラグ書込み → 次回起動時にセーフモード | ✅（自動） |
+| 重篤クラッシュ後の確認ダイアログ | アプリが起動完了前にパニックした場合、次回起動時にネイティブダイアログを表示 | ✅（自動） |
+
+#### 「起動直後にクラッシュする」最悪ケースへの対応
+
+> **課題（レビュー指摘）**: プラグインが起動直後（React のマウント前）にクラッシュさせた場合、アプリ画面が一切表示されない。この場合、通常の「設定画面 → セーフモード起動」という逃げ道が使えない。
+
+**OS レベルのエスケープハッチ設計**:
+
+```
+起動フェーズごとのクラッシュ対応:
+
+Phase A (Rust バックエンド初期化中にパニック):
+  → OS ネイティブの MessageDialog（Tauri の dialog プラグインを使わない）で
+    「起動に失敗しました。セーフモードで再起動しますか？」を表示
+  → Rust の std::panic::set_hook で catchし、native_dialog クレート経由で表示
+
+Phase B (フロントエンド React マウント中にクラッシュ):
+  → AppErrorBoundary が捕捉 → セーフモード起動を促すインジケーターを表示
+  → Tauri の emit イベントで Rust に「フロントエンドクラッシュ」を通知
+  → Rust が連続失敗カウンターをインクリメント
+
+Phase C (プラグインが3回連続でクラッシュ):
+  → Rust 側で起動失敗フラグを永続化 (settings.json の safeMode: true)
+  → 次回起動時に safeMode フラグを検出してセーフモードで起動
+```
+
+```rust
+// src-tauri/src/safe_mode.rs
+
+use std::fs;
+use std::path::PathBuf;
+
+/// 起動失敗カウンターをインクリメントし、閾値を超えたらセーフモードフラグを立てる。
+/// main() の最初期（プラグイン初期化前）に呼ぶ。
+pub fn increment_startup_failure_count(config_dir: &PathBuf) -> bool {
+    let flag_file = config_dir.join("startup_failure_count");
+    let count: u32 = fs::read_to_string(&flag_file)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0);
+
+    let new_count = count + 1;
+    let _ = fs::write(&flag_file, new_count.to_string());
+
+    if new_count >= 3 {
+        // 3回連続失敗 → セーフモードフラグを立てる
+        let safe_mode_flag = config_dir.join("safe_mode_requested");
+        let _ = fs::write(&safe_mode_flag, "1");
+        // ネイティブダイアログで案内（WebView が起動していない可能性があるため）
+        let _ = native_dialog::MessageDialog::new()
+            .set_title("起動エラー")
+            .set_text("連続して起動に失敗しました。セーフモードで起動します（プラグインが無効化されます）。")
+            .set_type(native_dialog::MessageType::Warning)
+            .show_alert();
+        return true; // safe_mode = true
+    }
+    false
+}
+
+/// 正常起動完了時に失敗カウンターをリセットする。
+/// フロントエンドが完全にマウントされた後に呼ぶ（Tauri の on_page_load フック等）。
+pub fn reset_startup_failure_count(config_dir: &PathBuf) {
+    let flag_file = config_dir.join("startup_failure_count");
+    let _ = fs::write(&flag_file, "0");
+}
+```
+
+```toml
+# Cargo.toml に追加（OS ネイティブダイアログ用）
+[dependencies]
+native-dialog = { version = "0.7", features = ["dark-theme"] }
+```
+
+#### セーフモード中の動作
+
+```
 セーフモード中の動作:
   - ビルトインプラグインは通常通り有効（Mermaid・KaTeX・画像）
   - サードパーティプラグインは全て 🔒 無効化（永続設定は保持）
   - ステータスバーに「🔒 セーフモード」バナー表示
   - 設定画面の「通常モードで再起動」ボタンからのみ通常起動に戻れる
+  - Shift を押しながらアプリアイコンをダブルクリック → セーフモード起動（Tauri の引数検出）
 ```
+
+> **OS レベルのショートカット（Shift+ダブルクリック）**: Tauri の `tauri::Builder::run` で起動引数を検出し、`Shift` キー修飾を OS イベントとして受け取る方法は OS ごとに異なるため、Phase 7 実装時に詳細を検討する。MVP では `--safe-mode` CLI フラグと連続クラッシュ自動検出に絞る。
 
 ```typescript
 // src/plugins/safeMode.ts

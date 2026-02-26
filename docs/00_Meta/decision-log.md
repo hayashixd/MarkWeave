@@ -23,7 +23,7 @@
 | メモリ使用量 | 高（Chromium プロセスを含む） | 低（OS の WebView を使用） |
 | バックエンド言語 | Node.js（JavaScript） | Rust（型安全・高パフォーマンス） |
 
-本プロジェクトは将来の Android / iOS 展開（roadmap.md Phase 8）を計画しており、Electron はこの要件を満たせない。
+本プロジェクトは将来の Android / iOS 展開（Phase 8 以降、`cross-platform-design.md §1` 参照）を計画しており、Electron はこの要件を満たせない。
 
 ---
 

@@ -101,7 +101,8 @@
 | サイドバイサイド | `Ctrl+Alt+4` | `Cmd+Option+4` | 🆕 |
 | フォーカスモード | `F8` | `F8` | Typora 互換 |
 | タイプライターモード | `F9` | `F9` | Typora 互換 |
-| フルスクリーン | `F11` | `Ctrl+Cmd+F` | OS 依存 |
+| フルスクリーン / Zen モード | `F11` | `Ctrl+Cmd+F` | OS 依存。Zen モードはフルスクリーンを内包するため同一キーで統合（`zen-mode-design.md §6` 参照） |
+| Zen モード（代替） | `Ctrl+Shift+F11` | `Cmd+Shift+F11` | 🆕 F11 が OS に奪われる環境向け代替キー |
 
 ---
 
