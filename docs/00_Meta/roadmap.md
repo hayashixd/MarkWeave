@@ -30,7 +30,7 @@
 
 詳細設計: [user-settings-design.md](./user-settings-design.md)
 
-- [ ] `AppSettings` 型定義・`DEFAULT_SETTINGS`
+- [x] `AppSettings` 型定義・`DEFAULT_SETTINGS`
 - [ ] `settingsStore`（Zustand + plugin-store）
 - [ ] プリファレンスダイアログ（外観・エディタ）
 - [ ] 設定マイグレーション関数

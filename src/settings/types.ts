@@ -1,0 +1,75 @@
+/**
+ * アプリ設定の型定義。
+ *
+ * user-settings-design.md §3 に準拠。
+ */
+
+import type { ImageStorageSettings } from '../file/imageStorage';
+
+export interface AppearanceSettings {
+  theme: 'light' | 'dark' | 'system';
+  /** UI 表示言語。'auto' は OS ロケールに自動追従（詳細: i18n-design.md） */
+  language: 'auto' | 'ja' | 'en';
+  editorFontFamily: string;
+  editorFontSize: number;
+  editorLineHeight: number;
+  uiFontSize: number;
+  codeBlockFontFamily: string;
+  codeBlockFontSize: number;
+  paragraphSpacing: number;
+}
+
+export interface EditorSettings {
+  autoFormat: boolean;
+  smartQuotes: boolean;
+  sourceTabSize: number;
+  smartPasteMode: 'auto' | 'ask' | 'never';
+  showLineNumbers: boolean;
+  wordWrap: boolean;
+  highlightCurrentLine: boolean;
+}
+
+export interface MarkdownSettings {
+  enableMath: boolean;
+  enableMermaid: boolean;
+  enableHighlight: boolean;
+  enableSuperscript: boolean;
+  enableSubscript: boolean;
+  enableTaskList: boolean;
+  enableFrontMatter: boolean;
+  enableGfmStrikethrough: boolean;
+}
+
+export interface FileSettings {
+  autoSaveDelay: number;
+  createBackup: boolean;
+  defaultSaveDir: string;
+  imageSettings: ImageStorageSettings;
+  restoreSession: boolean;
+}
+
+export interface AiCopySettings {
+  normalizeHeadings: boolean;
+  annotateCodeBlocks: boolean;
+  normalizeListMarkers: boolean;
+  trimWhitespace: boolean;
+  annotateLinks: boolean;
+  normalizeCodeFences: boolean;
+  analyzePromptStructure: boolean;
+}
+
+/** アプリ設定の全体型 */
+export interface AppSettings {
+  /** 設定ファイルのバージョン。マイグレーションに使用 */
+  version: number;
+  appearance: AppearanceSettings;
+  editor: EditorSettings;
+  markdown: MarkdownSettings;
+  file: FileSettings;
+  aiCopy: AiCopySettings;
+}
+
+/** ネストされたオブジェクトの部分更新用ユーティリティ型 */
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
