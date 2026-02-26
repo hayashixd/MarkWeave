@@ -2,12 +2,16 @@
  * 設定マイグレーション関数。
  *
  * user-settings-design.md §7 に準拠。
- * 本格的な段階的マイグレーションは「設定マイグレーション関数」タスクで実装。
- * 現時点では不足キーをデフォルト値で補完するのみ。
+ *
+ * 運用ルール:
+ * - 設定を追加するとき: DEFAULT_SETTINGS にデフォルト値を追加し、
+ *   旧バージョン用の補完を migrateSettings に記述
+ * - 設定を削除するとき: 余分なキーは deepMerge で無視される
+ * - 設定の型が変わるとき: version をインクリメントし、型変換ロジックを追加
  */
 
 import type { AppSettings } from './types';
-import { DEFAULT_SETTINGS } from './defaults';
+import { DEFAULT_SETTINGS, CURRENT_SETTINGS_VERSION } from './defaults';
 import { deepMerge } from './deepMerge';
 
 /** 古い設定オブジェクトを最新バージョンに変換する */
@@ -17,11 +21,11 @@ export function migrateSettings(raw: unknown): AppSettings {
   }
 
   const partial = raw as Partial<AppSettings>;
-  const version = partial.version ?? 0;
+  let version = partial.version ?? 0;
 
   // v0 → v1: aiCopy セクションが存在しない旧バージョン対応
   if (version < 1) {
-    return {
+    const migrated = {
       ...DEFAULT_SETTINGS,
       appearance: { ...DEFAULT_SETTINGS.appearance, ...partial.appearance },
       editor: { ...DEFAULT_SETTINGS.editor, ...partial.editor },
@@ -30,7 +34,16 @@ export function migrateSettings(raw: unknown): AppSettings {
       aiCopy: DEFAULT_SETTINGS.aiCopy,
       version: 1,
     };
+    version = 1;
+
+    // 最新バージョンならここで返す
+    if (version >= CURRENT_SETTINGS_VERSION) {
+      return migrated;
+    }
   }
+
+  // 将来のマイグレーション: v1 → v2 等はここに追加
+  // if (version < 2) { ... version = 2; }
 
   // 最新バージョン: 不足キーをデフォルトで補完
   return deepMerge(

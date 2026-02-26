@@ -33,7 +33,7 @@
 - [x] `AppSettings` 型定義・`DEFAULT_SETTINGS`
 - [x] `settingsStore`（Zustand + plugin-store）
 - [x] プリファレンスダイアログ（外観・エディタ）
-- [ ] 設定マイグレーション関数
+- [x] 設定マイグレーション関数
 
 ### スマートペースト
 

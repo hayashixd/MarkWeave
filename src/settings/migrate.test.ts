@@ -45,4 +45,34 @@ describe('migrateSettings', () => {
     const result = migrateSettings(DEFAULT_SETTINGS);
     expect(result).toEqual(DEFAULT_SETTINGS);
   });
+
+  it('v0 でマイグレーション後も他のカテゴリのデフォルトが保持される', () => {
+    const v0 = { appearance: { theme: 'light' as const } };
+    const result = migrateSettings(v0);
+    expect(result.markdown).toEqual(DEFAULT_SETTINGS.markdown);
+    expect(result.file).toEqual(DEFAULT_SETTINGS.file);
+  });
+
+  it('空オブジェクトを受け取ると v0→v1 マイグレーションが走る', () => {
+    const result = migrateSettings({});
+    expect(result.version).toBe(1);
+    expect(result).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('未知のキーが存在しても例外を投げない', () => {
+    const withExtra = {
+      ...DEFAULT_SETTINGS,
+      unknownSection: { foo: 'bar' },
+    };
+    const result = migrateSettings(withExtra);
+    expect(result.version).toBe(1);
+    expect(result.appearance).toEqual(DEFAULT_SETTINGS.appearance);
+  });
+
+  it('配列値を受け取るとデフォルトを返す（配列はオブジェクトだが設定ではない）', () => {
+    const result = migrateSettings([1, 2, 3]);
+    // 配列は typeof 'object' なので v0 マイグレーション経路に入るが、
+    // spread で安全にデフォルト値で補完される
+    expect(result.version).toBe(1);
+  });
 });
