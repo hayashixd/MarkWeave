@@ -12,7 +12,7 @@
 - [x] Vite + React + TypeScript プロジェクト初期化
 - [x] ESLint / Prettier 設定
 - [x] Vitest テスト環境
-- [ ] Playwright E2Eテスト環境
+- [x] Playwright E2Eテスト環境
 - [x] Rust / Tauri CLI のインストール
 - [x] Tauri 2.0 プロジェクト初期化（`src-tauri/` 構成: `commands/`, `db/`, `fs/`, `menu/`, `models/`）
 - [x] Tauri Capabilities 初期設定（`capabilities/default.json`）
