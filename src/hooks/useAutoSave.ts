@@ -31,7 +31,7 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
 
   // デバウンス保存のスケジュール
   const scheduleSave = useCallback(() => {
-    if (!settings.autoSave) return;
+    if (settings.file.autoSaveDelay <= 0) return;
 
     const tab = getTab(tabId);
     if (!tab || !tab.isDirty || !tab.filePath) return;
@@ -57,8 +57,8 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
       } catch {
         // エラーは writeFn 側で処理される（トースト通知など）
       }
-    }, settings.autoSaveIntervalMs);
-  }, [tabId, settings.autoSave, settings.autoSaveIntervalMs, getTab, markSaved, writeFn, isComposing]);
+    }, settings.file.autoSaveDelay);
+  }, [tabId, settings.file.autoSaveDelay, getTab, markSaved, writeFn, isComposing]);
 
   // 即時保存（Ctrl+S 用）
   const saveNow = useCallback(async () => {
