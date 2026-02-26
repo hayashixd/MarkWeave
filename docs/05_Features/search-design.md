@@ -364,7 +364,7 @@ async function searchWorkspace(req: SearchRequest): Promise<SearchFileResult[]> 
   │
   ▼
 invoke('search_workspace', { query, options })
-  │  Rust 側: ripgrep を subprocess で実行
+  │  Rust 側: walkdir + regex クレートで検索実行
   │  結果を streaming で返す（将来対応）
   ▼
 [ファイルグループ別に結果を表示]
@@ -502,7 +502,7 @@ function SearchResultItem({ match }: { match: SearchMatch }) {
 
 ## 7. パフォーマンスとの連携
 
-本ドキュメントは UX 設計を扱う。バックエンド（ripgrep の subprocess 管理・ストリーミング結果の返却・インデックスの有無）の設計は `performance-design.md §6` を参照。
+本ドキュメントは UX 設計を扱う。バックエンド（Rust 内製検索エンジン walkdir + regex・ストリーミング結果の返却・インデックスの有無）の設計は `performance-design.md §6` を参照。
 
 フロントエンド側で気をつけるパフォーマンスポイント:
 

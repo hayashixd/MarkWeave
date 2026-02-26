@@ -34,7 +34,8 @@
 | Markdown ↔ TipTap JSON 変換設計 | ✅ | [markdown-tiptap-conversion.md](../02_Core_Editor/markdown-tiptap-conversion.md) |
 | サポートする Markdown 要素マトリクス | ✅ | [markdown-tiptap-conversion.md](../02_Core_Editor/markdown-tiptap-conversion.md) §2 |
 | ラウンドトリップテスト戦略 | ✅ | [tiptap-roundtrip-test-strategy.md](../02_Core_Editor/tiptap-roundtrip-test-strategy.md) |
-| HTML ↔ Markdown 変換（turndown） | 🔶 | [system-design.md](../01_Architecture/system-design.md) §4、[markdown-tiptap-conversion.md](../02_Core_Editor/markdown-tiptap-conversion.md) |
+| HTML ↔ Markdown 変換（turndown）・変換マトリクス | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §10（SoT）、[smart-paste-design.md](../06_Export_Interop/smart-paste-design.md) §3 |
+| 技術選定・不採用理由の記録 | ✅ | [decision-log.md](./decision-log.md) |
 
 ---
 

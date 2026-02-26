@@ -120,18 +120,14 @@ export function htmlToMarkdown(html: string): string {
 
 ### 3.3 変換されるもの・されないもの
 
-| 変換される（Markdown 化）| 変換されない（除去される）|
-|------------------------|------------------------|
-| `<h1>`〜`<h6>` → `#`〜`######` | インラインスタイル（color, font-size 等）|
-| `<strong>`, `<b>` → `**text**` | `class` 属性 |
-| `<em>`, `<i>` → `*text*` | `<div>` の構造（中身のテキストのみ保持）|
-| `<a href>` → `[text](url)` | `<script>` タグ（DOMPurify で除去）|
-| `<ul>`, `<ol>`, `<li>` → リスト | CSS Grid / Flexbox レイアウト |
-| `<table>` → GFM テーブル | `<svg>`（除去）|
-| `<code>`, `<pre>` → バッククォート | カスタム HTML 要素 |
-| `<blockquote>` → `>` | |
-| `<img src>` → `![alt](src)` | |
-| `<del>`, `<s>` → `~~text~~` | |
+HTML → Markdown 変換の完全な変換マトリクス（許容ロスの定義を含む）は
+**[html-editing-design.md §10](../05_Features/HTML/html-editing-design.md)** を単一の真実源（SoT）とする。
+
+ペースト時に特有の注意点:
+
+- **DOMPurify による事前サニタイズ**: `<script>` タグ・危険な属性はペースト前に除去される（[security-design.md §2](../01_Architecture/security-design.md) 参照）
+- **スタイル属性は常に除去**: ペースト元のインラインスタイル（`color`, `font-size` 等）は Markdown に対応する表現がないため除去される
+- **`<div>` 構造の消失**: `<div>` タグは除去され、内部テキストのみが保持される。これはペーストの文脈では通常の挙動として許容する
 
 ---
 
