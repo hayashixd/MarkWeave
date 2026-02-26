@@ -1,15 +1,9 @@
-/**
- * Application Entry Point - アプリケーションエントリポイント
- *
- * TODO: Phase 1 で実装
- */
-
-// import React from 'react';
-// import { Editor } from './components/Editor/Editor';
-
 function App() {
-  // TODO: Phase 1 で実装
-  return null;
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <h1 className="text-2xl font-bold">Markdown Editor</h1>
+    </div>
+  );
 }
 
 export default App;
