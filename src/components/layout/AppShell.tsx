@@ -17,6 +17,8 @@ import { TabBar } from '../tabs/TabBar';
 import { Sidebar } from '../sidebar/Sidebar';
 import { MarkdownEditor } from '../editor/Editor';
 import { PreferencesDialog } from '../preferences/PreferencesDialog';
+import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
+import { ToastContainer } from '../toast/ToastContainer';
 import { useTabStore } from '../../store/tabStore';
 
 export function AppShell() {
@@ -143,11 +145,12 @@ export function AppShell() {
         {/* エディタエリア */}
         <div className="flex-1 min-w-0 flex flex-col">
           {activeTab ? (
-            <MarkdownEditor
-              key={activeTab.id}
-              initialContent={activeTab.content}
-              onContentChange={handleContentChange}
-            />
+            <EditorErrorBoundary key={activeTab.id}>
+              <MarkdownEditor
+                initialContent={activeTab.content}
+                onContentChange={handleContentChange}
+              />
+            </EditorErrorBoundary>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-400">
               <div className="text-center">
@@ -169,6 +172,9 @@ export function AppShell() {
         isOpen={preferencesOpen}
         onClose={() => setPreferencesOpen(false)}
       />
+
+      {/* トースト通知 */}
+      <ToastContainer />
     </div>
   );
 }

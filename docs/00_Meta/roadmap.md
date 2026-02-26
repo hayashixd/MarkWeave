@@ -47,12 +47,12 @@
 
 詳細設計: [error-handling-design.md](./error-handling-design.md)
 
-- [ ] `tauri-plugin-log` 設定
-- [ ] `logger` ユーティリティ（フロントエンド）
-- [ ] `AppErrorBoundary` / `EditorErrorBoundary`
-- [ ] `toastStore`（トースト通知）
-- [ ] Tauri コマンドエラー翻訳層
-- [ ] パース失敗時のソースモードフォールバック
+- [x] `tauri-plugin-log` 設定
+- [x] `logger` ユーティリティ（フロントエンド）
+- [x] `AppErrorBoundary` / `EditorErrorBoundary`
+- [x] `toastStore`（トースト通知）
+- [x] Tauri コマンドエラー翻訳層
+- [x] パース失敗時のソースモードフォールバック
 
 ### タブ・セッション管理
 
