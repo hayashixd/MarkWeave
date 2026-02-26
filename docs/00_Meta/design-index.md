@@ -1,7 +1,7 @@
 # 設計ドキュメント索引
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> 更新日: 2026-02-25
+> 更新日: 2026-02-26
 >
 > **用途**: 設計情報を追加・変更する際に「どのファイルに何を書くか」を判断するための索引。
 > 新規ドキュメント作成前に必ず参照すること。
@@ -221,6 +221,9 @@ docs/
 | Rust バックエンド構成・IPC コマンド追加 | `01_Architecture/system-design.md` §3.2 |
 | パフォーマンス改善の設計 | `01_Architecture/performance-design.md` |
 | 新プラグイン拡張ポイント・プラグイン設定 GUI | `01_Architecture/plugin-api-design.md` |
+| プラグイン処理の遅延警告・自動無効化・Web Worker 利用 | `01_Architecture/plugin-api-design.md` §10 |
+| スマートクォーテーション（`"` `'` の自動カーリー変換・Undo 連動・IME ガード）| `03_UI_UX/editor-ux-design.md` §16 |
+| 巨大ファイル（3MB 超）の差分チェックポイント・IndexedDB 保存 | `04_File_Workspace/window-tab-session-design.md` §13 |
 | メタデータクエリ・SQLite スキーマ変更 | `05_Features/metadata-query-design.md` |
 | グラフビュー・リンクグラフ可視化 | `05_Features/wikilinks-backlinks-design.md` §11 |
 | テーマカスタマイザー GUI・CSS 変数オーバーライド | `03_UI_UX/theme-design.md` §5.4〜§5.9 |

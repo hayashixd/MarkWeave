@@ -17,6 +17,7 @@
 7. [プラグインの配布とインストール](#7-プラグインの配布とインストール)
 8. [実装フェーズ](#8-実装フェーズ)
 9. [プラグイン設定 GUI とストア UX](#9-プラグイン設定-gui-とストア-ux)
+10. [プラグインパフォーマンス監視と通信オーバーヘッド対策](#10-プラグインパフォーマンス監視と通信オーバーヘッド対策)
 
 ---
 
@@ -991,3 +992,323 @@ export function shouldSkipPlugin(pluginId: string, safeModeActive: boolean): boo
   // ビルトインプラグインは ID が "builtin." で始まる
   return !pluginId.startsWith('builtin.');
 }
+
+---
+
+## 10. プラグインパフォーマンス監視と通信オーバーヘッド対策
+
+### 10.1 問題の整理
+
+サードパーティプラグインは `<iframe sandbox>` 内で実行され、エディタコアとは **postMessage による非同期 IPC** でのみ通信する（§4 参照）。この設計はセキュリティ面で堅牢だが、パフォーマンス面でのリスクを持つ。
+
+`performance-design.md §1` で定義したキー入力レイテンシ目標は **< 16ms (60fps)**。ユーザーが1文字タイプするたびに iframe 内のプラグインに `editor:onChange` イベントを送信し、処理結果を受け取って DOM を更新するような処理（例: カスタムシンタックスハイライト・リアルタイム Lint）が走ると、16ms のバジェットを容易に超過する。
+
+```
+キー入力 → TipTap トランザクション → [16ms 以内に]
+  ├─ DOM 更新（ProseMirror）        ≈ 2〜5ms   ← OK
+  ├─ postMessage → iframe 処理 → postMessage 応答 → DOM 更新
+  │                                ≈ 5〜50ms+  ← 問題
+  └─ 合計で 16ms 超過 → コマ落ち
+```
+
+### 10.2 設計原則
+
+1. **エディタ更新イベントはスロットリングする**: プラグインへの `editor:onChange` 通知は最低でも **100ms デバウンス**をかける。リアルタイム処理は要求しない
+2. **プラグインの処理はメインスレッドをブロックしない**: iframe 内での処理は非同期 postMessage で完結し、エディタ側は応答を**ブロック待ちしない**
+3. **処理時間を計測・監視する**: 遅いプラグインを検出して警告・自動無効化する
+4. **重い処理は Web Worker に委譲する**: プラグイン内でも Web Worker を使えるよう設計する
+
+---
+
+### 10.3 エディタイベントのスロットリング
+
+プラグインへの `editor:onChange` イベントは**デバウンス付き**で通知する。プラグインがリアルタイム処理を要求しても、エディタのレイテンシには影響しない。
+
+```typescript
+// src/plugins/plugin-bridge.ts（イベント通知部分）
+
+/**
+ * エディタ変更をプラグインに通知するデバウンサー。
+ * キー入力ごとに即時通知するのではなく、入力停止後に一括通知する。
+ */
+const EDITOR_CHANGE_DEBOUNCE_MS = 100;
+
+export class PluginBridge {
+  private changeDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /**
+   * エディタ変更をすべてのプラグインに通知する。
+   * 100ms デバウンス付き。
+   */
+  notifyEditorChange(changePayload: EditorChangePayload): void {
+    for (const [pluginId, iframe] of this.iframes) {
+      // 既存タイマーをキャンセルして再スケジュール
+      const existing = this.changeDebounceTimers.get(pluginId);
+      if (existing) clearTimeout(existing);
+
+      const timer = setTimeout(() => {
+        this.changeDebounceTimers.delete(pluginId);
+        iframe.contentWindow?.postMessage({
+          type: 'editor_event',
+          eventName: 'editor:onChange',
+          payload: changePayload,
+        }, '*');
+      }, EDITOR_CHANGE_DEBOUNCE_MS);
+
+      this.changeDebounceTimers.set(pluginId, timer);
+    }
+  }
+
+  /**
+   * ユーザー操作に直結する低レイテンシイベント（カーソル移動・選択変化等）は
+   * デバウンスなしで通知するが、「fire-and-forget」であり応答を待たない。
+   */
+  notifySelectionChange(payload: SelectionPayload): void {
+    for (const [, iframe] of this.iframes) {
+      iframe.contentWindow?.postMessage({
+        type: 'editor_event',
+        eventName: 'editor:onSelectionChange',
+        payload,
+      }, '*');
+      // ← 応答を await しない（fire-and-forget）
+    }
+  }
+}
+```
+
+---
+
+### 10.4 プラグイン処理時間の計測
+
+`PluginBridge` は各プラグインへの API 呼び出しの往復時間（RTT）を計測し、移動平均を追跡する。
+
+```typescript
+// src/plugins/plugin-bridge.ts（計測部分）
+
+interface PluginPerfStats {
+  pluginId: string;
+  /** 直近 N 回の API 呼び出し RTT（ms）*/
+  recentRtts: number[];
+  /** RTT の移動平均（ms）*/
+  avgRtt: number;
+  /** 遅延超過カウント（SLOW_THRESHOLD_MS を超えた回数）*/
+  slowCount: number;
+  /** 連続タイムアウト回数 */
+  timeoutCount: number;
+}
+
+const SLOW_THRESHOLD_MS = 50;       // これを超えると「遅い」
+const TIMEOUT_MS = 2000;            // 2秒で応答なし → タイムアウト
+const MAX_SLOW_COUNT = 10;          // 10回遅延 → 警告
+const MAX_CONSECUTIVE_TIMEOUTS = 3; // 3回連続タイムアウト → 自動無効化
+const RTT_WINDOW = 20;              // 移動平均の窓サイズ
+
+export class PluginBridge {
+  private perfStats = new Map<string, PluginPerfStats>();
+
+  private async executeApiCall(
+    pluginId: string,
+    method: string,
+    args: unknown[]
+  ): Promise<unknown> {
+    const callId = crypto.randomUUID();
+    const startMs = performance.now();
+
+    const resultPromise = new Promise<unknown>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingCalls.delete(callId);
+        reject(new Error(`Plugin API timeout: ${method}`));
+      }, TIMEOUT_MS);
+
+      this.pendingCalls.set(callId, { resolve, reject, timer });
+    });
+
+    // iframe にリクエストを送信
+    this.iframes.get(pluginId)?.contentWindow?.postMessage({
+      type: 'api_call', callId, method, args,
+    }, '*');
+
+    try {
+      const result = await resultPromise;
+      const rttMs = performance.now() - startMs;
+      this.recordRtt(pluginId, rttMs, false);
+      return result;
+    } catch (err) {
+      const isTimeout = String(err).includes('timeout');
+      this.recordRtt(pluginId, TIMEOUT_MS, isTimeout);
+      throw err;
+    }
+  }
+
+  private recordRtt(pluginId: string, rttMs: number, isTimeout: boolean): void {
+    const stats = this.getOrCreateStats(pluginId);
+
+    stats.recentRtts.push(rttMs);
+    if (stats.recentRtts.length > RTT_WINDOW) stats.recentRtts.shift();
+    stats.avgRtt = stats.recentRtts.reduce((a, b) => a + b, 0) / stats.recentRtts.length;
+
+    if (isTimeout) {
+      stats.timeoutCount++;
+      if (stats.timeoutCount >= MAX_CONSECUTIVE_TIMEOUTS) {
+        this.autoDisablePlugin(pluginId, 'timeout');
+        return;
+      }
+    } else {
+      stats.timeoutCount = 0; // 成功したらリセット
+    }
+
+    if (rttMs > SLOW_THRESHOLD_MS) {
+      stats.slowCount++;
+      if (stats.slowCount >= MAX_SLOW_COUNT) {
+        this.warnSlowPlugin(pluginId, stats.avgRtt);
+      }
+    }
+  }
+}
+```
+
+---
+
+### 10.5 遅いプラグインの警告と自動無効化
+
+#### 警告フロー
+
+```
+プラグインが SLOW_THRESHOLD_MS（50ms）を MAX_SLOW_COUNT（10）回超えた場合:
+  → トースト通知:
+    「プラグイン "{name}" の処理が遅い可能性があります（平均 {avgRtt}ms）。
+     パフォーマンスに影響している場合は無効化を検討してください。」
+  → 設定画面のプラグイン一覧に ⚠ アイコンを表示
+  → slowCount を 0 にリセット（次の 10 回の遅延まで通知しない）
+```
+
+#### 自動無効化フロー（タイムアウト連続発生時）
+
+```
+プラグインが TIMEOUT_MS（2秒）を MAX_CONSECUTIVE_TIMEOUTS（3）回連続で超えた場合:
+  → プラグインを自動無効化（§6 の deactivatePlugin() を呼ぶ）
+  → トースト通知（永続表示）:
+    「プラグイン "{name}" が応答しないため自動的に無効化されました。
+     設定画面から再有効化できます。」
+  → 設定画面でプラグインの状態を 🔴 エラーに変更
+```
+
+```typescript
+// src/plugins/plugin-bridge.ts
+
+private warnSlowPlugin(pluginId: string, avgRttMs: number): void {
+  const plugin = pluginRegistry.get(pluginId);
+  const name = plugin?.manifest.name ?? pluginId;
+
+  // トースト通知（3秒で自動消去）
+  useToastStore.getState().show({
+    type: 'warning',
+    message: `プラグイン "${name}" の処理が遅い可能性があります（平均 ${avgRttMs.toFixed(0)}ms）。`,
+    duration: 3000,
+  });
+
+  // 設定画面のプラグイン一覧に perf warning フラグを立てる
+  usePluginStatusStore.getState().setPerfWarning(pluginId, true);
+
+  // slowCount をリセット（次の 10 回超えまで通知しない）
+  this.perfStats.get(pluginId)!.slowCount = 0;
+}
+
+private autoDisablePlugin(pluginId: string, reason: 'timeout' | 'crash'): void {
+  const plugin = pluginRegistry.get(pluginId);
+  const name = plugin?.manifest.name ?? pluginId;
+
+  pluginManager.deactivatePlugin(pluginId).catch(() => {});
+
+  useToastStore.getState().show({
+    type: 'error',
+    message: `プラグイン "${name}" が応答しないため自動的に無効化されました。設定画面から再有効化できます。`,
+    persistent: true, // ユーザーが明示的に閉じるまで表示
+  });
+
+  usePluginStatusStore.getState().setStatus(pluginId, 'error');
+}
+```
+
+---
+
+### 10.6 プラグイン内での Web Worker 利用
+
+iframe 内のプラグインコードは独自の Web Worker を生成できる。重い処理（シンタックスハイライト・テキスト解析・Lint 等）をメインスレッドから分離することで、postMessage の往復時間を短縮できる。
+
+```
+iframe（プラグインメインスレッド）
+  │
+  ├─ 軽量な UI イベント処理（クリック・ホバー等）はメインスレッドで即時応答
+  │
+  └─ 重い解析処理 → Web Worker に委譲
+       │
+       ├─ Worker: テキスト解析・Lint・シンタックスハイライト計算
+       │   （非同期・非ブロッキング）
+       │
+       └─ 結果を iframe メインスレッドに返す → postMessage でエディタコアへ通知
+```
+
+```javascript
+// サードパーティプラグイン側のコード例（iframe 内）
+// src/ 内には含まれない（プラグイン開発者のコード）
+
+const worker = new Worker('lint-worker.js');
+
+// エディタ変更イベントを受け取ったら Worker に処理を委譲
+window.addEventListener('message', (event) => {
+  if (event.data?.eventName === 'editor:onChange') {
+    const { markdown } = event.data.payload;
+    worker.postMessage({ type: 'lint', markdown });
+  }
+});
+
+// Worker からの結果を受け取ってエディタに通知
+worker.onmessage = (e) => {
+  const { warnings } = e.data;
+  // PluginBridge 経由でエディタに Lint 結果を送信
+  window.parent.postMessage({
+    type: 'api_call',
+    callId: crypto.randomUUID(),
+    method: 'editor.setDecorations',
+    args: [warnings],
+  }, '*');
+};
+```
+
+**セキュリティ上の注意**: `<iframe sandbox="allow-scripts">` 内では Web Worker の `new Worker(url)` 構文が利用可能。`allow-same-origin` を付与していないため、Worker からも Tauri IPC には直接アクセスできない。
+
+---
+
+### 10.7 パフォーマンス統計の表示 UI
+
+設定画面のプラグイン一覧に、各プラグインのパフォーマンス統計を表示する。
+
+```
+設定 → プラグイン → [My Lint Plugin]
+
+  ────────────────────────────────────────
+  パフォーマンス統計                   [リセット]
+  ────────────────────────────────────────
+  API 呼び出し平均応答時間:  12ms  ✅
+  最大応答時間（直近 20 回）: 48ms
+  タイムアウト発生回数:        0 回
+  ────────────────────────────────────────
+  ⚠ 処理が 50ms を超えた回数: 3 回（直近 20 回中）
+```
+
+| 平均 RTT | アイコン | 意味 |
+|---------|---------|------|
+| < 50ms | ✅ | 良好 |
+| 50〜200ms | ⚠ | 注意（エディタへの影響可能性あり）|
+| > 200ms または タイムアウトあり | 🔴 | 問題あり（無効化を推奨） |
+
+---
+
+### 10.8 実装フェーズ
+
+| フェーズ | 実装内容 |
+|---------|---------|
+| **Phase 7**（サードパーティプラグイン対応時）| §10.3 のデバウンス通知・§10.4 の RTT 計測・§10.5 の自動無効化 |
+| **Phase 7**（同上） | §10.7 の設定画面パフォーマンス統計表示 |
+| **Phase 7 以降** | §10.6 の Web Worker 利用ガイドをプラグイン開発ドキュメントとして公開 |

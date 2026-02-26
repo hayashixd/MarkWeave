@@ -1,7 +1,7 @@
 # 設計検討済み項目一覧
 
 > プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
-> バージョン: 1.6
+> バージョン: 1.7
 > 更新日: 2026-02-26
 
 本ドキュメントは、プロジェクト全体の設計トピックを網羅した索引である。
@@ -64,7 +64,7 @@
 | リンクのクリック動作設計（Ctrl+クリックで外部ブラウザ / 内部ファイル遷移） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §7 |
 | ファイルツリーからのドラッグ&ドロップによる Markdown リンク挿入 | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §8 |
 | スプリットビューのスクロール同期アルゴリズム詳細 | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §9 |
-| スマートクォーテーション・オートコレクト動作設計 | 🔶 | [user-settings-design.md](../07_Platform_Settings/user-settings-design.md) §2.2（設定項目のみ）。[cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) §2.4 に macOS WKWebView の自動変換抑制策あり。エディタ UX 詳細設計（Undo 対応・変換タイミング）は未作成 |
+| スマートクォーテーション・オートコレクト動作設計 | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §16（TipTap InputRule 実装・開き閉じ判定・Undo 連動・IME ガード・設定連携・エッジケース）、[user-settings-design.md](../07_Platform_Settings/user-settings-design.md) §2.2（設定項目）、[cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) §2.4（macOS WKWebView 自動変換抑制）|
 | 空ドキュメントのプレースホルダー表示 UX | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §10 |
 
 ---
@@ -122,6 +122,7 @@
 | 外部クラウドストレージ同期競合対応（Dropbox/Google Drive 競合ファイル検出・バースト抑制・書き込みリトライ） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §16 |
 | セッション復元と LRU タブ上限の整合性（超過タブの扱い） | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §2.5 |
 | 3MB 超ファイルのクラッシュリカバリ制約とユーザー警告 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §10.7 |
+| 巨大ファイル差分チェックポイント設計（diff-match-patch・IndexedDB チャンク保存・Yjs CRDT 移行計画）| ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §13 |
 | 外部ファイル変更時の競合解決 UX（マージ選択ダイアログ・カーソル復元） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §4.2.1 |
 
 ---
@@ -263,6 +264,7 @@
 | プラグインライフサイクル・クリーンアップ | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §6 |
 | プラグインの配布・インストール | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §7 |
 | プラグイン更新フロー（バージョン比較・API 互換性チェック・ロールバック） | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §7.4 |
+| プラグインパフォーマンス監視・通信オーバーヘッド対策（RTT 計測・遅延警告・自動無効化・Web Worker 利用・イベントデバウンス）| ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §10 |
 
 ---
 

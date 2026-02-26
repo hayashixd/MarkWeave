@@ -20,6 +20,7 @@
 10. [クラッシュリカバリ設計](#10-クラッシュリカバリ設計)
 11. [複数 WebviewWindow 設計（Phase 5+）](#11-複数-webviewwindow-設計phase-5)
 12. [Undo / Redo 整合性と排他制御](#12-undo--redo-整合性と排他制御)
+13. [巨大ファイルの差分チェックポイント設計（Phase 4+）](#13-巨大ファイルの差分チェックポイント設計phase-4)
 
 ---
 
@@ -1076,27 +1077,52 @@ export async function onNormalExit(): Promise<void> {
 
 **課題**: チェックポイント保存（§10.2）は 30 秒ごとに全タブの内容を `content` フィールドに書き込む。
 3MB 超のファイルの場合、チェックポイント自体は動作するが、ストアに 3MB 以上の文字列を書き込む
-コストが問題になる可能性がある。
+コストが問題になる可能性がある。また、`@tauri-apps/plugin-store` は JSON ファイルに全内容をシリアライズするため、
+3MB 超の文字列を 30 秒ごとに書き込むと I/O コストおよびメモリ圧迫が顕著になる。
 
-**方針**:
+**Phase 1〜3 の方針**:
 1. **ユーザー向け警告の表示**: 3MB 超のファイルを開いた際にステータスバーへ警告を表示する
    「⚠ このファイルはクラッシュ時に未保存の変更が失われる可能性があります（定期的に Ctrl+S で保存してください）」
-2. **差分チェックポイント（Phase 4+ の改善候補）**: フルコンテンツではなく変更行のみを記録する
-   軽量なチェックポイント方式を将来的に検討する
-3. **現フェーズの方針**: Phase 1〜3 では警告表示のみを実装し、差分チェックポイントは Phase 4 で検討する
+2. **チェックポイントを記録しない**: ストアへの大容量書き込みコスト回避のため、3MB 超ファイルはチェックポイント対象外とする
+3. **差分チェックポイントは Phase 4 で対応**: §13 参照
 
 ```typescript
-// src/store/auto-save.ts — 3MB 超ファイルの警告表示
+// src/store/crash-recovery.ts — 3MB 超ファイルのチェックポイント除外
 const AUTO_SAVE_MAX_BYTES = 3 * 1024 * 1024;
 
-if (contentBytes >= AUTO_SAVE_MAX_BYTES) {
-  // 自動保存はスキップ
-  setStatusBarWarning(
-    '⚠ ファイルが大きいため自動保存は無効です。Ctrl+S で定期的に保存してください。'
-  );
-  return; // チェックポイントも記録しない（ストアへの書き込みコスト回避）
+export function startCheckpointScheduler(
+  getEntries: () => RecoveryEntry[]
+): () => void {
+  const intervalId = setInterval(async () => {
+    const entries = getEntries().filter((e) => {
+      const sizeBytes = new TextEncoder().encode(e.content).length;
+      if (sizeBytes >= AUTO_SAVE_MAX_BYTES) {
+        // 3MB 超ファイルはチェックポイント対象外。警告はファイルオープン時に表示済み。
+        return false;
+      }
+      return e.content !== e.savedContent;
+    });
+    if (entries.length > 0) {
+      await saveCheckpoint(entries);
+    }
+  }, CHECKPOINT_INTERVAL_MS);
+
+  return () => clearInterval(intervalId);
 }
 ```
+
+```typescript
+// src/file/auto-save.ts — 3MB 超ファイルの警告表示（ファイルオープン時）
+export function checkFileSizeWarning(contentBytes: number): void {
+  if (contentBytes >= AUTO_SAVE_MAX_BYTES) {
+    setStatusBarWarning(
+      '⚠ ファイルが大きいため自動保存・チェックポイントは無効です。Ctrl+S で定期的に保存してください。'
+    );
+  }
+}
+```
+
+> **Phase 4 以降の改善**: 差分チェックポイント（変更行のみを保存する軽量方式）の詳細設計は **§13** を参照。
 
 ---
 
@@ -1588,6 +1614,444 @@ export function useWriteAccessTransferHandler() {
 | Phase 5（前半）| タブのウィンドウ切り出し UI、`FileLockRegistry`（Rust）、`try_acquire_file_lock` / `release_file_lock` コマンド、`notify_file_opened/closed` イベント、Read-Only モードのエディタ表示 |
 | Phase 5（後半）| 設定・ワークスペースのウィンドウ間同期（`useWindowSync` フック）、書き込み権限譲渡フロー（`useWriteAccessTransferHandler`）、ファイルロック解放通知によるトースト |
 | Phase 6（将来）| Yjs CRDT の評価・試験実装（同時編集ニーズが確定した場合） |
+
+---
+
+---
+
+## 13. 巨大ファイルの差分チェックポイント設計（Phase 4+）
+
+### 13.1 背景と問題定義
+
+§10.7 で整理したように、3MB 超のファイルは自動保存・フルコンテンツチェックポイントの両方が無効化される。これにより以下のリスクが生じる。
+
+```
+ユーザーが 5MB のログファイル・長編原稿を編集中にクラッシュ
+  → チェックポイントなし
+  → 最後の手動保存（Ctrl+S）以降の変更がすべて失われる
+```
+
+手動保存を忘れがちなユーザー、または長時間編集が続くユーザーにとって、このリスクは許容しがたい。
+Phase 4 以降でこの問題を解決するため、「差分チェックポイント」設計を詳述する。
+
+---
+
+### 13.2 アプローチ比較
+
+3MB 超ファイルのクラッシュ保護に使える技術的アプローチを比較する。
+
+| アプローチ | 概要 | 利点 | 課題 |
+|-----------|------|------|------|
+| **A: フルコンテンツ（現行）** | 30 秒ごとに全文を `plugin-store` に書く | 実装が単純 | 3MB × 30s = I/O 過多・メモリ圧迫 |
+| **B: 行単位差分（diff-match-patch）** | 前回チェックポイントからの変更行差分を保存 | 差分が小さければ I/O 最小 | diff 計算コスト・復元時のマージロジックが必要 |
+| **C: IndexedDB チャンク保存** | エディタのドキュメントを N チャンクに分割し、変更チャンクのみ IndexedDB に保存 | ランダムアクセスに向く | チャンク境界管理・復元順序の整合性 |
+| **D: Yjs CRDT（差分更新）** | `Y.Doc` でドキュメントを管理し、更新を `Uint8Array` 差分としてローカルストレージに保存 | CRDT の恩恵（自動マージ・Undo/Redo）| TipTap に `@tiptap/extension-collaboration` 導入が必要 |
+
+**Phase 4 での採用方針: アプローチ B（行単位差分）**
+
+- 既存の `plugin-store` ベースのチェックポイント設計（§10.2）との親和性が高い
+- `diff-match-patch` ライブラリは軽量（約 30KB）で、Rust 側にも crate がある
+- CRDT（アプローチ D）は将来のリアルタイム協調編集（§12.4）と合流する形で Phase 6 以降に検討
+
+---
+
+### 13.3 差分チェックポイントの仕様
+
+#### 13.3.1 データ構造
+
+```typescript
+// src/store/crash-recovery.ts に追加
+
+/**
+ * 差分チェックポイントエントリ（大容量ファイル用）。
+ * 変更行の差分のみを記録し、ストレージ使用量を最小化する。
+ */
+export interface DiffCheckpointEntry {
+  /** ファイルパス */
+  filePath: string;
+  /** チェックポイントの基底となるコンテンツのハッシュ（SHA-256 の先頭 8 バイト）*/
+  baseHash: string;
+  /**
+   * diff-match-patch 形式の差分テキスト。
+   * 前回チェックポイントからの変更を表す。
+   */
+  patch: string;
+  /** チェックポイント作成時刻（ISO 8601）*/
+  checkpointAt: string;
+  /** このチェックポイントが適用可能な基底ファイルのパスと更新時刻 */
+  baseFileMtime: number; // Unix timestamp (ms)
+}
+
+/**
+ * 差分チェックポイントの累積履歴（最大 N 世代保持）。
+ * IndexedDB に保存し、クラッシュ時に一連のパッチを順に適用して復元する。
+ */
+export interface DiffCheckpointHistory {
+  filePath: string;
+  /** 最初のパッチが適用される起点（ディスク上のファイル内容のハッシュ）*/
+  originHash: string;
+  /** 最初の起点となったファイルのパス・最終更新時刻 */
+  originMtime: number;
+  /** 時系列順のパッチ列（最大 MAX_DIFF_GENERATIONS 件）*/
+  patches: DiffCheckpointEntry[];
+}
+```
+
+#### 13.3.2 保存先: IndexedDB
+
+フルコンテンツは `plugin-store`（JSON ファイル）に書いていたが、差分は **IndexedDB** に保存する。
+
+| 理由 | 説明 |
+|------|------|
+| 容量 | IndexedDB はブラウザのストレージ制限（通常 GB 単位）があり、数 MB 程度の差分を安全に保存できる |
+| 非同期 I/O | IndexedDB は非同期 API を持ち、メインスレッドをブロックしない |
+| バイナリ対応 | Uint8Array 等のバイナリを効率よく保存できる（将来の CRDT 移行時に有利）|
+| Tauri との親和性 | WebView 内の IndexedDB は Tauri アプリでも利用可能（`allow-same-origin` 付き `<webview>` では有効）|
+
+```typescript
+// src/store/diff-checkpoint-store.ts
+
+const DB_NAME = 'md-editor-checkpoints';
+const STORE_NAME = 'diff-checkpoints';
+const DB_VERSION = 1;
+
+let _db: IDBDatabase | null = null;
+
+async function getDb(): Promise<IDBDatabase> {
+  if (_db) return _db;
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = (e.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'filePath' });
+      }
+    };
+    req.onsuccess = () => { _db = req.result; resolve(_db!); };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function saveDiffCheckpoint(history: DiffCheckpointHistory): Promise<void> {
+  const db = await getDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(history);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function loadDiffCheckpoint(filePath: string): Promise<DiffCheckpointHistory | null> {
+  const db = await getDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.get(filePath);
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearDiffCheckpoint(filePath: string): Promise<void> {
+  const db = await getDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.objectStore(STORE_NAME).delete(filePath);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+```
+
+---
+
+### 13.4 差分計算と適用
+
+```typescript
+// src/store/diff-checkpoint-manager.ts
+import DiffMatchPatch from 'diff-match-patch';
+
+const dmp = new DiffMatchPatch();
+const MAX_DIFF_GENERATIONS = 10; // 最大 10 世代の差分を保持
+
+/**
+ * 差分チェックポイントを保存する。
+ *
+ * @param filePath   - ファイルパス
+ * @param savedText  - 最後にディスクに書き込んだテキスト（基底）
+ * @param currentText - 現在のエディタ内容
+ * @param savedMtime  - 基底ファイルの最終更新時刻
+ */
+export async function saveDiffCheckpointEntry(
+  filePath: string,
+  savedText: string,
+  currentText: string,
+  savedMtime: number,
+): Promise<void> {
+  if (savedText === currentText) return; // 変更なし
+
+  // diff 計算（同期だが軽量: テキストが大きくても通常 < 5ms）
+  const patches = dmp.patch_make(savedText, currentText);
+  const patchText = dmp.patch_toText(patches);
+
+  if (!patchText) return; // 実質変更なし
+
+  const baseHash = await shortHash(savedText);
+  const history = await loadDiffCheckpoint(filePath) ?? {
+    filePath,
+    originHash: baseHash,
+    originMtime: savedMtime,
+    patches: [],
+  };
+
+  // 基底が変わっていたら履歴をリセット（Ctrl+S 後の新しいチェックポイント系列）
+  if (history.originHash !== baseHash || history.originMtime !== savedMtime) {
+    history.originHash = baseHash;
+    history.originMtime = savedMtime;
+    history.patches = [];
+  }
+
+  history.patches.push({
+    filePath,
+    baseHash,
+    patch: patchText,
+    checkpointAt: new Date().toISOString(),
+    baseFileMtime: savedMtime,
+  });
+
+  // 最大世代数を超えたら古いものを削除（先頭は起点として保持しない: 末尾 N 個のみ保持）
+  if (history.patches.length > MAX_DIFF_GENERATIONS) {
+    history.patches = history.patches.slice(-MAX_DIFF_GENERATIONS);
+  }
+
+  await saveDiffCheckpoint(history);
+}
+
+/**
+ * 差分チェックポイントを適用してテキストを復元する。
+ *
+ * @param filePath   - ファイルパス
+ * @param savedText  - ディスク上の現在のファイル内容（起点）
+ * @returns 最新チェックポイント適用後のテキスト（復元失敗時は null）
+ */
+export async function applyDiffCheckpoint(
+  filePath: string,
+  savedText: string,
+): Promise<string | null> {
+  const history = await loadDiffCheckpoint(filePath);
+  if (!history || history.patches.length === 0) return null;
+
+  const currentHash = await shortHash(savedText);
+
+  // ディスクの内容が起点と一致するか確認
+  if (history.originHash !== currentHash) {
+    // ファイルが外部で変更されている場合は復元不可
+    console.warn('[DiffCheckpoint] ディスクのファイルが変更されているため差分適用をスキップ');
+    return null;
+  }
+
+  // 最新パッチを起点テキストに適用
+  try {
+    const lastPatch = history.patches[history.patches.length - 1];
+    const patches = dmp.patch_fromText(lastPatch.patch);
+    const [restored, results] = dmp.patch_apply(patches, savedText);
+
+    // 適用失敗した hunk がある場合は警告
+    const failCount = results.filter((r) => !r).length;
+    if (failCount > 0) {
+      console.warn(`[DiffCheckpoint] ${failCount} 個の差分を適用できませんでした`);
+    }
+
+    return restored;
+  } catch (err) {
+    console.error('[DiffCheckpoint] 差分適用に失敗:', err);
+    return null;
+  }
+}
+
+/** テキストの先頭 8 バイトの hex ハッシュ（衝突回避ではなく変更検知用）*/
+async function shortHash(text: string): Promise<string> {
+  const encoded = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
+  const hashArray = Array.from(new Uint8Array(hashBuffer).slice(0, 8));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+```
+
+---
+
+### 13.5 差分チェックポイントのスケジューリング
+
+差分チェックポイントは通常チェックポイント（`startCheckpointScheduler`）と**別のタイマー**で動作する。
+
+```typescript
+// src/store/crash-recovery.ts に追加
+
+const DIFF_CHECKPOINT_INTERVAL_MS = 30_000; // 30 秒（通常チェックポイントと同間隔）
+const LARGE_FILE_BYTES = 3 * 1024 * 1024;   // 3MB
+
+/**
+ * 大容量ファイル（3MB 超）専用の差分チェックポイントスケジューラー。
+ * 通常の startCheckpointScheduler() が 3MB 超を除外するため、こちらで補完する。
+ */
+export function startDiffCheckpointScheduler(
+  getTabSnapshots: () => Array<{
+    filePath: string;
+    content: string;
+    savedContent: string;
+    savedMtime: number;
+  }>
+): () => void {
+  const intervalId = setInterval(async () => {
+    const snapshots = getTabSnapshots().filter((s) => {
+      const sizeBytes = new TextEncoder().encode(s.content).length;
+      return sizeBytes >= LARGE_FILE_BYTES && s.content !== s.savedContent;
+    });
+
+    for (const snap of snapshots) {
+      await saveDiffCheckpointEntry(
+        snap.filePath,
+        snap.savedContent,
+        snap.content,
+        snap.savedMtime,
+      ).catch((err) => {
+        console.error('[DiffCheckpoint] 保存失敗:', err);
+      });
+    }
+  }, DIFF_CHECKPOINT_INTERVAL_MS);
+
+  return () => clearInterval(intervalId);
+}
+```
+
+---
+
+### 13.6 差分チェックポイントの復元フロー
+
+起動時の `checkNeedsRecovery()` を拡張し、差分チェックポイントも確認する。
+
+```
+起動時のリカバリ判定フロー（拡張版）:
+
+  [session.json の lastCleanExit を確認]
+    │ false（クラッシュ）
+    ▼
+  [loadRecoveryData() で通常チェックポイントを確認]
+    ├─ 小規模ファイル（< 3MB）のエントリがあれば → 通常リカバリダイアログ
+    └─ なし
+    ▼
+  [各タブのファイルパスに対して loadDiffCheckpoint() を確認]
+    ├─ 差分エントリがあれば → 差分リカバリダイアログ（§13.7）
+    └─ なし → 通常起動
+```
+
+```typescript
+// src/store/crash-recovery.ts（拡張）
+
+export async function checkNeedsRecoveryWithDiff(
+  openFilePaths: string[],
+): Promise<{
+  standard: RecoveryEntry[] | null;
+  diff: Array<{ filePath: string; checkpointAt: string }> | null;
+}> {
+  const session = await loadSession();
+  if (session?.lastCleanExit === true) {
+    return { standard: null, diff: null };
+  }
+
+  const standard = await loadRecoveryData();
+
+  const diffEntries: Array<{ filePath: string; checkpointAt: string }> = [];
+  for (const filePath of openFilePaths) {
+    const history = await loadDiffCheckpoint(filePath);
+    if (history && history.patches.length > 0) {
+      const latest = history.patches[history.patches.length - 1];
+      diffEntries.push({ filePath, checkpointAt: latest.checkpointAt });
+    }
+  }
+
+  return {
+    standard,
+    diff: diffEntries.length > 0 ? diffEntries : null,
+  };
+}
+```
+
+---
+
+### 13.7 差分リカバリダイアログ
+
+```tsx
+// src/components/DiffRecoveryDialog.tsx
+
+interface DiffRecoveryDialogProps {
+  entries: Array<{ filePath: string; checkpointAt: string }>;
+  onRestore: (filePaths: string[]) => void;
+  onDiscard: () => void;
+}
+
+export function DiffRecoveryDialog({ entries, onRestore, onDiscard }: DiffRecoveryDialogProps) {
+  return (
+    <Modal title="大容量ファイルの変更を復元しますか？">
+      <p>
+        以下の大容量ファイルでクラッシュ前の変更が検出されました。
+        差分チェックポイントから復元できます（最大 30 秒前の状態）。
+      </p>
+      <p className="text-warning">
+        ⚠ これらのファイルは 3MB を超えるため自動保存は無効です。
+        復元に失敗した場合、変更は失われます。
+      </p>
+      <ul>
+        {entries.map((e) => (
+          <li key={e.filePath}>
+            {basename(e.filePath)} —{' '}
+            <span className="text-muted">
+              {new Date(e.checkpointAt).toLocaleString('ja-JP')} 時点の差分
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="dialog-actions">
+        <button onClick={() => onRestore(entries.map((e) => e.filePath))}>
+          差分から復元する
+        </button>
+        <button onClick={onDiscard}>破棄して最後の保存状態で開く</button>
+      </div>
+    </Modal>
+  );
+}
+```
+
+---
+
+### 13.8 将来の拡張: Yjs CRDT への移行検討
+
+§12.4 で言及した Yjs CRDT を差分チェックポイントに応用する構想を整理する。
+
+**構想**: TipTap に `@tiptap/extension-collaboration` を導入し、`Y.Doc` でドキュメントを管理する。
+`Y.encodeStateAsUpdate()` で生成される差分バイト列（Uint8Array）を IndexedDB に保存する。
+
+| 項目 | 差分（diff-match-patch）| Yjs CRDT |
+|------|----------------------|----------|
+| 実装難易度 | 低 | 高（TipTap 全体の改修必要）|
+| 差分サイズ | 変更量に比例（テキスト差分）| 変更量に比例（バイナリ差分、通常より小さい）|
+| Undo/Redo への影響 | なし（独立した仕組み）| `Y.UndoManager` との統合が必要 |
+| マルチウィンドウ同期 | 別途ロック機構が必要 | CRDT で自動解決 |
+| 採用フェーズ | **Phase 4**（差分チェックポイント）| Phase 6 以降（マルチウィンドウ同時編集ニーズ確定後）|
+
+**Phase 4 では diff-match-patch を採用し**、Yjs CRDT への移行は「マルチウィンドウ協調編集が必要になった段階」まで先送りする。
+
+---
+
+### 13.9 実装フェーズ
+
+| フェーズ | 実装内容 |
+|---------|---------|
+| **Phase 1〜3** | §10.7 の警告表示のみ（チェックポイントなし） |
+| **Phase 4** | `diff-match-patch` 導入・`saveDiffCheckpointEntry` / `applyDiffCheckpoint` 実装・IndexedDB ストア・差分チェックポイントスケジューラー・差分リカバリダイアログ |
+| **Phase 6 以降** | Yjs CRDT 移行の評価（マルチウィンドウ同時編集ニーズ確定後）|
 
 ---
 

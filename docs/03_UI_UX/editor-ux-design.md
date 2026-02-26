@@ -22,6 +22,8 @@
 12. [テキスト整形コマンド](#12-テキスト整形コマンド)
 13. [行ブックマークと F2 ジャンプ](#13-行ブックマークと-f2-ジャンプ)
 14. [単語の自動補完（Ctrl+Space）](#14-単語の自動補完ctrlspace)
+15. [ブロック境界カーソル脱出設計（カーソルトラップ回避）](#15-ブロック境界カーソル脱出設計カーソルトラップ回避)
+16. [スマートクォーテーション詳細設計](#16-スマートクォーテーション詳細設計)
 
 ---
 
@@ -905,9 +907,268 @@ export function BlockEscapeHint() {
 
 ---
 
+---
+
+## 16. スマートクォーテーション詳細設計
+
+### 16.1 機能概要
+
+入力した直線引用符（`"` / `'`）を、文脈に応じて自動的に「開き」「閉じ」のカーリー引用符（"" / ''）に変換する機能。Typora・Word・macOS が標準で提供する「スマートクォーテーション（Smart Quotes）」と同等の動作を目指す。
+
+| 入力 | 変換結果 | 条件 |
+|------|---------|------|
+| `"` | `"` (U+201C 開きダブルクォート) | 直前が空白・行頭・開き括弧等 |
+| `"` | `"` (U+201D 閉じダブルクォート) | 直前が文字・閉じ括弧等 |
+| `'` | `'` (U+2018 開きシングルクォート) | 直前が空白・行頭・開き括弧等 |
+| `'` | `'` (U+2019 閉じシングルクォート) | 直前が文字・閉じ括弧等（アポストロフィも同様）|
+
+**実装方針**: TipTap の `InputRule` として実装し、変換は **composing（IME 変換中）でないときのみ**発火させる。
+
+---
+
+### 16.2 開き・閉じの判定ロジック
+
+変換前にカーソル直前の文字を調べ、「開き」か「閉じ」かを決定する。
+
+```typescript
+// src/plugins/smart-quotes/smart-quotes-utils.ts
+
+/** 直前の文字が「開きクォート」文脈かどうかを判定する */
+export function isOpeningContext(charBefore: string | null): boolean {
+  if (charBefore === null) return true; // 行頭 → 開き
+  // 開き文脈: 空白・改行・開き括弧・ダッシュ・開きクォート類
+  return /[\s\p{Ps}「『【（〔〈《—–\u201C\u2018]/u.test(charBefore);
+}
+```
+
+| 直前の文字 | 判定 | 例 |
+|-----------|------|----|
+| なし（行頭・段落先頭） | 開き | `"Hello` → `"Hello` |
+| スペース・タブ | 開き | `foo "bar` → `foo "bar` |
+| 開き括弧 `(`, `[`, `{`, `「` 等 | 開き | `("test` → `("test` |
+| 英数字・CJK 文字 | 閉じ | `foo"` → `foo"` |
+| 閉じ括弧 `)`, `]`, `}` 等 | 閉じ | `)"` → `)"` |
+| すでにクォートで囲まれた文字 | 閉じ | `"word"` の末尾 → `"word"` |
+
+---
+
+### 16.3 TipTap InputRule による実装
+
+```typescript
+// src/plugins/smart-quotes/smart-quotes-extension.ts
+
+import { Extension, InputRule } from '@tiptap/core';
+import { isOpeningContext } from './smart-quotes-utils';
+
+/**
+ * スマートクォーテーション Extension。
+ * ダブルクォート・シングルクォートを文脈に応じて自動変換する。
+ *
+ * 注意:
+ *   - IME 変換中（composing）は発火しない
+ *   - コードブロック・インラインコード内では発火しない
+ *   - 設定で無効にできる
+ */
+export const SmartQuotesExtension = Extension.create({
+  name: 'smartQuotes',
+
+  addInputRules() {
+    return [
+      // ダブルクォート変換
+      new InputRule({
+        find: /(")/,
+        handler({ state, range, match }) {
+          // IME 変換中は処理しない
+          if ((state as any).composing) return null;
+
+          // コードブロック・インラインコード内は変換しない
+          const $from = state.selection.$from;
+          if (isInsideCode($from)) return null;
+
+          // 直前の文字を取得
+          const charBefore = $from.nodeBefore?.text?.slice(-1) ?? null;
+          const quote = isOpeningContext(charBefore) ? '\u201C' : '\u201D';
+
+          return state.tr.insertText(quote, range.from, range.to);
+        },
+      }),
+
+      // シングルクォート変換
+      new InputRule({
+        find: /(')/,
+        handler({ state, range, match }) {
+          if ((state as any).composing) return null;
+
+          const $from = state.selection.$from;
+          if (isInsideCode($from)) return null;
+
+          const charBefore = $from.nodeBefore?.text?.slice(-1) ?? null;
+          const quote = isOpeningContext(charBefore) ? '\u2018' : '\u2019';
+
+          return state.tr.insertText(quote, range.from, range.to);
+        },
+      }),
+    ];
+  },
+});
+
+/** カーソルがコードブロックまたはインラインコード内かどうかを判定 */
+function isInsideCode($from: ResolvedPos): boolean {
+  // 親ノードがコードブロック
+  if ($from.node(-1)?.type.name === 'codeBlock') return true;
+  // アクティブな Mark にインラインコードが含まれる
+  const marks = $from.marks();
+  return marks.some((m) => m.type.name === 'code');
+}
+```
+
+---
+
+### 16.4 Undo 連動設計（スマートクォート化の取り消し）
+
+**要件**: `Ctrl+Z` を1回押すと、スマートクォート変換だけを取り消し、元のプレーンな引用符（`"` / `'`）に戻す。さらにもう1回 `Ctrl+Z` を押すと、引用符の入力自体が取り消される。
+
+**ProseMirror での動作**:
+
+TipTap の標準 `InputRule` は内部で `closeHistory(tr)` を呼ぶため、変換トランザクションは**直前の文字入力とは別の履歴グループ**に格納される。
+
+```
+ユーザーが `"` を入力（スマートクォートが有効な場合）:
+
+  [履歴グループ A: `"` の文字入力トランザクション]
+  [履歴グループ B: `"` → `"` 変換トランザクション ← closeHistory で区切られる]
+
+Ctrl+Z を1回:
+  → グループ B が取り消される
+  → `"` に戻る（変換前の状態）
+
+さらに Ctrl+Z:
+  → グループ A が取り消される
+  → `"` の入力自体が消える（空白に戻る）
+```
+
+これは TipTap/ProseMirror の `InputRule` が標準的に提供する動作であり、**追加実装は不要**。`handler` 内で返した `state.tr` に `closeHistory` が自動的に付加される。
+
+**スマートクォートをバイパスして直接プレーン引用符を入力したい場合**:
+
+| 方法 | 動作 |
+|------|------|
+| `Ctrl+Z` を変換直後に押す | 変換を取り消し、`"` のプレーン表示に戻る |
+| 設定でスマートクォートを無効化 | 常にプレーン引用符のまま |
+| コードブロック内での入力 | 自動的に変換しない（§16.3 参照）|
+
+---
+
+### 16.5 IME 入力中の制御
+
+日本語・中国語・韓国語の IME 変換中に誤って変換が走らないよう、`composing` フラグで発火を抑制する。
+
+```typescript
+// InputRule の handler 内で毎回チェック
+if ((state as any).composing) return null;
+```
+
+`compositionstart` から `compositionend` の間、ProseMirror は `state.composing = true` を維持する。この間に `"` や `'` が入力される可能性はほとんどないが（CJK では引用符として ASCII コードを直接入力するケースが少ない）、念のためガードを入れる。
+
+また、macOS の WKWebView では OS レベルのスマートクォート変換（「スマート引用符と置換ダッシュ」）が有効な場合、OS と拡張機能が二重に変換する問題が発生する。この抑制策は `cross-platform-design.md §2.4` に記載する。
+
+---
+
+### 16.6 設定項目
+
+`user-settings-design.md §2.2` に定義する `AppSettings` に以下を追加する:
+
+| 設定キー | 型 | デフォルト | 説明 |
+|---------|-----|-----------|------|
+| `smartQuotes` | `boolean` | `true` | スマートクォーテーションの有効/無効 |
+| `smartQuoteStyle` | `'curly' \| 'guillemet' \| 'cjk'` | `'curly'` | クォートスタイル（将来拡張用、Phase 1 では `'curly'` 固定）|
+
+```typescript
+// src/plugins/smart-quotes/smart-quotes-extension.ts（設定連携版）
+
+export const SmartQuotesExtension = Extension.create({
+  name: 'smartQuotes',
+
+  addOptions() {
+    return {
+      enabled: true,  // AppSettings.smartQuotes から注入
+    };
+  },
+
+  addInputRules() {
+    // 設定が無効の場合は InputRule を空配列で返す（=何も変換しない）
+    if (!this.options.enabled) return [];
+    return [/* ... §16.3 のルール ... */];
+  },
+});
+```
+
+```typescript
+// エディタ初期化側（src/renderer/wysiwyg/editor.ts）
+import { useSettingsStore } from '../../store/settingsStore';
+
+const { smartQuotes } = useSettingsStore.getState().settings;
+
+const editor = new Editor({
+  extensions: [
+    SmartQuotesExtension.configure({ enabled: smartQuotes }),
+    // ...
+  ],
+});
+
+// 設定変更時にリアルタイムで拡張を再設定する
+useSettingsStore.subscribe(
+  (s) => s.settings.smartQuotes,
+  (enabled) => {
+    editor.extensionManager.extensions
+      .find((e) => e.name === 'smartQuotes')
+      ?.configure({ enabled });
+  }
+);
+```
+
+---
+
+### 16.7 エッジケースと制限
+
+| ケース | 動作 |
+|--------|------|
+| `"` を連続入力（`""` → 空文字列ラップ）| 最初の `"` → `"` 、次の `"` → `"` （直前が `"` → 文字扱い → 閉じ）|
+| コードブロック内 | 変換なし（プレーン `"` / `'` のまま） |
+| インラインコード（`` `code` ``）内 | 変換なし |
+| ソースモード（CodeMirror 6）| TipTap InputRule は動作しないため変換なし。CodeMirror の `closebrackets` 等で別途対応可能（Phase 7 以降）|
+| HTML 編集モード | HTML の属性値 `<a href="...">` 等でスマートクォートは不適切なため、HTML モードでは無効化する |
+| macOS OS レベルの自動変換との二重変換 | `cross-platform-design.md §2.4` の抑制策（WKWebView の `isAutomaticQuoteSubstitutionEnabled = false`）で回避 |
+| `'` アポストロフィ（`don't` 等）| 閉じシングルクォートと同じ `'` (U+2019) を使用するため自然な結果になる |
+
+---
+
+### 16.8 テストケース
+
+```typescript
+// src/plugins/smart-quotes/smart-quotes.test.ts
+
+describe('SmartQuotesExtension', () => {
+  it('行頭の " → 開きダブルクォートに変換', ...);
+  it('単語後の " → 閉じダブルクォートに変換', ...);
+  it('スペース後の " → 開きダブルクォートに変換', ...);
+  it('連続 "" → 開き+閉じのペアになる', ...);
+  it('コードブロック内では変換しない', ...);
+  it('インラインコード内では変換しない', ...);
+  it("don't の ' → アポストロフィ（U+2019）になる", ...);
+  it('Ctrl+Z で変換のみ取り消し → プレーン " に戻る', ...);
+  it('設定 smartQuotes=false で変換が無効になる', ...);
+  it('IME composing 中は発火しない', ...);
+});
+```
+
+---
+
 ## 関連ドキュメント
 
 - [system-design.md](../01_Architecture/system-design.md) — Typora 式カーソル位置計算・NodeView 設計
 - [keyboard-shortcuts.md](./keyboard-shortcuts.md) — Ctrl+Enter 等のショートカット定義
 - [user-settings-design.md](../07_Platform_Settings/user-settings-design.md) — showLineNumbers・smartQuotes 等の設定
 - [accessibility-design.md](./accessibility-design.md) — キーボードのみの操作フロー（roving tabindex）
+- [cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) — macOS WKWebView の OS レベル自動変換抑制策（§2.4）
+- [undo-redo-design.md](../02_Core_Editor/undo-redo-design.md) — InputRule と closeHistory の連動設計
