@@ -1,9 +1,7 @@
+import { AppShell } from './components/layout/AppShell';
+
 function App() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <h1 className="text-2xl font-bold">Markdown Editor</h1>
-    </div>
-  );
+  return <AppShell />;
 }
 
 export default App;

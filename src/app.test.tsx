@@ -3,8 +3,14 @@ import { render, screen } from "@testing-library/react";
 import App from "./app";
 
 describe("App", () => {
-  it("renders the heading", () => {
+  it("renders the app shell with tab bar", () => {
     render(<App />);
-    expect(screen.getByText("Markdown Editor")).toBeInTheDocument();
+    // 初回起動時に Untitled タブが表示される
+    expect(screen.getByText("Untitled-1")).toBeInTheDocument();
+  });
+
+  it("renders the status bar", () => {
+    render(<App />);
+    expect(screen.getByText("Markdown")).toBeInTheDocument();
   });
 });

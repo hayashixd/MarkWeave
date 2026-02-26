@@ -4,12 +4,19 @@ mod fs;
 mod menu;
 mod models;
 
+use commands::fs_commands;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .invoke_handler(tauri::generate_handler![
+            fs_commands::read_file,
+            fs_commands::write_file,
+            fs_commands::file_exists,
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
