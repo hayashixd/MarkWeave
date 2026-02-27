@@ -23,6 +23,7 @@ import { useTabStore } from '../../store/tabStore';
 import { useTitleBar } from '../../hooks/useTitleBar';
 import { useCloseGuard } from '../../hooks/useCloseGuard';
 import { useSessionRestore } from '../../hooks/useSessionRestore';
+import { useFileOpenListener } from '../../hooks/useFileOpenListener';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -40,6 +41,9 @@ export function AppShell() {
 
   // セッション復元（前回開いていたタブを復元、なければ空タブ）
   useSessionRestore();
+
+  // 外部ファイルオープンイベント受信（シングルインスタンス制御・CLI引数対応）
+  useFileOpenListener();
 
   // 新しいタブを開く
   const handleNewTab = useCallback(() => {
