@@ -7,10 +7,12 @@
  * - 太字・斜体
  * - リスト（箇条書き・番号付き）
  * - インラインコード
- * - コードブロック
+ * - コードブロック（シンタックスハイライト）
  * - 引用
  * - 水平線
  * - リンク
+ * - タスクリスト
+ * - ソースモード切替（Ctrl+/）
  *
  * CLAUDE.md 制約:
  * - IME 入力中の isComposing ガード
@@ -25,12 +27,14 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIMEComposition } from './useIMEComposition';
 import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
 import { markdownToTipTap } from '../../lib/markdown-to-tiptap';
 import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
+
+export type EditorMode = 'wysiwyg' | 'source';
 
 export interface EditorProps {
   /** 初期 Markdown テキスト */
@@ -49,6 +53,8 @@ export function MarkdownEditor({
   readOnly = false,
   placeholder = '入力を開始...',
 }: EditorProps) {
+  const [mode, setMode] = useState<EditorMode>('wysiwyg');
+  const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
 
@@ -125,6 +131,48 @@ export function MarkdownEditor({
     };
   }, [editor, ime]);
 
+  // Ctrl+/ でソースモード切替
+  // keyboard-shortcuts.md §1-5, §4-2 に準拠
+  const toggleMode = useCallback(() => {
+    if (!editor) return;
+
+    if (mode === 'wysiwyg') {
+      // WYSIWYG → ソース: 現在のエディタ内容を Markdown に変換
+      const json = editor.getJSON() as unknown as TipTapDoc;
+      const markdown = tiptapToMarkdown(json);
+      setSourceText(markdown);
+      setMode('source');
+    } else {
+      // ソース → WYSIWYG: Markdown を TipTap JSON に変換してエディタに設定
+      const doc = markdownToTipTap(sourceText);
+      editor.commands.setContent(doc as unknown as Record<string, unknown>);
+      onContentChangeRef.current?.(sourceText);
+      setMode('wysiwyg');
+    }
+  }, [editor, mode, sourceText]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        toggleMode();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [toggleMode]);
+
+  // ソースモードでのテキスト変更
+  const handleSourceChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      setSourceText(value);
+      onContentChangeRef.current?.(value);
+    },
+    [],
+  );
+
   // 外部から Markdown を設定するメソッド
   const setMarkdown = useCallback(
     (markdown: string) => {
@@ -149,13 +197,23 @@ export function MarkdownEditor({
 
   return (
     <div className="editor-container flex flex-col h-full">
-      <EditorToolbar editor={editor} />
-      <div className="flex-1 overflow-y-auto px-8 py-4">
-        <EditorContent
-          editor={editor}
-          className="prose prose-neutral max-w-none focus:outline-none"
+      <EditorToolbar editor={editor} mode={mode} onToggleMode={toggleMode} />
+      {mode === 'wysiwyg' ? (
+        <div className="flex-1 overflow-y-auto px-8 py-4">
+          <EditorContent
+            editor={editor}
+            className="prose prose-neutral max-w-none focus:outline-none"
+          />
+        </div>
+      ) : (
+        <textarea
+          className="flex-1 w-full px-8 py-4 font-mono text-sm bg-gray-50 resize-none focus:outline-none"
+          value={sourceText}
+          onChange={handleSourceChange}
+          readOnly={readOnly}
+          spellCheck={false}
         />
-      </div>
+      )}
       <EditorHandle setMarkdown={setMarkdown} getMarkdown={getMarkdown} />
     </div>
   );
@@ -175,80 +233,99 @@ function EditorHandle(_props: {
 /**
  * 簡易ツールバー (Phase 1)
  */
-function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
+function EditorToolbar({
+  editor,
+  mode,
+  onToggleMode,
+}: {
+  editor: ReturnType<typeof useEditor>;
+  mode: EditorMode;
+  onToggleMode: () => void;
+}) {
   if (!editor) return null;
 
   return (
     <div className="editor-toolbar flex items-center gap-1 px-4 py-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+      {mode === 'wysiwyg' && (
+        <>
+          <ToolbarButton
+            label="B"
+            title="太字 (Ctrl+B)"
+            active={editor.isActive('bold')}
+            onClick={() => editor.chain().focus().toggleBold().run()}
+          />
+          <ToolbarButton
+            label="I"
+            title="斜体 (Ctrl+I)"
+            active={editor.isActive('italic')}
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className="italic"
+          />
+          <ToolbarButton
+            label="S"
+            title="取り消し線"
+            active={editor.isActive('strike')}
+            onClick={() => editor.chain().focus().toggleStrike().run()}
+            className="line-through"
+          />
+          <ToolbarButton
+            label="<>"
+            title="インラインコード"
+            active={editor.isActive('code')}
+            onClick={() => editor.chain().focus().toggleCode().run()}
+          />
+          <ToolbarDivider />
+          {([1, 2, 3] as const).map((level) => (
+            <ToolbarButton
+              key={level}
+              label={`H${level}`}
+              title={`見出し${level} (Ctrl+Alt+${level})`}
+              active={editor.isActive('heading', { level })}
+              onClick={() =>
+                editor.chain().focus().toggleHeading({ level }).run()
+              }
+            />
+          ))}
+          <ToolbarDivider />
+          <ToolbarButton
+            label="UL"
+            title="箇条書きリスト"
+            active={editor.isActive('bulletList')}
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+          />
+          <ToolbarButton
+            label="OL"
+            title="番号付きリスト"
+            active={editor.isActive('orderedList')}
+            onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          />
+          <ToolbarButton
+            label="Quote"
+            title="引用"
+            active={editor.isActive('blockquote')}
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          />
+          <ToolbarButton
+            label="Code"
+            title="コードブロック"
+            active={editor.isActive('codeBlock')}
+            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          />
+          <ToolbarDivider />
+          <ToolbarButton
+            label="—"
+            title="水平線"
+            active={false}
+            onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          />
+          <ToolbarDivider />
+        </>
+      )}
       <ToolbarButton
-        label="B"
-        title="太字 (Ctrl+B)"
-        active={editor.isActive('bold')}
-        onClick={() => editor.chain().focus().toggleBold().run()}
-      />
-      <ToolbarButton
-        label="I"
-        title="斜体 (Ctrl+I)"
-        active={editor.isActive('italic')}
-        onClick={() => editor.chain().focus().toggleItalic().run()}
-        className="italic"
-      />
-      <ToolbarButton
-        label="S"
-        title="取り消し線"
-        active={editor.isActive('strike')}
-        onClick={() => editor.chain().focus().toggleStrike().run()}
-        className="line-through"
-      />
-      <ToolbarButton
-        label="<>"
-        title="インラインコード"
-        active={editor.isActive('code')}
-        onClick={() => editor.chain().focus().toggleCode().run()}
-      />
-      <ToolbarDivider />
-      {([1, 2, 3] as const).map((level) => (
-        <ToolbarButton
-          key={level}
-          label={`H${level}`}
-          title={`見出し${level} (Ctrl+Alt+${level})`}
-          active={editor.isActive('heading', { level })}
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level }).run()
-          }
-        />
-      ))}
-      <ToolbarDivider />
-      <ToolbarButton
-        label="UL"
-        title="箇条書きリスト"
-        active={editor.isActive('bulletList')}
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-      />
-      <ToolbarButton
-        label="OL"
-        title="番号付きリスト"
-        active={editor.isActive('orderedList')}
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-      />
-      <ToolbarButton
-        label="Quote"
-        title="引用"
-        active={editor.isActive('blockquote')}
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
-      />
-      <ToolbarButton
-        label="Code"
-        title="コードブロック"
-        active={editor.isActive('codeBlock')}
-        onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-      />
-      <ToolbarDivider />
-      <ToolbarButton
-        label="—"
-        title="水平線"
-        active={false}
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
+        label={mode === 'wysiwyg' ? '</>' : 'WYSIWYG'}
+        title={`${mode === 'wysiwyg' ? 'ソースモード' : 'WYSIWYG モード'} (Ctrl+/)`}
+        active={mode === 'source'}
+        onClick={onToggleMode}
       />
     </div>
   );

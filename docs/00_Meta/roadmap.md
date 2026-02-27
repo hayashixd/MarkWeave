@@ -82,7 +82,7 @@
 - [x] タスクリスト（@tiptap/extension-task-list 要追加）
 - [x] コードブロック（シンタックスハイライト）※コードブロック自体はStarterKitで表示可。lowlight統合が未実装
 - [x] 水平線 StarterKit
-- [ ] ソースモード切替（Ctrl+/）
+- [x] ソースモード切替（Ctrl+/）
 
 ### オートフォーマット
 
