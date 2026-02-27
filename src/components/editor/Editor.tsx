@@ -23,6 +23,8 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { common, createLowlight } from 'lowlight';
 import { useCallback, useEffect, useRef } from 'react';
 import { useIMEComposition } from './useIMEComposition';
 import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
@@ -54,9 +56,14 @@ export function MarkdownEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4, 5, 6] },
-        codeBlock: { languageClassPrefix: 'language-' },
+        // StarterKit の codeBlock を無効化し、CodeBlockLowlight を使用
+        codeBlock: false,
         // StarterKit v3 に含まれる Link を無効化し、個別設定版を使用
         link: false,
+      }),
+      CodeBlockLowlight.configure({
+        lowlight: createLowlight(common),
+        languageClassPrefix: 'language-',
       }),
       Link.configure({
         openOnClick: false,

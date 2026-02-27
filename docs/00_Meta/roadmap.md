@@ -80,7 +80,7 @@
 - [x] 引用ブロック StarterKit blockquote
 - [x] 順序なし・順序付きリスト StarterKit
 - [x] タスクリスト（@tiptap/extension-task-list 要追加）
-- [ ] コードブロック（シンタックスハイライト）※コードブロック自体はStarterKitで表示可。lowlight統合が未実装
+- [x] コードブロック（シンタックスハイライト）※コードブロック自体はStarterKitで表示可。lowlight統合が未実装
 - [x] 水平線 StarterKit
 - [ ] ソースモード切替（Ctrl+/）
 
