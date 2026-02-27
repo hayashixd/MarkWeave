@@ -26,6 +26,14 @@
 - [x] ファイル読み書き（@tauri-apps/plugin-fs + `src-tauri/src/commands/fs_commands.rs`）
 - [x] Zustand ストアセットアップ（`settingsStore`, `tabStore`）
 
+### ファイル管理基本機能
+
+詳細設計: [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §9, §15
+
+- [x] ファイルを開くダイアログ（`Ctrl+O`）`src/hooks/useFileDialogs.ts`
+- [x] 名前を付けて保存ダイアログ（`Ctrl+Shift+S` / 未保存ファイルの `Ctrl+S`）
+- [x] ドラッグ&ドロップでファイルを開く `src/hooks/useDropListener.ts`
+
 ### ユーザー設定
 
 詳細設計: [user-settings-design.md](./user-settings-design.md)

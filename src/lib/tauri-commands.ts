@@ -56,6 +56,26 @@ export async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+/** パスの種別情報 */
+export interface PathInfo {
+  isDirectory: boolean;
+  isFile: boolean;
+  extension: string | null;
+}
+
+/**
+ * パスの種別（ファイル/ディレクトリ）を判定する。
+ * ドラッグ&ドロップ時のパス判定に使用。
+ * @param path 絶対パス
+ */
+export async function getPathInfo(path: string): Promise<PathInfo> {
+  try {
+    return await invoke<PathInfo>('get_path_info', { path });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
 /**
  * タイトルバーに未保存マーカーを反映する。
  *

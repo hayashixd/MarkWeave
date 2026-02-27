@@ -31,6 +31,7 @@ pub fn run() {
             fs_commands::read_file,
             fs_commands::write_file,
             fs_commands::file_exists,
+            fs_commands::get_path_info,
             window_commands::set_title_dirty,
         ])
         .plugin(

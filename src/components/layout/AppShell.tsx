@@ -8,8 +8,14 @@
  * window-tab-session-design.md に準拠:
  * - タブの追加・削除・切り替え
  * - 未保存確認ダイアログ
- * - Ctrl+S での即時保存
+ * - Ctrl+S での即時保存（未保存ファイルは Save As へフォールバック）
+ * - Ctrl+Shift+S での名前を付けて保存
+ * - Ctrl+O でファイルを開くダイアログ
  * - Ctrl+N での新規タブ
+ *
+ * file-workspace-design.md §15 に準拠:
+ * - ドラッグ&ドロップでファイルを開く
+ * - ドラッグ中のオーバーレイ表示
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -25,6 +31,8 @@ import { useCloseGuard } from '../../hooks/useCloseGuard';
 import { useSessionRestore } from '../../hooks/useSessionRestore';
 import { useFileOpenListener } from '../../hooks/useFileOpenListener';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useDropListener } from '../../hooks/useDropListener';
+import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
 import { writeFile } from '../../lib/tauri-commands';
 
 export function AppShell() {
@@ -48,6 +56,13 @@ export function AppShell() {
   // 外部ファイルオープンイベント受信（シングルインスタンス制御・CLI引数対応）
   useFileOpenListener();
 
+  // ドラッグ&ドロップでファイルを開く
+  const { isDragOver } = useDropListener();
+
+  // ファイルダイアログ
+  const openFileDialog = useOpenFileDialog();
+  const saveAsDialog = useSaveAsDialog();
+
   // IME 変換中フラグ（useAutoSave に渡すため window レベルで追跡）
   const isComposingRef = useRef(false);
 
@@ -61,6 +76,14 @@ export function AppShell() {
   // flushPendingSave を ref 経由で参照（useEffect の deps を最小化）
   const flushRef = useRef(flushPendingSave);
   flushRef.current = flushPendingSave;
+
+  // saveAsDialog を ref で保持（keydown handler の deps を安定化）
+  const saveAsDialogRef = useRef(saveAsDialog);
+  saveAsDialogRef.current = saveAsDialog;
+
+  // openFileDialog を ref で保持
+  const openFileDialogRef = useRef(openFileDialog);
+  openFileDialogRef.current = openFileDialog;
 
   // IME 変換イベントをキャプチャフェーズで監視
   // compositionend 後に pending になっている自動保存を即時スケジュール
@@ -136,15 +159,29 @@ export function AppShell() {
         return;
       }
 
-      // Ctrl+S: 即時保存
+      // Ctrl+O: ファイルを開くダイアログ
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+        e.preventDefault();
+        openFileDialogRef.current();
+        return;
+      }
+
+      // Ctrl+Shift+S: 名前を付けて保存
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'S') {
+        e.preventDefault();
+        saveAsDialogRef.current();
+        return;
+      }
+
+      // Ctrl+S: 即時保存（未保存ファイルは Save As にフォールバック）
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         const tab = getActiveTab();
         if (!tab) return;
 
         if (!tab.filePath) {
-          // 未保存ファイル: Phase 1 ではまだ Save As 未実装
-          // Phase 3 で Tauri ダイアログを使って実装
+          // 未保存ファイル（Untitled）: Save As ダイアログを開く
+          saveAsDialogRef.current();
           return;
         }
 
@@ -169,7 +206,7 @@ export function AppShell() {
   }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow]);
 
   return (
-    <div className="app-shell flex flex-col h-screen">
+    <div className="app-shell flex flex-col h-screen relative">
       {/* タブバー */}
       <TabBar onCloseTab={handleCloseTab} onNewTab={handleNewTab} />
 
@@ -191,7 +228,7 @@ export function AppShell() {
               />
             </EditorErrorBoundary>
           ) : (
-            <EmptyState onNewTab={handleNewTab} />
+            <EmptyState onNewTab={handleNewTab} onOpenFile={() => openFileDialogRef.current()} />
           )}
         </div>
       </div>
@@ -207,6 +244,42 @@ export function AppShell() {
 
       {/* トースト通知 */}
       <ToastContainer />
+
+      {/* ドラッグ&ドロップオーバーレイ */}
+      {isDragOver && <DropOverlay />}
+    </div>
+  );
+}
+
+/**
+ * ドラッグ&ドロップ時のビジュアルフィードバックオーバーレイ。
+ * file-workspace-design.md §15.3 に準拠。
+ */
+function DropOverlay() {
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/10 border-2 border-dashed border-blue-400 pointer-events-none">
+      <div className="flex flex-col items-center gap-3 bg-white/90 rounded-xl px-10 py-8 shadow-lg">
+        <svg
+          width="48"
+          height="48"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          className="text-blue-500"
+        >
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="12" y1="18" x2="12" y2="12" />
+          <polyline points="9 15 12 12 15 15" />
+        </svg>
+        <p className="text-lg font-medium text-gray-700">
+          ここにドロップして開く
+        </p>
+        <p className="text-sm text-gray-400">
+          .md / .html ファイルに対応
+        </p>
+      </div>
     </div>
   );
 }
@@ -214,7 +287,7 @@ export function AppShell() {
 /**
  * ファイルが開かれていない時の空状態
  */
-function EmptyState({ onNewTab }: { onNewTab: () => void }) {
+function EmptyState({ onNewTab, onOpenFile }: { onNewTab: () => void; onOpenFile: () => void }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-gray-50">
       <div className="text-center max-w-md px-8">
@@ -239,7 +312,17 @@ function EmptyState({ onNewTab }: { onNewTab: () => void }) {
           >
             新しいファイルを作成
           </button>
-          <div className="flex items-center gap-4 text-xs text-gray-400 mt-2">
+          <button
+            type="button"
+            onClick={onOpenFile}
+            className="px-6 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm"
+          >
+            ファイルを開く
+          </button>
+          <p className="text-xs text-gray-400 mt-2">
+            またはファイルをウィンドウにドラッグ&ドロップ
+          </p>
+          <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
             <span>
               <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+N</kbd>
               {' '}新規作成

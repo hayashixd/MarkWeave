@@ -117,3 +117,36 @@ pub async fn file_exists(path: String) -> Result<bool, String> {
     let file_path = Path::new(&path);
     Ok(file_path.exists())
 }
+
+/// パスの種別情報
+#[derive(serde::Serialize)]
+pub struct PathInfo {
+    pub is_directory: bool,
+    pub is_file: bool,
+    pub extension: Option<String>,
+}
+
+/// パスの種別（ファイル/ディレクトリ）を判定する Tauri コマンド。
+///
+/// ドラッグ&ドロップ時のパス判定に使用。
+/// file-workspace-design.md §15 に準拠。
+#[tauri::command]
+pub async fn get_path_info(path: String) -> Result<PathInfo, String> {
+    let p = Path::new(&path);
+
+    if !p.exists() {
+        return Err(AppError::FileNotFound {
+            path: path.clone(),
+        }
+        .into());
+    }
+
+    let is_dir = p.is_dir();
+    let extension = p.extension().map(|e| e.to_string_lossy().to_string());
+
+    Ok(PathInfo {
+        is_directory: is_dir,
+        is_file: !is_dir,
+        extension,
+    })
+}
