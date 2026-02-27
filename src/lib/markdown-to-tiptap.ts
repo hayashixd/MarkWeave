@@ -67,6 +67,18 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
       ];
 
     case 'list': {
+      // タスクリスト判定: いずれかの item に checked が設定されていればタスクリスト
+      const isTaskList = node.children.some((item) => item.checked != null);
+
+      if (isTaskList) {
+        return [
+          {
+            type: 'taskList',
+            content: node.children.map((item) => convertTaskItem(item)),
+          },
+        ];
+      }
+
       const listType = node.ordered ? 'orderedList' : 'bulletList';
       const attrs: Record<string, unknown> = {};
       if (node.ordered && node.start != null && node.start !== 1) {
@@ -131,14 +143,36 @@ function convertListItem(
     content.push({ type: 'paragraph' });
   }
 
-  const result: TipTapNode = { type: 'listItem', content };
+  return { type: 'listItem', content };
+}
 
-  // タスクリスト対応
-  if (node.checked != null) {
-    result.attrs = { checked: node.checked };
+function convertTaskItem(
+  node: Extract<RootContent, { type: 'listItem' }>,
+): TipTapNode {
+  const content: TipTapNode[] = [];
+
+  for (const child of node.children) {
+    if (child.type === 'paragraph') {
+      content.push({
+        type: 'paragraph',
+        content: convertInlineNodes(child.children),
+      });
+    } else if (child.type === 'list') {
+      content.push(...convertBlockNode(child));
+    } else {
+      content.push(...convertBlockNode(child as RootContent));
+    }
   }
 
-  return result;
+  if (content.length === 0) {
+    content.push({ type: 'paragraph' });
+  }
+
+  return {
+    type: 'taskItem',
+    attrs: { checked: node.checked ?? false },
+    content,
+  };
 }
 
 /**

@@ -54,6 +54,10 @@ function serializeBlockNode(
       return serializeList(node, true);
     }
 
+    case 'taskList': {
+      return serializeTaskList(node);
+    }
+
     case 'blockquote': {
       if (!node.content) return '>';
       const inner = node.content
@@ -103,26 +107,65 @@ function serializeListItem(node: TipTapNode, marker: string): string {
     if (child.type === 'paragraph') {
       const text = serializeInlineContent(child.content);
       if (i === 0) {
-        // タスクリスト対応
-        if (node.attrs?.checked === true) {
-          parts.push(`${marker} [x] ${text}`);
-        } else if (node.attrs?.checked === false) {
-          parts.push(`${marker} [ ] ${text}`);
-        } else {
-          parts.push(`${marker} ${text}`);
-        }
+        parts.push(`${marker} ${text}`);
       } else {
         // 2つ目以降の段落はインデント
         const indent = ' '.repeat(marker.length + 1);
         parts.push(`\n${indent}${text}`);
       }
-    } else if (child.type === 'bulletList' || child.type === 'orderedList') {
+    } else if (
+      child.type === 'bulletList' ||
+      child.type === 'orderedList' ||
+      child.type === 'taskList'
+    ) {
       // ネストされたリスト
       const indent = ' '.repeat(marker.length + 1);
       const nested = serializeBlockNode(child, i, node.content);
       const indented = nested
         .split('\n')
         .map((line) => `${indent}${line}`)
+        .join('\n');
+      parts.push(indented);
+    }
+  }
+
+  return parts.join('\n');
+}
+
+function serializeTaskList(node: TipTapNode): string {
+  if (!node.content) return '';
+
+  return node.content
+    .map((item) => serializeTaskItem(item))
+    .join('\n');
+}
+
+function serializeTaskItem(node: TipTapNode): string {
+  if (!node.content) return '- [ ]';
+
+  const checked = node.attrs?.checked === true;
+  const checkbox = checked ? '[x]' : '[ ]';
+  const parts: string[] = [];
+
+  for (let i = 0; i < node.content.length; i++) {
+    const child = node.content[i]!;
+
+    if (child.type === 'paragraph') {
+      const text = serializeInlineContent(child.content);
+      if (i === 0) {
+        parts.push(`- ${checkbox} ${text}`);
+      } else {
+        parts.push(`\n  ${text}`);
+      }
+    } else if (
+      child.type === 'bulletList' ||
+      child.type === 'orderedList' ||
+      child.type === 'taskList'
+    ) {
+      const nested = serializeBlockNode(child, i, node.content);
+      const indented = nested
+        .split('\n')
+        .map((line) => `  ${line}`)
         .join('\n');
       parts.push(indented);
     }

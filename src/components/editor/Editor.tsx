@@ -21,6 +21,8 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 import { useCallback, useEffect, useRef } from 'react';
 import { useIMEComposition } from './useIMEComposition';
 import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
@@ -67,6 +69,10 @@ export function MarkdownEditor({
       }),
       Placeholder.configure({
         placeholder,
+      }),
+      TaskList,
+      TaskItem.configure({
+        nested: true, // ネストしたタスクリストを許可
       }),
       SmartPasteExtension,
     ],
