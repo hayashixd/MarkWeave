@@ -35,6 +35,121 @@
 
 ---
 
+## セットアップと実行方法
+
+### 必要な環境
+
+| ツール | バージョン | 用途 |
+|--------|-----------|------|
+| [Node.js](https://nodejs.org/) | 20 以上 | フロントエンドビルド |
+| [pnpm](https://pnpm.io/) | 9 以上 | パッケージ管理 |
+| [Rust](https://rustup.rs/) | 1.77.2 以上 | Tauri バックエンド |
+| [Tauri 前提条件](https://v2.tauri.app/start/prerequisites/) | — | OS ごとの依存ライブラリ（WebView2 等） |
+
+> **Linux の場合:** `webkit2gtk`・`libayatana-appindicator3` 等が必要です。詳細は [Tauri 公式ドキュメント](https://v2.tauri.app/start/prerequisites/#linux) を参照してください。
+
+---
+
+### インストール
+
+```bash
+# リポジトリのクローン
+git clone <repository-url>
+cd markdown-editor
+
+# Node.js 依存パッケージのインストール
+pnpm install
+```
+
+---
+
+### 開発サーバーの起動
+
+#### フロントエンドのみ（ブラウザで確認）
+
+Tauri なしで React + Vite の UI だけを確認したい場合:
+
+```bash
+pnpm dev
+```
+
+ブラウザで `http://localhost:1420` を開くと UI が表示されます。
+
+> **注意:** Tauri API（ファイル読み書き・ネイティブメニュー等）はブラウザモードでは動作しません。
+
+#### Tauri デスクトップアプリとして起動（推奨）
+
+```bash
+pnpm tauri dev
+```
+
+Rust のコンパイル（初回は数分かかります）が完了するとデスクトップウィンドウが起動します。フロントエンドのホットリロードが有効なため、`src/` 配下の変更は即座に反映されます。
+
+---
+
+### ビルド（本番用）
+
+```bash
+pnpm tauri build
+```
+
+プラットフォームごとのインストーラーが `src-tauri/target/release/bundle/` に生成されます。
+
+---
+
+## 動作確認方法（テスト）
+
+### ユニット・統合テスト（Vitest）
+
+```bash
+# テストを一度だけ実行
+pnpm test
+
+# ウォッチモード（ファイル変更時に自動再実行）
+pnpm test:watch
+
+# カバレッジレポートの生成
+pnpm test:coverage
+```
+
+テスト対象: `src/**/*.{test,spec}.{ts,tsx}`
+カバレッジレポートは `coverage/` ディレクトリに出力されます。
+
+### E2E テスト（Playwright）
+
+E2E テストは Vite dev server（`http://localhost:1420`）に対して Chromium で実行されます。
+
+```bash
+# 初回のみ: Playwright 用ブラウザのインストール
+pnpm dlx playwright install chromium
+
+# E2E テストを実行（dev server を自動起動）
+pnpm test:e2e
+
+# インタラクティブ UI モードで実行（デバッグに便利）
+pnpm test:e2e:ui
+```
+
+テスト結果・スクリーンショットは `e2e-results/` に、HTML レポートは `playwright-report/` に出力されます。
+
+### コード品質チェック
+
+```bash
+# ESLint によるリント
+pnpm lint
+
+# ESLint による自動修正
+pnpm lint:fix
+
+# Prettier によるフォーマットチェック
+pnpm format:check
+
+# Prettier による自動フォーマット
+pnpm format
+```
+
+---
+
 ## アーキテクチャ概要
 
 ### コア原則
