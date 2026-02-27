@@ -1,2 +1,2 @@
-export { MarkdownEditor, default } from './Editor';
-export type { EditorProps } from './Editor';
+export { MarkdownEditor, default } from './TipTapEditor';
+export type { EditorProps } from './TipTapEditor';
