@@ -61,7 +61,7 @@
 - [x] タブバー UI（開く・閉じる・切り替え）`src/components/tabs/TabBar.tsx`
 - [x] Zustand タブストア（`addTab` / `removeTab` / `updateContent` / `markSaved`）`src/store/tabStore.ts`
 - [x] タブタイトルへの未保存マーカー表示（`● filename.md`）StatusBar実装済み
-- [ ] タイトルバーへの未保存マーカー反映（Rustコマンド経由）
+- [x] タイトルバーへの未保存マーカー反映（Rustコマンド経由）
 - [x] タブ閉じる時の未保存確認ダイアログ（window.confirm。Phase 3でTauriダイアログに置換）
 - [ ] `onCloseRequested` によるウィンドウクローズ時の未保存ガード
 - [ ] セッション保存・復元（@tauri-apps/plugin-store）

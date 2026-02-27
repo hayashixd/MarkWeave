@@ -20,6 +20,7 @@ import { PreferencesDialog } from '../preferences/PreferencesDialog';
 import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
 import { ToastContainer } from '../toast/ToastContainer';
 import { useTabStore } from '../../store/tabStore';
+import { useTitleBar } from '../../hooks/useTitleBar';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -28,6 +29,9 @@ export function AppShell() {
     useTabStore();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // タイトルバーにアクティブタブの未保存マーカーを反映
+  useTitleBar();
 
   // 初回起動: 空のタブを 1 つ開く
   useEffect(() => {

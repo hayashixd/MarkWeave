@@ -5,6 +5,7 @@ mod menu;
 mod models;
 
 use commands::fs_commands;
+use commands::window_commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +17,7 @@ pub fn run() {
             fs_commands::read_file,
             fs_commands::write_file,
             fs_commands::file_exists,
+            window_commands::set_title_dirty,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
