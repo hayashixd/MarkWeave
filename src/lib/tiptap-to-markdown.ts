@@ -187,7 +187,8 @@ function serializeInlineContent(nodes?: TipTapNode[]): string {
 
   for (const node of nodes) {
     if (node.type === 'hardBreak') {
-      result.push('\\\n');
+      // CommonMark 仕様: 末尾スペース2つ + 改行 (trailing spaces + newline)
+      result.push('  \n');
       continue;
     }
 

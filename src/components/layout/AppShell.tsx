@@ -12,7 +12,7 @@
  * - Ctrl+N での新規タブ
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { TabBar } from '../tabs/TabBar';
 import { Sidebar } from '../sidebar/Sidebar';
 import { MarkdownEditor } from '../editor';
@@ -24,12 +24,14 @@ import { useTitleBar } from '../../hooks/useTitleBar';
 import { useCloseGuard } from '../../hooks/useCloseGuard';
 import { useSessionRestore } from '../../hooks/useSessionRestore';
 import { useFileOpenListener } from '../../hooks/useFileOpenListener';
+import { useAutoSave } from '../../hooks/useAutoSave';
+import { writeFile } from '../../lib/tauri-commands';
 
 export function AppShell() {
   // Phase 1 ではサイドバーはデフォルト非表示（機能がないため）
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
-  const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab, markSaved } =
+  const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab } =
     useTabStore();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
@@ -45,6 +47,38 @@ export function AppShell() {
 
   // 外部ファイルオープンイベント受信（シングルインスタンス制御・CLI引数対応）
   useFileOpenListener();
+
+  // IME 変換中フラグ（useAutoSave に渡すため window レベルで追跡）
+  const isComposingRef = useRef(false);
+
+  // 自動保存フック（アクティブタブに対して動作）
+  const { scheduleSave, saveNow, flushPendingSave } = useAutoSave({
+    tabId: activeTabId ?? '',
+    isComposing: () => isComposingRef.current,
+    writeFn: writeFile,
+  });
+
+  // flushPendingSave を ref 経由で参照（useEffect の deps を最小化）
+  const flushRef = useRef(flushPendingSave);
+  flushRef.current = flushPendingSave;
+
+  // IME 変換イベントをキャプチャフェーズで監視
+  // compositionend 後に pending になっている自動保存を即時スケジュール
+  useEffect(() => {
+    const handleStart = () => {
+      isComposingRef.current = true;
+    };
+    const handleEnd = () => {
+      isComposingRef.current = false;
+      flushRef.current();
+    };
+    window.addEventListener('compositionstart', handleStart, true);
+    window.addEventListener('compositionend', handleEnd, true);
+    return () => {
+      window.removeEventListener('compositionstart', handleStart, true);
+      window.removeEventListener('compositionend', handleEnd, true);
+    };
+  }, []); // 空の依存配列: ref 経由のため再登録不要
 
   // 新しいタブを開く
   const handleNewTab = useCallback(() => {
@@ -72,13 +106,14 @@ export function AppShell() {
     [removeTab],
   );
 
-  // エディタからのコンテンツ変更
+  // エディタからのコンテンツ変更 → ストア更新 + 自動保存スケジュール
   const handleContentChange = useCallback(
     (markdown: string) => {
       if (!activeTabId) return;
       updateContent(activeTabId, markdown);
+      scheduleSave();
     },
-    [activeTabId, updateContent],
+    [activeTabId, updateContent, scheduleSave],
   );
 
   // キーボードショートカット
@@ -101,7 +136,7 @@ export function AppShell() {
         return;
       }
 
-      // Ctrl+S: 保存
+      // Ctrl+S: 即時保存
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         const tab = getActiveTab();
@@ -113,9 +148,8 @@ export function AppShell() {
           return;
         }
 
-        // 即時保存（Tauri コマンド呼び出しはここでは省略、
-        // useAutoSave フックが実際のプロジェクトで統合される）
-        markSaved(tab.id);
+        // useAutoSave の saveNow を呼び出してファイルを実際に書き込む
+        saveNow();
         return;
       }
 
@@ -132,7 +166,7 @@ export function AppShell() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, markSaved]);
+  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow]);
 
   return (
     <div className="app-shell flex flex-col h-screen">

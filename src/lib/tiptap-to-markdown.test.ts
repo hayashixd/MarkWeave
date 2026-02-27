@@ -171,6 +171,23 @@ describe('tiptapToMarkdown', () => {
     expect(tiptapToMarkdown(doc)).toBe('---\n');
   });
 
+  it('serializes hard break as two trailing spaces + newline (CommonMark)', () => {
+    const doc: TipTapDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'line one' },
+            { type: 'hardBreak' },
+            { type: 'text', text: 'line two' },
+          ],
+        },
+      ],
+    };
+    expect(tiptapToMarkdown(doc)).toBe('line one  \nline two\n');
+  });
+
   it('returns empty string for empty doc', () => {
     const doc: TipTapDoc = { type: 'doc', content: [] };
     expect(tiptapToMarkdown(doc)).toBe('');
