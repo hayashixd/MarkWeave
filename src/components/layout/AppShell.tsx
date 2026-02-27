@@ -21,6 +21,7 @@ import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
 import { ToastContainer } from '../toast/ToastContainer';
 import { useTabStore } from '../../store/tabStore';
 import { useTitleBar } from '../../hooks/useTitleBar';
+import { useCloseGuard } from '../../hooks/useCloseGuard';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -32,6 +33,9 @@ export function AppShell() {
 
   // タイトルバーにアクティブタブの未保存マーカーを反映
   useTitleBar();
+
+  // ウィンドウクローズ時の未保存ガード
+  useCloseGuard();
 
   // 初回起動: 空のタブを 1 つ開く
   useEffect(() => {

@@ -63,7 +63,7 @@
 - [x] タブタイトルへの未保存マーカー表示（`● filename.md`）StatusBar実装済み
 - [x] タイトルバーへの未保存マーカー反映（Rustコマンド経由）
 - [x] タブ閉じる時の未保存確認ダイアログ（window.confirm。Phase 3でTauriダイアログに置換）
-- [ ] `onCloseRequested` によるウィンドウクローズ時の未保存ガード
+- [x] `onCloseRequested` によるウィンドウクローズ時の未保存ガード
 - [ ] セッション保存・復元（@tauri-apps/plugin-store）
 - [ ] ファイル関連付け設定（tauri.conf.json の `fileAssociations`）
 - [ ] シングルインスタンス制御（tauri-plugin-single-instance）
