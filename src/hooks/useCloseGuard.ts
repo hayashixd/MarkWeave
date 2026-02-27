@@ -5,6 +5,10 @@
  * - 未保存タブがある場合、ウィンドウクローズをキャンセルして確認ダイアログを表示
  * - ユーザーが「閉じる」を選択した場合のみ destroy で閉じる
  * - 未保存タブがない場合はセッションを保存してそのまま閉じる
+ *
+ * エラーハンドリング:
+ * - ダイアログ表示が失敗した場合は window.confirm にフォールバック
+ * - セッション保存が失敗してもウィンドウのクローズはブロックしない
  */
 
 import { useEffect } from 'react';
@@ -25,6 +29,24 @@ function getCurrentSession() {
     activeFilePath: activeTab?.filePath ?? null,
     sidebarVisible: true, // Phase 1 ではサイドバー状態の追跡は省略
   };
+}
+
+/** 未保存確認ダイアログを表示する（Tauri ダイアログ → window.confirm フォールバック） */
+async function showUnsavedConfirmation(dirtyFileNames: string[]): Promise<boolean> {
+  const fileList = dirtyFileNames.map((f) => `・${f}`).join('\n');
+  const message = `以下のファイルに未保存の変更があります:\n${fileList}\n\n保存せずに閉じますか？`;
+
+  try {
+    return await ask(message, {
+      title: '未保存の変更',
+      kind: 'warning',
+      okLabel: '閉じる',
+      cancelLabel: 'キャンセル',
+    });
+  } catch {
+    // Tauri ダイアログが失敗した場合は window.confirm にフォールバック
+    return window.confirm(message);
+  }
 }
 
 export function useCloseGuard() {
@@ -53,20 +75,17 @@ export function useCloseGuard() {
 
       event.preventDefault(); // デフォルトのクローズをキャンセル
 
-      const fileList = dirtyFileNames.map((f) => `・${f}`).join('\n');
-      const confirmed = await ask(
-        `以下のファイルに未保存の変更があります:\n${fileList}\n\n保存せずに閉じますか？`,
-        {
-          title: '未保存の変更',
-          kind: 'warning',
-          okLabel: '閉じる',
-          cancelLabel: 'キャンセル',
-        },
-      );
+      try {
+        const confirmed = await showUnsavedConfirmation(dirtyFileNames);
 
-      if (confirmed) {
+        if (confirmed) {
+          await saveSession(getCurrentSession()).catch(() => {});
+          appWindow.destroy(); // onCloseRequested を再トリガーしないよう destroy を使う
+        }
+      } catch {
+        // ダイアログ表示自体が完全に失敗した場合は、安全にウィンドウを閉じる
         await saveSession(getCurrentSession()).catch(() => {});
-        appWindow.destroy(); // onCloseRequested を再トリガーしないよう destroy を使う
+        appWindow.destroy();
       }
     });
 

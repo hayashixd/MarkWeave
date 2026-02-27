@@ -51,12 +51,13 @@ export function MarkdownEditor({
   initialContent = '',
   onContentChange,
   readOnly = false,
-  placeholder = '入力を開始...',
+  placeholder = 'ここに入力を始めてください...\n\nヒント: ツールバーのボタンや、# + スペースで見出し、- + スペースでリスト、> + スペースで引用を作成できます。',
 }: EditorProps) {
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
   const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
+  const editorWrapperRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -252,6 +253,18 @@ export function MarkdownEditor({
     [],
   );
 
+  // エディタ領域のクリックでフォーカスを設定
+  const handleEditorAreaClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!editor) return;
+      // クリックが直接 wrapper 上（ProseMirror 外の余白）の場合、末尾にフォーカス
+      if (e.target === e.currentTarget || e.target === editorWrapperRef.current) {
+        editor.chain().focus('end').run();
+      }
+    },
+    [editor],
+  );
+
   // 外部から Markdown を設定するメソッド
   const setMarkdown = useCallback(
     (markdown: string) => {
@@ -278,11 +291,17 @@ export function MarkdownEditor({
     <div className="editor-container flex flex-col h-full">
       <EditorToolbar editor={editor} mode={mode} onToggleMode={toggleMode} />
       {mode === 'wysiwyg' ? (
-        <div className="flex-1 overflow-y-auto px-8 py-4">
-          <EditorContent
-            editor={editor}
-            className="prose prose-neutral max-w-none focus:outline-none"
-          />
+        <div
+          ref={editorWrapperRef}
+          className="flex-1 overflow-y-auto cursor-text"
+          onClick={handleEditorAreaClick}
+        >
+          <div className="max-w-[800px] mx-auto px-12 py-8">
+            <EditorContent
+              editor={editor}
+              className="prose prose-neutral max-w-none focus:outline-none"
+            />
+          </div>
         </div>
       ) : (
         <textarea
@@ -310,7 +329,11 @@ function EditorHandle(_props: {
 }
 
 /**
- * 簡易ツールバー (Phase 1)
+ * ツールバー - 直感的な操作のためのフォーマットボタン群
+ *
+ * ペルソナ:
+ * - マークダウンが分からないけどマークダウンで書きたいエンジニア
+ * - マークダウンでの編集を楽に行いたいエンジニア
  */
 function EditorToolbar({
   editor,
@@ -324,85 +347,143 @@ function EditorToolbar({
   if (!editor) return null;
 
   return (
-    <div className="editor-toolbar flex items-center gap-1 px-4 py-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+    <div className="editor-toolbar flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200 bg-white flex-shrink-0 overflow-x-auto">
       {mode === 'wysiwyg' && (
         <>
+          {/* ブロック種別セレクタ */}
+          <BlockTypeSelect editor={editor} />
+          <ToolbarDivider />
+
+          {/* テキスト書式 */}
           <ToolbarButton
-            label="B"
-            title="太字 (Ctrl+B)"
+            icon={<span className="font-bold">B</span>}
+            tooltip="太字 (Ctrl+B)"
             active={editor.isActive('bold')}
             onClick={() => editor.chain().focus().toggleBold().run()}
           />
           <ToolbarButton
-            label="I"
-            title="斜体 (Ctrl+I)"
+            icon={<span className="italic">I</span>}
+            tooltip="斜体 (Ctrl+I)"
             active={editor.isActive('italic')}
             onClick={() => editor.chain().focus().toggleItalic().run()}
-            className="italic"
           />
           <ToolbarButton
-            label="S"
-            title="取り消し線"
+            icon={<span className="line-through">S</span>}
+            tooltip="取り消し線"
             active={editor.isActive('strike')}
             onClick={() => editor.chain().focus().toggleStrike().run()}
-            className="line-through"
           />
           <ToolbarButton
-            label="<>"
-            title="インラインコード"
+            icon={<span className="font-mono text-xs bg-gray-200 px-1 rounded">&lt;/&gt;</span>}
+            tooltip="インラインコード"
             active={editor.isActive('code')}
             onClick={() => editor.chain().focus().toggleCode().run()}
           />
           <ToolbarDivider />
-          {([1, 2, 3] as const).map((level) => (
-            <ToolbarButton
-              key={level}
-              label={`H${level}`}
-              title={`見出し${level} (Ctrl+Alt+${level})`}
-              active={editor.isActive('heading', { level })}
-              onClick={() =>
-                editor.chain().focus().toggleHeading({ level }).run()
-              }
-            />
-          ))}
-          <ToolbarDivider />
+
+          {/* リスト */}
           <ToolbarButton
-            label="UL"
-            title="箇条書きリスト"
+            icon={
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <circle cx="3" cy="4" r="1.5" />
+                <circle cx="3" cy="8" r="1.5" />
+                <circle cx="3" cy="12" r="1.5" />
+                <rect x="6" y="3" width="8" height="2" rx="0.5" />
+                <rect x="6" y="7" width="8" height="2" rx="0.5" />
+                <rect x="6" y="11" width="8" height="2" rx="0.5" />
+              </svg>
+            }
+            tooltip="箇条書きリスト"
             active={editor.isActive('bulletList')}
             onClick={() => editor.chain().focus().toggleBulletList().run()}
           />
           <ToolbarButton
-            label="OL"
-            title="番号付きリスト"
+            icon={
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <text x="1" y="5.5" fontSize="5" fontWeight="bold">1.</text>
+                <text x="1" y="9.5" fontSize="5" fontWeight="bold">2.</text>
+                <text x="1" y="13.5" fontSize="5" fontWeight="bold">3.</text>
+                <rect x="6" y="3" width="8" height="2" rx="0.5" />
+                <rect x="6" y="7" width="8" height="2" rx="0.5" />
+                <rect x="6" y="11" width="8" height="2" rx="0.5" />
+              </svg>
+            }
+            tooltip="番号付きリスト"
             active={editor.isActive('orderedList')}
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
           />
           <ToolbarButton
-            label="Quote"
-            title="引用"
+            icon={
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <rect x="1" y="2" width="2" height="12" rx="0.5" opacity="0.6" />
+                <rect x="5" y="3" width="9" height="2" rx="0.5" />
+                <rect x="5" y="7" width="7" height="2" rx="0.5" />
+                <rect x="5" y="11" width="8" height="2" rx="0.5" />
+              </svg>
+            }
+            tooltip="タスクリスト"
+            active={editor.isActive('taskList')}
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+          />
+          <ToolbarDivider />
+
+          {/* ブロック要素 */}
+          <ToolbarButton
+            icon={
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M3 2h1v12H3V2zm3 2h8v2H6V4zm0 4h6v2H6V8z" opacity="0.7" />
+              </svg>
+            }
+            tooltip="引用"
             active={editor.isActive('blockquote')}
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
           />
           <ToolbarButton
-            label="Code"
-            title="コードブロック"
+            icon={
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <text x="4" y="11" fontSize="8" fontFamily="monospace">{'{}'}</text>
+              </svg>
+            }
+            tooltip="コードブロック"
             active={editor.isActive('codeBlock')}
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
           />
-          <ToolbarDivider />
           <ToolbarButton
-            label="—"
-            title="水平線"
+            icon={
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <rect x="1" y="7" width="14" height="2" rx="1" />
+              </svg>
+            }
+            tooltip="水平線"
             active={false}
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
+          />
+          <ToolbarButton
+            icon={
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2 12h8v1.5H2V12zm0-1L7 3h2l5 8H2zm3.5-1.5h5L8 5.5l-2.5 4z" opacity="0" />
+                <path d="M1.5 3C1.5 2.17 2.17 1.5 3 1.5h6.5l4 4V13c0 .83-.67 1.5-1.5 1.5H3c-.83 0-1.5-.67-1.5-1.5V3z" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M8.5 1.5v4h4" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M4 7.5h5M4 10h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            }
+            tooltip="リンク挿入 (Ctrl+K)"
+            active={editor.isActive('link')}
+            onClick={() => window.dispatchEvent(new CustomEvent('editor-link-insert'))}
           />
           <ToolbarDivider />
         </>
       )}
       <ToolbarButton
-        label={mode === 'wysiwyg' ? '</>' : 'WYSIWYG'}
-        title={`${mode === 'wysiwyg' ? 'ソースモード' : 'WYSIWYG モード'} (Ctrl+/)`}
+        icon={
+          mode === 'wysiwyg' ? (
+            <span className="font-mono text-xs">&lt;/&gt;</span>
+          ) : (
+            <span className="text-xs">WYSIWYG</span>
+          )
+        }
+        tooltip={`${mode === 'wysiwyg' ? 'ソースモード' : 'WYSIWYG モード'}に切替 (Ctrl+/)`}
         active={mode === 'source'}
         onClick={onToggleMode}
       />
@@ -410,37 +491,78 @@ function EditorToolbar({
   );
 }
 
+/**
+ * ブロック種別セレクタ（見出しレベル / 段落の切り替え）
+ */
+function BlockTypeSelect({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  if (!editor) return null;
+
+  const getCurrentBlockType = (): string => {
+    for (let i = 1; i <= 6; i++) {
+      if (editor.isActive('heading', { level: i })) return `h${i}`;
+    }
+    return 'paragraph';
+  };
+
+  const blockType = getCurrentBlockType();
+
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    if (value === 'paragraph') {
+      editor.chain().focus().setParagraph().run();
+    } else {
+      const level = parseInt(value.replace('h', '')) as 1 | 2 | 3 | 4 | 5 | 6;
+      editor.chain().focus().toggleHeading({ level }).run();
+    }
+  };
+
+  return (
+    <select
+      value={blockType}
+      onChange={handleChange}
+      className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400 min-w-[120px]"
+      title="ブロック種別を選択"
+    >
+      <option value="paragraph">段落</option>
+      <option value="h1">見出し 1</option>
+      <option value="h2">見出し 2</option>
+      <option value="h3">見出し 3</option>
+      <option value="h4">見出し 4</option>
+      <option value="h5">見出し 5</option>
+      <option value="h6">見出し 6</option>
+    </select>
+  );
+}
+
 function ToolbarButton({
-  label,
-  title,
+  icon,
+  tooltip,
   active,
   onClick,
-  className = '',
 }: {
-  label: string;
-  title: string;
+  icon: React.ReactNode;
+  tooltip: string;
   active: boolean;
   onClick: () => void;
-  className?: string;
 }) {
   return (
     <button
       type="button"
-      title={title}
+      title={tooltip}
       onClick={onClick}
-      className={`px-2 py-1 text-sm rounded transition-colors ${className} ${
+      className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
         active
-          ? 'bg-blue-100 text-blue-700 font-semibold'
-          : 'text-gray-600 hover:bg-gray-100'
+          ? 'bg-blue-100 text-blue-700'
+          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       }`}
     >
-      {label}
+      {icon}
     </button>
   );
 }
 
 function ToolbarDivider() {
-  return <div className="w-px h-5 bg-gray-300 mx-1" />;
+  return <div className="w-px h-5 bg-gray-300 mx-1 flex-shrink-0" />;
 }
 
 export default MarkdownEditor;
