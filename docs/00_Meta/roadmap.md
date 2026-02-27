@@ -74,7 +74,7 @@
 - [x] 見出し（H1〜H6）StarterKit heading
 - [x] 段落 StarterKit
 - [x] 太字・斜体 StarterKit bold/italic
-- [ ] 取り消し線（@tiptap/extension-strike 要追加）
+- [x] 取り消し線（@tiptap/extension-strike 要追加）
 - [x] インラインコード StarterKit code
 - [x] リンク @tiptap/extension-link
 - [x] 引用ブロック StarterKit blockquote
