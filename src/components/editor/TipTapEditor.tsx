@@ -347,7 +347,7 @@ function EditorToolbar({
   if (!editor) return null;
 
   return (
-    <div className="editor-toolbar flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200 bg-white flex-shrink-0 overflow-x-auto">
+    <div className="editor-toolbar flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200 bg-white flex-shrink-0 overflow-x-auto" role="toolbar" aria-label="書式ツールバー">
       {mode === 'wysiwyg' && (
         <>
           {/* ブロック種別セレクタ */}
@@ -522,6 +522,7 @@ function BlockTypeSelect({ editor }: { editor: ReturnType<typeof useEditor> }) {
       onChange={handleChange}
       className="text-sm border border-gray-300 rounded px-2 py-1 bg-white text-gray-700 cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400 min-w-[120px]"
       title="ブロック種別を選択"
+      aria-label="ブロック種別"
     >
       <option value="paragraph">段落</option>
       <option value="h1">見出し 1</option>
@@ -550,6 +551,8 @@ function ToolbarButton({
       type="button"
       title={tooltip}
       onClick={onClick}
+      aria-label={tooltip}
+      aria-pressed={active}
       className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
         active
           ? 'bg-blue-100 text-blue-700'
