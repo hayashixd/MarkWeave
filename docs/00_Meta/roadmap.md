@@ -95,10 +95,10 @@
 
 - [x] Ctrl+B（太字）StarterKit 組み込み
 - [x] Ctrl+I（斜体）StarterKit 組み込み
-- [ ] Ctrl+K（リンク挿入ダイアログ）
+- [x] Ctrl+K（リンク挿入ダイアログ）
 - [x] Ctrl+Z / Ctrl+Shift+Z（Undo/Redo）StarterKit History
 - [x] Ctrl+S（保存）AppShell.tsx
-- [ ] Ctrl+1〜6（見出しレベル）
+- [x] Ctrl+1〜6（見出しレベル）
 
 ---
 

@@ -92,17 +92,96 @@ export function MarkdownEditor({
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
     editorProps: {
-      handleKeyDown(_view, event) {
+      handleKeyDown(view, event) {
         // IME 変換中の Enter キーは ProseMirror に渡さない
         if (event.isComposing || event.keyCode === 229) {
           return false;
         }
+
+        // Ctrl+K: リンク挿入 (keyboard-shortcuts.md §1-1)
+        if ((event.ctrlKey || event.metaKey) && event.key === 'k' && !event.shiftKey && !event.altKey) {
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent('editor-link-insert'));
+          return true;
+        }
+
+        // Ctrl+0〜6: 見出しレベル / 段落 (keyboard-shortcuts.md §1-2)
+        if ((event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey) {
+          const key = event.key;
+          if (key >= '1' && key <= '6') {
+            event.preventDefault();
+            const level = parseInt(key) as 1 | 2 | 3 | 4 | 5 | 6;
+            const editorInstance = view.state;
+            // ProseMirror の dispatch を使って見出し切替
+            const { tr } = editorInstance;
+            if (tr) {
+              // TipTap の chain API は view からは直接使えないため、
+              // カスタムイベントで editor インスタンスに伝播させる
+              window.dispatchEvent(
+                new CustomEvent('editor-heading', { detail: { level } }),
+              );
+            }
+            return true;
+          }
+          if (key === '0') {
+            event.preventDefault();
+            window.dispatchEvent(
+              new CustomEvent('editor-heading', { detail: { level: 0 } }),
+            );
+            return true;
+          }
+        }
+
         return false;
       },
     },
   });
 
   const ime = useIMEComposition(editor);
+
+  // Ctrl+0〜6 のカスタムイベントハンドラ
+  useEffect(() => {
+    if (!editor) return;
+    const handler = (e: Event) => {
+      const { level } = (e as CustomEvent).detail as { level: number };
+      if (level === 0) {
+        // 段落に変換
+        editor.chain().focus().setParagraph().run();
+      } else {
+        editor
+          .chain()
+          .focus()
+          .toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 })
+          .run();
+      }
+    };
+    window.addEventListener('editor-heading', handler);
+    return () => window.removeEventListener('editor-heading', handler);
+  }, [editor]);
+
+  // Ctrl+K リンク挿入のカスタムイベントハンドラ
+  useEffect(() => {
+    if (!editor) return;
+    const handler = () => {
+      if (editor.isActive('link')) {
+        // 既存リンクを解除
+        editor.chain().focus().unsetLink().run();
+        return;
+      }
+
+      // Phase 1: window.prompt で URL を入力（Phase 3 でカスタムダイアログに置き換え）
+      const url = window.prompt('リンクURLを入力してください:');
+      if (!url) return;
+
+      editor
+        .chain()
+        .focus()
+        .setLink({ href: url })
+        .run();
+    };
+    window.addEventListener('editor-link-insert', handler);
+    return () => window.removeEventListener('editor-link-insert', handler);
+  }, [editor]);
 
   // 初期コンテンツの設定
   useEffect(() => {
