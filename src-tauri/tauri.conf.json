@@ -38,6 +38,9 @@
     "fileAssociations": [
       {
         "ext": ["md", "markdown"],
+        "name": "Markdown File",
+        "description": "Markdown document",
+        "role": "Editor",
         "mimeType": "text/markdown"
       }
     ]

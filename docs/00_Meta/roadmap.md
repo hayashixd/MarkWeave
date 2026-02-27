@@ -65,7 +65,7 @@
 - [x] タブ閉じる時の未保存確認ダイアログ（window.confirm。Phase 3でTauriダイアログに置換）
 - [x] `onCloseRequested` によるウィンドウクローズ時の未保存ガード
 - [x] セッション保存・復元（@tauri-apps/plugin-store）
-- [ ] ファイル関連付け設定（tauri.conf.json の `fileAssociations`）
+- [x] ファイル関連付け設定（tauri.conf.json の `fileAssociations`）
 - [ ] シングルインスタンス制御（tauri-plugin-single-instance）
 - [ ] 外部ファイルオープンイベント受信フック（`useFileOpenListener`）
 
