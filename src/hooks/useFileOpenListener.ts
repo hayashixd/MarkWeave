@@ -34,6 +34,9 @@ export function useFileOpenListener() {
   );
 
   useEffect(() => {
+    // Tauri 環境以外（ブラウザ開発時）では何もしない
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+
     const unlistenPromise = listen<string>('open-file-request', (event) => {
       openFile(event.payload);
     });

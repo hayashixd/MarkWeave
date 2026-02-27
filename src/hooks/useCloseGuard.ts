@@ -35,6 +35,9 @@ export function useCloseGuard() {
     .map((t) => t.fileName);
 
   useEffect(() => {
+    // Tauri 環境以外（ブラウザ開発時）では何もしない
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+
     let cancelled = false;
 
     const appWindow = getCurrentWebviewWindow();
