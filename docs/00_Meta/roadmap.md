@@ -66,7 +66,7 @@
 - [x] `onCloseRequested` によるウィンドウクローズ時の未保存ガード
 - [x] セッション保存・復元（@tauri-apps/plugin-store）
 - [x] ファイル関連付け設定（tauri.conf.json の `fileAssociations`）
-- [ ] シングルインスタンス制御（tauri-plugin-single-instance）
+- [x] シングルインスタンス制御（tauri-plugin-single-instance）
 - [ ] 外部ファイルオープンイベント受信フック（`useFileOpenListener`）
 
 ### WYSIWYG要素
