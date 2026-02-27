@@ -15,7 +15,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { TabBar } from '../tabs/TabBar';
 import { Sidebar } from '../sidebar/Sidebar';
-import { MarkdownEditor } from '../editor/Editor';
+import { MarkdownEditor } from '../editor';
 import { PreferencesDialog } from '../preferences/PreferencesDialog';
 import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
 import { ToastContainer } from '../toast/ToastContainer';
