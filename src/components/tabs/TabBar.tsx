@@ -21,22 +21,70 @@ interface TabBarProps {
 export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
   const { tabs, activeTabId, setActiveTab } = useTabStore();
 
+  const moveFocusToTab = (index: number) => {
+    const nextTab = tabs[index];
+    if (!nextTab) return;
+    setActiveTab(nextTab.id);
+  };
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, index: number) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      moveFocusToTab((index + 1) % tabs.length);
+      return;
+    }
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      moveFocusToTab((index - 1 + tabs.length) % tabs.length);
+      return;
+    }
+
+    if (e.key === 'Home') {
+      e.preventDefault();
+      moveFocusToTab(0);
+      return;
+    }
+
+    if (e.key === 'End') {
+      e.preventDefault();
+      moveFocusToTab(tabs.length - 1);
+      return;
+    }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && onCloseTab) {
+      e.preventDefault();
+      const tab = tabs[index];
+      if (tab) {
+        onCloseTab(tab.id, tab.isDirty);
+      }
+    }
+  };
+
   return (
     <div className="tab-bar flex items-center bg-gray-100 border-b border-gray-200 overflow-x-auto flex-shrink-0">
-      <div className="flex items-center min-w-0 flex-1">
-        {tabs.map((tab) => {
+      <div
+        className="flex items-center min-w-0 flex-1"
+        role="tablist"
+        aria-label="開いているファイル"
+      >
+        {tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId;
           return (
             <div
               key={tab.id}
               role="tab"
               aria-selected={isActive}
+              aria-controls="editor-panel"
+              id={`tab-${tab.id}`}
+              tabIndex={isActive ? 0 : -1}
               className={`tab-item flex items-center gap-1.5 px-3 py-2 cursor-pointer border-r border-gray-200 text-sm whitespace-nowrap select-none transition-colors ${
                 isActive
                   ? 'bg-white text-gray-900 font-medium border-b-2 border-b-blue-500'
                   : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
               }`}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(e) => handleTabKeyDown(e, index)}
             >
               <span className="truncate max-w-40">
                 {tab.isDirty && (
@@ -57,6 +105,7 @@ export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
                   e.stopPropagation();
                   onCloseTab?.(tab.id, tab.isDirty);
                 }}
+                aria-label={`${tab.fileName} を閉じる`}
                 title="タブを閉じる"
               >
                 ×
@@ -69,6 +118,7 @@ export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
         type="button"
         className="px-3 py-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 text-lg flex-shrink-0"
         onClick={onNewTab}
+        aria-label="新しいタブ"
         title="新しいタブ (Ctrl+N)"
       >
         +

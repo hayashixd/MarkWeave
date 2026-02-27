@@ -206,12 +206,12 @@ export function AppShell() {
   }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow]);
 
   return (
-    <div className="app-shell flex flex-col h-screen relative">
+    <div className="app-shell flex flex-col h-screen relative" role="application" aria-label="Markdown エディタ">
       {/* タブバー */}
       <TabBar onCloseTab={handleCloseTab} onNewTab={handleNewTab} />
 
       {/* メインエリア */}
-      <div className="flex flex-1 min-h-0">
+      <main id="editor-panel" className="flex flex-1 min-h-0" role="main" aria-label="エディタ領域">
         {/* サイドバー */}
         <Sidebar
           isOpen={sidebarOpen}
@@ -231,7 +231,7 @@ export function AppShell() {
             <EmptyState onNewTab={handleNewTab} onOpenFile={() => openFileDialogRef.current()} />
           )}
         </div>
-      </div>
+      </main>
 
       {/* ステータスバー */}
       <StatusBar tab={activeTab ?? null} />
@@ -340,7 +340,7 @@ function EmptyState({ onNewTab, onOpenFile }: { onNewTab: () => void; onOpenFile
 
 function StatusBar({ tab }: { tab: ReturnType<typeof useTabStore.getState>['tabs'][number] | null }) {
   return (
-    <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-500">
+    <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-600" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
         {tab ? (
           <>
