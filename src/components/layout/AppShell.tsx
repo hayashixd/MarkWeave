@@ -22,6 +22,7 @@ import { ToastContainer } from '../toast/ToastContainer';
 import { useTabStore } from '../../store/tabStore';
 import { useTitleBar } from '../../hooks/useTitleBar';
 import { useCloseGuard } from '../../hooks/useCloseGuard';
+import { useSessionRestore } from '../../hooks/useSessionRestore';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -37,17 +38,8 @@ export function AppShell() {
   // ウィンドウクローズ時の未保存ガード
   useCloseGuard();
 
-  // 初回起動: 空のタブを 1 つ開く
-  useEffect(() => {
-    if (tabs.length === 0) {
-      addTab({
-        filePath: null,
-        fileName: 'Untitled',
-        content: '',
-        savedContent: '',
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // セッション復元（前回開いていたタブを復元、なければ空タブ）
+  useSessionRestore();
 
   // 新しいタブを開く
   const handleNewTab = useCallback(() => {
