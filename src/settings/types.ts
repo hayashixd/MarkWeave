@@ -27,6 +27,8 @@ export interface EditorSettings {
   showLineNumbers: boolean;
   wordWrap: boolean;
   highlightCurrentLine: boolean;
+  /** インデントスタイル: スペース or タブ */
+  indentStyle: 'spaces' | 'tabs';
 }
 
 export interface MarkdownSettings {
@@ -46,6 +48,8 @@ export interface FileSettings {
   defaultSaveDir: string;
   imageSettings: ImageStorageSettings;
   restoreSession: boolean;
+  /** 改行コード保存設定: preserve=読み込み時の改行を維持, lf/crlf/os=指定の改行で保存 */
+  lineEnding: 'preserve' | 'lf' | 'crlf' | 'os';
 }
 
 export interface AiCopySettings {

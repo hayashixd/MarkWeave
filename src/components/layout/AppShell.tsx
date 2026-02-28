@@ -28,6 +28,8 @@ import { PreferencesDialog } from '../preferences/PreferencesDialog';
 import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
 import { ToastContainer } from '../toast/ToastContainer';
 import { useTabStore } from '../../store/tabStore';
+import type { FileEncoding, LineEnding } from '../../store/tabStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { useTitleBar } from '../../hooks/useTitleBar';
 import { useCloseGuard } from '../../hooks/useCloseGuard';
 import { useSessionRestore } from '../../hooks/useSessionRestore';
@@ -370,6 +372,39 @@ function EmptyState({ onNewTab, onOpenFile }: { onNewTab: () => void; onOpenFile
 }
 
 function StatusBar({ tab }: { tab: ReturnType<typeof useTabStore.getState>['tabs'][number] | null }) {
+  const [encodingPopover, setEncodingPopover] = useState(false);
+  const [lineEndingPopover, setLineEndingPopover] = useState(false);
+  const [indentPopover, setIndentPopover] = useState(false);
+  const { updateEncoding, updateLineEnding } = useTabStore();
+  const { settings, updateSettings } = useSettingsStore();
+  const encodingRef = useRef<HTMLDivElement>(null);
+  const lineEndingRef = useRef<HTMLDivElement>(null);
+  const indentRef = useRef<HTMLDivElement>(null);
+
+  // ポップオーバー外クリックで閉じる
+  useEffect(() => {
+    const handler = (e: PointerEvent) => {
+      if (encodingPopover && encodingRef.current && !encodingRef.current.contains(e.target as Node)) {
+        setEncodingPopover(false);
+      }
+      if (lineEndingPopover && lineEndingRef.current && !lineEndingRef.current.contains(e.target as Node)) {
+        setLineEndingPopover(false);
+      }
+      if (indentPopover && indentRef.current && !indentRef.current.contains(e.target as Node)) {
+        setIndentPopover(false);
+      }
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [encodingPopover, lineEndingPopover, indentPopover]);
+
+  const encodings: FileEncoding[] = ['UTF-8', 'UTF-8 BOM', 'Shift-JIS', 'EUC-JP'];
+  const lineEndings: LineEnding[] = ['LF', 'CRLF'];
+
+  const indentLabel = settings.editor.indentStyle === 'tabs'
+    ? `タブ: ${settings.editor.sourceTabSize}`
+    : `スペース: ${settings.editor.sourceTabSize}`;
+
   return (
     <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-600" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
@@ -385,6 +420,113 @@ function StatusBar({ tab }: { tab: ReturnType<typeof useTabStore.getState>['tabs
         )}
       </div>
       <div className="flex items-center gap-3">
+        {/* インデント設定 */}
+        <div ref={indentRef} className="relative">
+          <button
+            type="button"
+            className="status-bar__button"
+            onClick={() => { setIndentPopover((v) => !v); setEncodingPopover(false); setLineEndingPopover(false); }}
+            title="インデント設定"
+          >
+            {indentLabel}
+          </button>
+          {indentPopover && (
+            <div className="status-bar__popover">
+              <div className="status-bar__popover-title">インデント設定</div>
+              <div className="status-bar__popover-group">
+                <div className="status-bar__popover-label">スタイル</div>
+                {(['spaces', 'tabs'] as const).map((style) => (
+                  <button
+                    key={style}
+                    type="button"
+                    className={`status-bar__popover-item${settings.editor.indentStyle === style ? ' status-bar__popover-item--active' : ''}`}
+                    onClick={() => { updateSettings({ editor: { indentStyle: style } }); }}
+                  >
+                    {style === 'spaces' ? 'スペース' : 'タブ'}
+                  </button>
+                ))}
+              </div>
+              <div className="status-bar__popover-group">
+                <div className="status-bar__popover-label">タブ幅</div>
+                {[2, 4, 8].map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    className={`status-bar__popover-item${settings.editor.sourceTabSize === size ? ' status-bar__popover-item--active' : ''}`}
+                    onClick={() => { updateSettings({ editor: { sourceTabSize: size } }); }}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 改行コード */}
+        {tab && (
+          <div ref={lineEndingRef} className="relative">
+            <button
+              type="button"
+              className="status-bar__button"
+              onClick={() => { setLineEndingPopover((v) => !v); setEncodingPopover(false); setIndentPopover(false); }}
+              title="改行コード"
+            >
+              {tab.lineEnding}
+            </button>
+            {lineEndingPopover && (
+              <div className="status-bar__popover">
+                <div className="status-bar__popover-title">改行コード</div>
+                {lineEndings.map((le) => (
+                  <button
+                    key={le}
+                    type="button"
+                    className={`status-bar__popover-item${tab.lineEnding === le ? ' status-bar__popover-item--active' : ''}`}
+                    onClick={() => {
+                      updateLineEnding(tab.id, le);
+                      setLineEndingPopover(false);
+                    }}
+                  >
+                    {le} {le === 'LF' ? '(Unix/macOS)' : '(Windows)'}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 文字コード */}
+        {tab && (
+          <div ref={encodingRef} className="relative">
+            <button
+              type="button"
+              className="status-bar__button"
+              onClick={() => { setEncodingPopover((v) => !v); setLineEndingPopover(false); setIndentPopover(false); }}
+              title="文字コード"
+            >
+              {tab.encoding}
+            </button>
+            {encodingPopover && (
+              <div className="status-bar__popover">
+                <div className="status-bar__popover-title">文字コード</div>
+                {encodings.map((enc) => (
+                  <button
+                    key={enc}
+                    type="button"
+                    className={`status-bar__popover-item${tab.encoding === enc ? ' status-bar__popover-item--active' : ''}`}
+                    onClick={() => {
+                      updateEncoding(tab.id, enc);
+                      setEncodingPopover(false);
+                    }}
+                  >
+                    {enc}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <span>Markdown</span>
       </div>
     </div>

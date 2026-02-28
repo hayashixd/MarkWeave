@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showLineNumbers: false,
     wordWrap: true,
     highlightCurrentLine: true,
+    indentStyle: 'spaces',
   },
   markdown: {
     enableMath: true,
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     defaultSaveDir: '',
     imageSettings: DEFAULT_IMAGE_SETTINGS,
     restoreSession: true,
+    lineEnding: 'preserve',
   },
   aiCopy: {
     normalizeHeadings: true,

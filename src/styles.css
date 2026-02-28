@@ -1203,3 +1203,78 @@
   font-size: 0.75rem;
   color: #d1d5db;
 }
+
+/* ===== ステータスバー ポップオーバー（Phase 3: 文字コード・改行コード・インデント） ===== */
+
+.status-bar__button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 0.6875rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: background-color 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+
+.status-bar__button:hover {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.status-bar__popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 9000;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0.5rem 0;
+  min-width: 10rem;
+}
+
+.status-bar__popover-title {
+  padding: 0.25rem 0.75rem 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-bar__popover-group {
+  padding: 0.25rem 0;
+  border-top: 1px solid #f3f4f6;
+}
+
+.status-bar__popover-label {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.status-bar__popover-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #374151;
+  font-size: 0.8125rem;
+  transition: background-color 0.1s;
+}
+
+.status-bar__popover-item:hover {
+  background-color: #f3f4f6;
+}
+
+.status-bar__popover-item--active {
+  color: #2563eb;
+  background-color: #eff6ff;
+}

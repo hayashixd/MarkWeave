@@ -14,6 +14,8 @@ describe('TabBar accessibility', () => {
           isDirty: false,
           content: '',
           savedContent: '',
+          encoding: 'UTF-8',
+          lineEnding: 'LF',
         },
         {
           id: 'tab-2',
@@ -22,6 +24,8 @@ describe('TabBar accessibility', () => {
           isDirty: true,
           content: 'draft',
           savedContent: '',
+          encoding: 'UTF-8',
+          lineEnding: 'LF',
         },
       ],
       activeTabId: 'tab-1',

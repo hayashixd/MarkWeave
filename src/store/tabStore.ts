@@ -12,6 +12,9 @@
 
 import { create } from 'zustand';
 
+export type FileEncoding = 'UTF-8' | 'UTF-8 BOM' | 'Shift-JIS' | 'EUC-JP';
+export type LineEnding = 'LF' | 'CRLF';
+
 export interface TabState {
   id: string;
   filePath: string | null; // null = 新規未保存ファイル
@@ -19,6 +22,8 @@ export interface TabState {
   isDirty: boolean;
   content: string; // 現在のエディタ内容 (Markdown)
   savedContent: string; // 最後に保存した内容
+  encoding: FileEncoding; // ファイルの文字コード
+  lineEnding: LineEnding; // 改行コード
 }
 
 interface TabStore {
@@ -26,7 +31,7 @@ interface TabStore {
   activeTabId: string | null;
 
   // タブ操作
-  addTab: (tab: Omit<TabState, 'id' | 'isDirty'>) => string;
+  addTab: (tab: Omit<TabState, 'id' | 'isDirty' | 'encoding' | 'lineEnding'> & { encoding?: FileEncoding; lineEnding?: LineEnding }) => string;
   removeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
 
@@ -35,6 +40,10 @@ interface TabStore {
 
   // 保存関連
   markSaved: (tabId: string, filePath?: string) => void;
+
+  // エンコーディング・改行コード更新
+  updateEncoding: (tabId: string, encoding: FileEncoding) => void;
+  updateLineEnding: (tabId: string, lineEnding: LineEnding) => void;
 
   // ファイルパス更新（名前を付けて保存後）
   updateFilePath: (oldPath: string, newPath: string) => void;
@@ -87,6 +96,8 @@ export const useTabStore = create<TabStore>((set, get) => ({
       isDirty: false,
       content: tabData.content,
       savedContent: tabData.savedContent,
+      encoding: tabData.encoding ?? 'UTF-8',
+      lineEnding: tabData.lineEnding ?? 'LF',
     };
 
     set({
@@ -150,6 +161,22 @@ export const useTabStore = create<TabStore>((set, get) => ({
                 : {}),
             }
           : tab,
+      ),
+    }));
+  },
+
+  updateEncoding: (tabId, encoding) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === tabId ? { ...tab, encoding } : tab,
+      ),
+    }));
+  },
+
+  updateLineEnding: (tabId, lineEnding) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === tabId ? { ...tab, lineEnding, isDirty: true } : tab,
       ),
     }));
   },
