@@ -11,6 +11,7 @@
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import type { Root, RootContent, PhrasingContent } from 'mdast';
 
 export interface TipTapMark {
@@ -31,7 +32,7 @@ export interface TipTapDoc {
   content: TipTapNode[];
 }
 
-const parser = unified().use(remarkParse).use(remarkGfm);
+const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
 /**
  * Markdown テキストを TipTap JSON に変換する
@@ -111,6 +112,18 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
           content: node.value ? [{ type: 'text', text: node.value }] : undefined,
         },
       ];
+
+    case 'math': {
+      // remark-math が生成するブロック数式ノード ($$...$$)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mathNode = node as any;
+      return [
+        {
+          type: 'mathBlock',
+          attrs: { latex: mathNode.value ?? '' },
+        },
+      ];
+    }
 
     case 'thematicBreak':
       return [{ type: 'horizontalRule' }];
@@ -278,6 +291,17 @@ function convertInlineNodes(
         };
         const marks = [...parentMarks, linkMark];
         result.push(...convertInlineNodes(node.children, marks));
+        break;
+      }
+
+      case 'inlineMath': {
+        // remark-math が生成するインライン数式ノード ($...$)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mathNode = node as any;
+        result.push({
+          type: 'mathInline',
+          attrs: { latex: mathNode.value ?? '' },
+        });
         break;
       }
 

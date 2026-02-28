@@ -48,6 +48,7 @@ import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
 import { SearchExtension } from '../../extensions/SearchExtension';
 import { SearchBar } from '../Search/SearchBar';
+import { MathInline, MathBlock } from '../../extensions/MathExtension';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -129,6 +130,8 @@ export function MarkdownEditor({
       TableDragExtension,
       SmartPasteExtension,
       SearchExtension,
+      MathInline,
+      MathBlock,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない

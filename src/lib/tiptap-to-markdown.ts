@@ -82,6 +82,11 @@ function serializeBlockNode(
     case 'table':
       return serializeTable(node);
 
+    case 'mathBlock': {
+      const latex = (node.attrs?.latex as string) ?? '';
+      return `$$\n${latex}\n$$`;
+    }
+
     default:
       return '';
   }
@@ -251,6 +256,12 @@ function serializeInlineContent(nodes?: TipTapNode[]): string {
     if (node.type === 'hardBreak') {
       // CommonMark 仕様: 末尾スペース2つ + 改行 (trailing spaces + newline)
       result.push('  \n');
+      continue;
+    }
+
+    if (node.type === 'mathInline') {
+      const latex = (node.attrs?.latex as string) ?? '';
+      result.push(`$${latex}$`);
       continue;
     }
 
