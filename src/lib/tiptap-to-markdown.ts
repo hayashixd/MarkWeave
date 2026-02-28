@@ -9,6 +9,7 @@
  * - 強調: `**text**`
  * - 斜体: `*text*`
  * - ファイル末尾: 単一改行 `\n`
+ * - テーブル: GFM パイプ記法
  */
 
 import type { TipTapDoc, TipTapNode, TipTapMark } from './markdown-to-tiptap';
@@ -78,9 +79,70 @@ function serializeBlockNode(
     case 'horizontalRule':
       return '---';
 
+    case 'table':
+      return serializeTable(node);
+
     default:
       return '';
   }
+}
+
+/**
+ * テーブルノードを GFM パイプ記法の Markdown に変換する。
+ *
+ * ヘッダー行（1行目）のセルに設定された style 属性から
+ * text-align を読み取ってセパレータ行に反映する。
+ */
+function serializeTable(node: TipTapNode): string {
+  if (!node.content || node.content.length === 0) return '';
+
+  const rows = node.content;
+  const headerRow = rows[0];
+  const bodyRows = rows.slice(1);
+
+  if (!headerRow || !headerRow.content || headerRow.content.length === 0) return '';
+
+  const colCount = headerRow.content.length;
+
+  // ヘッダーセルのスタイルから配置を抽出
+  const alignments = headerRow.content.map((cell) => {
+    const style = cell.attrs?.style as string | undefined;
+    if (!style) return null;
+    if (style.includes('text-align: center')) return 'center';
+    if (style.includes('text-align: right')) return 'right';
+    if (style.includes('text-align: left')) return 'left';
+    return null;
+  });
+
+  // ヘッダー行
+  const headerCells = headerRow.content.map((cell) => {
+    const para = cell.content?.[0];
+    return serializeInlineContent(para?.content) || ' ';
+  });
+  const headerLine = `| ${headerCells.join(' | ')} |`;
+
+  // セパレータ行（配置記号付き）
+  const separatorCells = alignments.map((align) => {
+    if (align === 'center') return ':---:';
+    if (align === 'right') return '---:';
+    if (align === 'left') return ':---';
+    return '---';
+  });
+  const separatorLine = `| ${separatorCells.join(' | ')} |`;
+
+  // データ行
+  const bodyLines = bodyRows.map((row) => {
+    if (!row.content) return `| ${' |'.repeat(colCount)}`;
+    const cells = row.content.map((cell) => {
+      const para = cell.content?.[0];
+      return serializeInlineContent(para?.content) || ' ';
+    });
+    // 列数が足りない場合は空セルで補完
+    while (cells.length < colCount) cells.push(' ');
+    return `| ${cells.join(' | ')} |`;
+  });
+
+  return [headerLine, separatorLine, ...bodyLines].join('\n');
 }
 
 function serializeList(node: TipTapNode, ordered: boolean): string {

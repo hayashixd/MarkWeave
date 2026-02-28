@@ -5,6 +5,7 @@
  * TipTap (ProseMirror) が受け取れる JSON 構造に変換する。
  *
  * Phase 1 対応要素: Heading, Paragraph, Strong, Emphasis, List, ListItem, Code (inline)
+ * Phase 2 対応要素: Table, TableRow, TableCell, TableHeader
  */
 
 import { unified } from 'unified';
@@ -113,6 +114,49 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
 
     case 'thematicBreak':
       return [{ type: 'horizontalRule' }];
+
+    case 'table': {
+      // remark-gfm が生成する GFM テーブルノード
+      // mdast-util-gfm-table 型定義に準拠: align は列ごとの配置
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tableNode = node as any;
+      const alignments: (string | null)[] = tableNode.align ?? [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows: any[] = tableNode.children ?? [];
+
+      const tiptapRows = rows.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (row: any, rowIndex: number): TipTapNode => {
+          const isHeaderRow = rowIndex === 0;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const cells = (row.children as any[]).map(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (cell: any, colIndex: number): TipTapNode => {
+              const alignment = alignments[colIndex] ?? null;
+              const cellType = isHeaderRow ? 'tableHeader' : 'tableCell';
+              return {
+                type: cellType,
+                attrs: {
+                  colspan: 1,
+                  rowspan: 1,
+                  colwidth: null,
+                  ...(alignment ? { style: `text-align: ${alignment}` } : {}),
+                },
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: convertInlineNodes(cell.children as PhrasingContent[]),
+                  },
+                ],
+              };
+            },
+          );
+          return { type: 'tableRow', content: cells };
+        },
+      );
+
+      return [{ type: 'table', content: tiptapRows }];
+    }
 
     default:
       // 未対応のブロック要素は段落として保持

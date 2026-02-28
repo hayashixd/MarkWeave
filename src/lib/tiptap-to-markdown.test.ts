@@ -218,6 +218,14 @@ describe('roundtrip: MD → TipTap → MD', () => {
       name: 'link',
       input: '[click](https://example.com)\n',
     },
+    {
+      name: 'simple table',
+      input: '| Name | Age |\n| --- | --- |\n| Alice | 30 |\n| Bob | 25 |\n',
+    },
+    {
+      name: 'aligned table',
+      input: '| L | C | R |\n| :--- | :---: | ---: |\n| a | b | c |\n',
+    },
   ];
 
   for (const { name, input } of cases) {
@@ -227,4 +235,20 @@ describe('roundtrip: MD → TipTap → MD', () => {
       expect(output).toBe(input);
     });
   }
+});
+
+describe('tiptapToMarkdown - table serialization', () => {
+  it('serializes table nodes to GFM pipe syntax', () => {
+    const doc = markdownToTipTap('| A | B |\n| --- | --- |\n| 1 | 2 |\n');
+    const result = tiptapToMarkdown(doc);
+    expect(result).toBe('| A | B |\n| --- | --- |\n| 1 | 2 |\n');
+  });
+
+  it('serializes alignment separators correctly', () => {
+    const doc = markdownToTipTap('| L | C | R |\n| :--- | :---: | ---: |\n| x | y | z |\n');
+    const result = tiptapToMarkdown(doc);
+    expect(result).toContain(':---');
+    expect(result).toContain(':---:');
+    expect(result).toContain('---:');
+  });
 });
