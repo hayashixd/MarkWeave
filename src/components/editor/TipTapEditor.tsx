@@ -48,8 +48,10 @@ import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
 import { SearchExtension } from '../../extensions/SearchExtension';
 import { SearchBar } from '../Search/SearchBar';
+import Image from '@tiptap/extension-image';
 import { MathInline, MathBlock } from '../../extensions/MathExtension';
 import { MermaidBlock } from '../../extensions/MermaidExtension';
+import { ImageDropPasteExtension } from '../../extensions/ImageDropPasteExtension';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -131,6 +133,11 @@ export function MarkdownEditor({
       TableDragExtension,
       SmartPasteExtension,
       SearchExtension,
+      Image.configure({
+        inline: true,
+        allowBase64: true,
+      }),
+      ImageDropPasteExtension,
       MathInline,
       MathBlock,
       MermaidBlock,

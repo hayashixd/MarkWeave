@@ -304,6 +304,18 @@ function convertInlineNodes(
         break;
       }
 
+      case 'image': {
+        result.push({
+          type: 'image',
+          attrs: {
+            src: node.url,
+            alt: node.alt ?? '',
+            title: node.title ?? null,
+          },
+        });
+        break;
+      }
+
       case 'inlineMath': {
         // remark-math が生成するインライン数式ノード ($...$)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -264,6 +264,18 @@ function serializeInlineContent(nodes?: TipTapNode[]): string {
       continue;
     }
 
+    if (node.type === 'image') {
+      const src = (node.attrs?.src as string) ?? '';
+      const alt = (node.attrs?.alt as string) ?? '';
+      const title = node.attrs?.title as string | undefined;
+      if (title) {
+        result.push(`![${alt}](${src} "${title}")`);
+      } else {
+        result.push(`![${alt}](${src})`);
+      }
+      continue;
+    }
+
     if (node.type === 'mathInline') {
       const latex = (node.attrs?.latex as string) ?? '';
       result.push(`$${latex}$`);
