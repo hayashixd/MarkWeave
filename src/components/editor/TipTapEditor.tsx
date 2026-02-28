@@ -14,6 +14,9 @@
  * - タスクリスト
  * - ソースモード切替（Ctrl+/）
  *
+ * Phase 2 対応要素:
+ * - テーブル（Tab/Shift+Tab セル移動、行・列操作コンテキストメニュー）
+ *
  * CLAUDE.md 制約:
  * - IME 入力中の isComposing ガード
  * - パフォーマンスバジェット (入力レイテンシ < 16ms)
@@ -37,6 +40,8 @@ import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
 import { markdownToTipTap } from '../../lib/markdown-to-tiptap';
 import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
+import { TableContextMenu } from '../Table/TableContextMenu';
+import type { TableContextMenuState } from '../Table/TableContextMenu';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -62,6 +67,16 @@ export function MarkdownEditor({
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+
+  // テーブルコンテキストメニューの状態
+  const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
+  const closeTableMenu = useCallback(() => {
+    setTableMenu((prev) => ({ ...prev, visible: false }));
+  }, []);
 
   const editor = useEditor({
     extensions: [
@@ -295,16 +310,35 @@ export function MarkdownEditor({
     return tiptapToMarkdown(json);
   }, [editor, ime]);
 
+  // テーブルセル右クリック → コンテキストメニュー表示
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!editor) return;
+      // クリック対象がテーブルセル内かどうか判定
+      const target = e.target as HTMLElement;
+      const cellEl = target.closest('td, th');
+      if (!cellEl) return;
+
+      e.preventDefault();
+      setTableMenu({ visible: true, x: e.clientX, y: e.clientY });
+    },
+    [editor],
+  );
+
   if (!editor) return null;
 
   return (
     <div className="editor-container flex flex-col h-full">
       <EditorToolbar editor={editor} mode={mode} onToggleMode={toggleMode} />
+      {editor && (
+        <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />
+      )}
       {mode === 'wysiwyg' ? (
         <div
           ref={editorWrapperRef}
           className="flex-1 overflow-y-auto cursor-text"
           onClick={handleEditorAreaClick}
+          onContextMenu={handleContextMenu}
         >
           <div className="max-w-[800px] mx-auto px-12 py-8">
             <EditorContent
