@@ -49,6 +49,8 @@ import type { TableContextMenuState } from '../Table/TableContextMenu';
 import { SearchExtension } from '../../extensions/SearchExtension';
 import { SearchBar } from '../Search/SearchBar';
 import { QuickOpenModal } from '../QuickOpen/QuickOpenModal';
+import { GoToLineDialog } from '../GoToLine/GoToLineDialog';
+import { TextStatsDialog } from '../TextStats/TextStatsDialog';
 import Image from '@tiptap/extension-image';
 import { MathInline, MathBlock } from '../../extensions/MathExtension';
 import { MermaidBlock } from '../../extensions/MermaidExtension';
@@ -88,6 +90,12 @@ export function MarkdownEditor({
 
   // クイックオープンの状態
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
+
+  // 行番号ジャンプの状態
+  const [goToLineVisible, setGoToLineVisible] = useState(false);
+
+  // 文書統計ダイアログの状態
+  const [textStatsVisible, setTextStatsVisible] = useState(false);
 
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
@@ -228,6 +236,13 @@ export function MarkdownEditor({
       if ((e.ctrlKey || e.metaKey) && e.key === 'p' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         setQuickOpenVisible(true);
+        return;
+      }
+
+      // Ctrl+G: 行番号ジャンプ
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setGoToLineVisible(true);
         return;
       }
     };
@@ -406,6 +421,40 @@ export function MarkdownEditor({
       {/* クイックオープンモーダル（Ctrl+P） */}
       {quickOpenVisible && (
         <QuickOpenModal onClose={() => setQuickOpenVisible(false)} />
+      )}
+      {/* 行番号ジャンプダイアログ（Ctrl+G） */}
+      {goToLineVisible && editor && (
+        <GoToLineDialog
+          totalLines={editor.state.doc.content.childCount}
+          onGoToLine={(line) => {
+            // WYSIWYG モード: ブロック番号でジャンプ
+            let pos = 0;
+            let blockIndex = 0;
+            editor.state.doc.descendants((_node, nodePos) => {
+              blockIndex++;
+              if (blockIndex === line) {
+                pos = nodePos;
+                return false;
+              }
+            });
+            editor.chain().focus().setTextSelection(pos + 1).run();
+            // スクロール
+            const dom = editor.view.domAtPos(pos + 1);
+            if (dom.node instanceof HTMLElement) {
+              dom.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else if (dom.node.parentElement) {
+              dom.node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }}
+          onClose={() => setGoToLineVisible(false)}
+        />
+      )}
+      {/* 文書統計ダイアログ */}
+      {textStatsVisible && editor && (
+        <TextStatsDialog
+          text={editor.state.doc.textContent}
+          onClose={() => setTextStatsVisible(false)}
+        />
       )}
       {mode === 'wysiwyg' ? (
         <div

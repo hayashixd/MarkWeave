@@ -142,7 +142,7 @@ Excelライクなテーブル操作を実現する。
 
 詳細設計: [editor-ux-design.md](../03_UI_UX/editor-ux-design.md), [app-shell-design.md](../03_UI_UX/app-shell-design.md), [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md)
 
-- [ ] 行番号指定ジャンプ（`Ctrl+G`）
+- [x] 行番号指定ジャンプ（`Ctrl+G`）
 - [ ] 行ブックマーク（`Ctrl+F2` / `F2` / `Shift+F2`）
 - [ ] 矩形選択（ソースモード限定 `Alt+ドラッグ`）
 - [ ] 単語補完（`Ctrl+Space`）
@@ -150,7 +150,7 @@ Excelライクなテーブル操作を実現する。
 - [ ] 文字コードの表示・再読み込み（UTF-8 / UTF-8 BOM / Shift-JIS）
 - [ ] 改行コード（LF / CRLF）の切り替え保存
 - [ ] インデント設定（タブ幅・タブ/スペース変換・自動インデント）
-- [ ] 文書統計ダイアログ（文字数・単語数・読了時間）
+- [x] 文書統計ダイアログ（文字数・単語数・読了時間）
 
 ### ワークスペース管理
 
