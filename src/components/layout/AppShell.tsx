@@ -38,6 +38,7 @@ import { useAutoSave } from '../../hooks/useAutoSave';
 import { useDropListener } from '../../hooks/useDropListener';
 import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
 import { writeFile } from '../../lib/tauri-commands';
+import { useWorkspaceStore } from '../../store/workspaceStore';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -68,6 +69,24 @@ export function AppShell() {
   // ファイルダイアログ
   const openFileDialog = useOpenFileDialog();
   const saveAsDialog = useSaveAsDialog();
+  const { openWorkspace } = useWorkspaceStore();
+
+  // フォルダを開くダイアログ（Ctrl+Shift+O）
+  const openFolderDialog = useCallback(async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const dir = await open({ directory: true, multiple: false });
+      if (typeof dir === 'string') {
+        openWorkspace(dir);
+        setSidebarOpen(true);
+        setSidebarTab('files');
+      }
+    } catch {
+      // Tauri 外ではスキップ
+    }
+  }, [openWorkspace]);
+  const openFolderDialogRef = useRef(openFolderDialog);
+  openFolderDialogRef.current = openFolderDialog;
 
   // IME 変換中フラグ（useAutoSave に渡すため window レベルで追跡）
   const isComposingRef = useRef(false);
@@ -165,6 +184,13 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Shift+O: フォルダを開くダイアログ
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'O') {
+        e.preventDefault();
+        openFolderDialogRef.current();
+        return;
+      }
+
       // Ctrl+O: ファイルを開くダイアログ
       if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
         e.preventDefault();
@@ -248,6 +274,7 @@ export function AppShell() {
           activeTab={sidebarTab}
           onTabChange={setSidebarTab}
           editor={currentEditor}
+          onOpenFolder={openFolderDialog}
         />
 
         {/* エディタエリア */}

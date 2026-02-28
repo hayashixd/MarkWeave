@@ -1325,3 +1325,148 @@
   color: #9ca3af;
   flex-shrink: 0;
 }
+
+/* ===== ファイルツリー（Phase 3: ワークスペース管理） ===== */
+
+.file-tree-panel {
+  font-size: 0.8125rem;
+}
+
+.file-tree-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.file-tree-panel__root-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-tree-panel__action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.file-tree-panel__action-btn:hover {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.file-tree-panel__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  color: #4b5563;
+  transition: background-color 0.1s;
+  user-select: none;
+}
+
+.file-tree-node:hover {
+  background-color: #f3f4f6;
+}
+
+.file-tree-node--open {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.file-tree-node__icon {
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  width: 14px;
+  text-align: center;
+}
+
+.file-tree-node__icon--file {
+  font-size: 0.75rem;
+}
+
+.file-tree-node__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.file-tree-node__input {
+  flex: 1;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid #3b82f6;
+  border-radius: 3px;
+  font-size: 0.8125rem;
+  outline: none;
+  background-color: #ffffff;
+}
+
+.file-tree-node__create-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+}
+
+/* ファイルツリー コンテキストメニュー */
+
+.file-tree-context-menu {
+  position: fixed;
+  z-index: 10000;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem 0;
+  min-width: 8rem;
+}
+
+.file-tree-context-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #374151;
+  font-size: 0.8125rem;
+  transition: background-color 0.1s;
+}
+
+.file-tree-context-menu__item:hover {
+  background-color: #f3f4f6;
+}
+
+.file-tree-context-menu__item--danger {
+  color: #dc2626;
+}
+
+.file-tree-context-menu__item--danger:hover {
+  background-color: #fef2f2;
+}
+
+.file-tree-context-menu__divider {
+  height: 1px;
+  background-color: #e5e7eb;
+  margin: 0.25rem 0;
+}

@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import type { Editor } from '@tiptap/react';
 import { OutlinePanel } from '../Outline/OutlinePanel';
+import { FileTreePanel } from './FileTreePanel';
 
 export type SidebarTab = 'outline' | 'files';
 
@@ -22,6 +23,7 @@ interface SidebarProps {
   activeTab?: SidebarTab;
   onTabChange?: (tab: SidebarTab) => void;
   editor?: Editor | null;
+  onOpenFolder?: () => void;
 }
 
 export function Sidebar({
@@ -30,6 +32,7 @@ export function Sidebar({
   activeTab: controlledTab,
   onTabChange,
   editor = null,
+  onOpenFolder,
 }: SidebarProps) {
   const [internalTab, setInternalTab] = useState<SidebarTab>('outline');
   const activeTab = controlledTab ?? internalTab;
@@ -115,10 +118,7 @@ export function Sidebar({
             role="tabpanel"
             aria-labelledby="tab-files"
           >
-            <div className="p-3 text-sm text-gray-400">
-              <p>フォルダを開いてください</p>
-              <p className="text-xs mt-2">Ctrl+Shift+O</p>
-            </div>
+            <FileTreePanel onOpenFolder={onOpenFolder ?? (() => {})} />
           </div>
         )}
       </div>
