@@ -143,7 +143,7 @@ Excelライクなテーブル操作を実現する。
 詳細設計: [editor-ux-design.md](../03_UI_UX/editor-ux-design.md), [app-shell-design.md](../03_UI_UX/app-shell-design.md), [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md)
 
 - [x] 行番号指定ジャンプ（`Ctrl+G`）
-- [ ] 行ブックマーク（`Ctrl+F2` / `F2` / `Shift+F2`）
+- [x] 行ブックマーク（`Ctrl+F2` / `F2` / `Shift+F2`）
 - [ ] 矩形選択（ソースモード限定 `Alt+ドラッグ`）
 - [ ] 単語補完（`Ctrl+Space`）
 - [x] テキスト整形コマンド（前後空白除去・全角/半角変換・行ソート）

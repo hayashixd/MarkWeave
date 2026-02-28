@@ -1278,3 +1278,10 @@
   color: #2563eb;
   background-color: #eff6ff;
 }
+
+/* ===== 行ブックマーク（Phase 3: Ctrl+F2） ===== */
+
+.bookmark-line {
+  background-color: rgba(59, 130, 246, 0.08);
+  border-left: 3px solid #3b82f6;
+}
