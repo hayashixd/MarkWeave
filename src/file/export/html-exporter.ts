@@ -2,11 +2,12 @@
  * html-exporter.ts
  *
  * Markdown ドキュメントをスタイル付きスタンドアロン HTML としてエクスポートするモジュール。
+ * export-interop-design.md §2 に準拠。
  *
- * convertMdToHtml() を使って変換し、ファイルシステムへ書き出す。
+ * convertMdToHtml() を使って変換し、Tauri plugin-fs でファイルシステムへ書き出す。
  */
 
-import { convertMdToHtml, type MdToHtmlOptions } from '../../core/converter/md-to-html';
+import { convertMdToHtml, extractTitle, type MdToHtmlOptions } from '../../core/converter/md-to-html';
 
 export interface ExportResult {
   /** 書き出したファイルのパス */
@@ -22,48 +23,36 @@ export interface ExportResult {
  * @param outputPath   - 出力先ファイルパス（例: '/path/to/output.html'）
  * @param options      - 変換オプション（テーマ・数式・ハイライト等）
  * @returns エクスポート結果
- *
- * @example
- * const result = await exportToHtml(markdownText, '/docs/output.html', {
- *   theme: 'github',
- *   title: 'My Document',
- * });
- * console.log(`Exported: ${result.filePath} (${result.sizeBytes} bytes)`);
  */
 export async function exportToHtml(
   markdown: string,
   outputPath: string,
   options: Partial<MdToHtmlOptions> = {}
 ): Promise<ExportResult> {
+  // タイトルが未設定の場合は Markdown から抽出
+  if (!options.title) {
+    options.title = extractTitle(markdown) ?? 'Document';
+  }
+
   const html = await convertMdToHtml(markdown, options);
 
-  // TODO: File System Access API または Node.js fs を使ってファイルに書き出す
-  // const encoder = new TextEncoder();
-  // const data = encoder.encode(html);
-  // const fileHandle = await window.showSaveFilePicker({ ... });
-  // const writable = await fileHandle.createWritable();
-  // await writable.write(data);
-  // await writable.close();
+  // Tauri plugin-fs でファイルに書き出し
+  try {
+    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+    await writeTextFile(outputPath, html);
+  } catch {
+    // Tauri 外（テスト・ブラウザ開発）ではダウンロードにフォールバック
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = outputPath.split('/').pop() ?? 'export.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
-  void html;
-  void outputPath;
-  throw new Error('exportToHtml: not implemented yet');
-}
+  const encoder = new TextEncoder();
+  const sizeBytes = encoder.encode(html).byteLength;
 
-/**
- * エクスポートダイアログを表示して、ユーザーにオプションを選択させる。
- * 確定後に exportToHtml() を呼び出す。
- *
- * @param markdown   - エクスポート対象の Markdown テキスト
- * @param defaultTitle - デフォルトのドキュメントタイトル
- */
-export async function showExportDialog(
-  markdown: string,
-  defaultTitle: string
-): Promise<ExportResult | null> {
-  // TODO: Reactモーダルを開いてオプションをUIで選択させる
-  // 選択後に exportToHtml() を実行
-  void markdown;
-  void defaultTitle;
-  return null;
+  return { filePath: outputPath, sizeBytes };
 }

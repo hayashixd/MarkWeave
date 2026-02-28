@@ -2,23 +2,34 @@
  * md-to-html.ts
  *
  * Markdown テキストをスタイル付き HTML に変換する変換パイプライン。
+ * export-interop-design.md §2 に準拠。
  *
  * パイプライン:
  *   Markdown文字列
- *     → remark（mdast）
+ *     → remark-parse（mdast）
+ *     → remark-gfm（GFM テーブル・取り消し線等）
+ *     → remark-math（数式ブロック）
  *     → remark-rehype（hast）
+ *     → rehype-slug（見出しに id 付与）
  *     → rehype-highlight（シンタックスハイライト）
- *     → rehype-katex（数式）
+ *     → rehype-katex（数式レンダリング）
  *     → rehype-stringify（HTML文字列）
  *     → HTMLテンプレートへ注入
  *     → juice（CSSインライン化）
  *     → スタンドアロンHTML
- *
- * 使用ライブラリ:
- *   - unified, remark-parse, remark-rehype
- *   - rehype-highlight, rehype-katex, rehype-stringify
- *   - juice
  */
+
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import remarkRehype from 'remark-rehype';
+import rehypeHighlight from 'rehype-highlight';
+import rehypeKatex from 'rehype-katex';
+import rehypeSlug from 'rehype-slug';
+import rehypeStringify from 'rehype-stringify';
+import juice from 'juice';
+import { loadThemeCss, loadHighlightCss, loadKatexCss } from './theme-loader';
 
 export interface MdToHtmlOptions {
   /** エクスポート用テーマ名 */
@@ -58,34 +69,119 @@ export async function convertMdToHtml(
   markdown: string,
   options: Partial<MdToHtmlOptions> = {}
 ): Promise<string> {
-  const _opts = { ...defaultOptions, ...options };
-  // TODO: unifiedパイプラインを組み立てて変換を実行
-  // const processor = unified()
-  //   .use(remarkParse)
-  //   .use(remarkRehype)
-  //   .use(opts.highlight ? rehypeHighlight : [])
-  //   .use(opts.math ? rehypeKatex : [])
-  //   .use(rehypeStringify);
-  // const contentHtml = await processor.process(markdown);
-  // const fullHtml = injectIntoTemplate(String(contentHtml), opts);
-  // return opts.inlineCss ? juice(fullHtml) : fullHtml;
-  void markdown;
-  throw new Error('convertMdToHtml: not implemented yet');
+  const opts = { ...defaultOptions, ...options };
+
+  // unified パイプラインを組み立て
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let processor: any = unified()
+    .use(remarkParse)
+    .use(remarkGfm);
+
+  if (opts.math) {
+    processor = processor.use(remarkMath);
+  }
+
+  processor = processor.use(remarkRehype, { allowDangerousHtml: false });
+  processor = processor.use(rehypeSlug);
+
+  if (opts.highlight) {
+    processor = processor.use(rehypeHighlight, { detect: true });
+  }
+
+  if (opts.math) {
+    processor = processor.use(rehypeKatex);
+  }
+
+  processor = processor.use(rehypeStringify);
+
+  // Markdown → HTML コンテンツ変換
+  const result = await processor.process(markdown);
+  const contentHtml = String(result);
+
+  // HTML テンプレートに注入
+  const fullHtml = injectIntoTemplate(contentHtml, opts);
+
+  // CSS インライン化
+  if (opts.inlineCss) {
+    return juice(fullHtml);
+  }
+
+  return fullHtml;
+}
+
+/**
+ * Markdown テキストから H1 見出しテキストを抽出してタイトルとして返す。
+ */
+export function extractTitle(markdown: string): string | null {
+  const match = markdown.match(/^#\s+(.+)$/m);
+  return match?.[1]?.trim() ?? null;
 }
 
 /**
  * HTML コンテンツをテンプレートに注入してスタンドアロン HTML を構築する。
- *
- * @param content  - `<body>` に埋め込む HTML コンテンツ文字列
- * @param options  - テンプレートオプション
- * @returns 完全な HTML ドキュメント文字列
+ * export-interop-design.md §2.2 に準拠。
  */
 export function injectIntoTemplate(
   content: string,
   options: MdToHtmlOptions
 ): string {
-  // TODO: theme CSSを読み込んでテンプレートへ注入
-  void content;
-  void options;
-  throw new Error('injectIntoTemplate: not implemented yet');
+  const themeCss = loadThemeCss(options.theme);
+  const highlightCss = options.highlight ? loadHighlightCss() : '';
+  const katexCss = options.math ? loadKatexCss() : '';
+
+  // TOC 生成
+  const tocHtml = options.toc ? generateToc(content) : '';
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(options.title)}</title>
+  <style>${themeCss}</style>
+${highlightCss ? `  <style>${highlightCss}</style>\n` : ''}${katexCss ? `  <style>${katexCss}</style>\n` : ''}</head>
+<body>
+${tocHtml ? `  <nav class="toc">${tocHtml}</nav>\n` : ''}  <main class="markdown-body">
+${content}
+  </main>
+</body>
+</html>`;
+}
+
+/**
+ * HTML コンテンツ内の見出し（h1〜h6）から目次を生成する。
+ */
+function generateToc(html: string): string {
+  const headingRegex = /<h([1-6])\s+id="([^"]*)"[^>]*>(.*?)<\/h[1-6]>/gi;
+  const entries: { level: number; id: string; text: string }[] = [];
+
+  let match;
+  while ((match = headingRegex.exec(html)) !== null) {
+    entries.push({
+      level: parseInt(match[1] ?? '1'),
+      id: match[2] ?? '',
+      text: (match[3] ?? '').replace(/<[^>]+>/g, ''),
+    });
+  }
+
+  if (entries.length === 0) return '';
+
+  const minLevel = Math.min(...entries.map((e) => e.level));
+
+  let tocHtml = '<ol>\n';
+  for (const entry of entries) {
+    const indent = '  '.repeat(entry.level - minLevel + 1);
+    tocHtml += `${indent}<li><a href="#${entry.id}">${escapeHtml(entry.text)}</a></li>\n`;
+  }
+  tocHtml += '</ol>';
+
+  return tocHtml;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

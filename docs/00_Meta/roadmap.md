@@ -179,25 +179,25 @@ MarkdownをスタイルつきHTMLファイルとして書き出す機能。
 
 ### 変換パイプライン
 
-- [ ] remark-rehype 統合（MD AST → HTML AST）
-- [ ] rehype-highlight 統合（コードのシンタックスハイライト）
-- [ ] rehype-katex 統合（数式レンダリング）
-- [ ] rehype-stringify 統合（HTML文字列生成）
-- [ ] HTMLテンプレートエンジン実装
-- [ ] juice によるCSS インライン化
+- [x] remark-rehype 統合（MD AST → HTML AST）
+- [x] rehype-highlight 統合（コードのシンタックスハイライト）
+- [x] rehype-katex 統合（数式レンダリング）
+- [x] rehype-stringify 統合（HTML文字列生成）
+- [x] HTMLテンプレートエンジン実装
+- [x] juice によるCSS インライン化
 
 ### エクスポートオプションUI
 
-- [ ] テーマ選択（GitHub / ドキュメント等）
-- [ ] 目次（TOC）の自動生成トグル
-- [ ] 数式・図表レンダリングのオン/オフ
-- [ ] エクスポートダイアログ
-- [ ] メニュー: ファイル → エクスポート → HTMLにエクスポート
+- [x] テーマ選択（GitHub / ドキュメント等）
+- [x] 目次（TOC）の自動生成トグル
+- [x] 数式・図表レンダリングのオン/オフ
+- [x] エクスポートダイアログ
+- [x] メニュー: ファイル → エクスポート → HTMLにエクスポート
 
 ### HTMLテーマCSS
 
-- [ ] GitHub Markdownスタイル
-- [ ] ドキュメントスタイル（書籍風）
+- [x] GitHub Markdownスタイル
+- [x] ドキュメントスタイル（書籍風）
 - [ ] プレゼンテーションスタイル（将来）
 
 ---

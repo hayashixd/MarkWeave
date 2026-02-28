@@ -39,11 +39,13 @@ import { useDropListener } from '../../hooks/useDropListener';
 import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
 import { writeFile } from '../../lib/tauri-commands';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { ExportDialog } from '../Export/ExportDialog';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('outline');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   // エディタインスタンスへの参照（アウトラインパネル等で使用）
   const [currentEditor, setCurrentEditor] = useState<Editor | null>(null);
   const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab } =
@@ -254,6 +256,13 @@ export function AppShell() {
         setSidebarTab('files');
         return;
       }
+
+      // Ctrl+Shift+E: HTML エクスポートダイアログ (export-interop-design.md §4.2)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
+        e.preventDefault();
+        setExportDialogOpen(true);
+        return;
+      }
     };
 
     window.addEventListener('keydown', handler);
@@ -301,6 +310,15 @@ export function AppShell() {
         isOpen={preferencesOpen}
         onClose={() => setPreferencesOpen(false)}
       />
+
+      {/* HTML エクスポートダイアログ */}
+      {exportDialogOpen && activeTab && (
+        <ExportDialog
+          markdown={activeTab.content}
+          currentFilePath={activeTab.filePath ?? undefined}
+          onClose={() => setExportDialogOpen(false)}
+        />
+      )}
 
       {/* トースト通知 */}
       <ToastContainer />
