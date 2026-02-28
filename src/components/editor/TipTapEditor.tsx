@@ -55,6 +55,7 @@ import Image from '@tiptap/extension-image';
 import { MathInline, MathBlock } from '../../extensions/MathExtension';
 import { MermaidBlock } from '../../extensions/MermaidExtension';
 import { ImageDropPasteExtension } from '../../extensions/ImageDropPasteExtension';
+import { TEXT_TRANSFORM_COMMANDS } from '../../core/text-transform';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -653,6 +654,10 @@ function EditorToolbar({
           {/* テーブル挿入 */}
           <TableInsertButton editor={editor} />
           <ToolbarDivider />
+
+          {/* テキスト整形 */}
+          <TextTransformDropdown editor={editor} />
+          <ToolbarDivider />
         </>
       )}
       <ToolbarButton
@@ -842,6 +847,81 @@ function TableInsertButton({ editor }: { editor: ReturnType<typeof useEditor> })
               );
             })}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * テキスト整形ドロップダウン
+ * editor-ux-design.md §12 に準拠。
+ */
+function TextTransformDropdown({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const applyTransform = (transform: (text: string) => string) => {
+    if (!editor) return;
+    const { from, to, empty } = editor.state.selection;
+
+    if (empty) {
+      // 選択なし: ドキュメント全体を対象
+      const fullText = editor.state.doc.textContent;
+      const transformed = transform(fullText);
+      // ドキュメント全体を置き換え
+      editor.chain().focus().selectAll().deleteSelection().insertContent(transformed).run();
+    } else {
+      // 選択範囲を対象
+      const selectedText = editor.state.doc.textBetween(from, to, '\n');
+      const transformed = transform(selectedText);
+      editor.chain().focus().deleteSelection().insertContent(transformed).run();
+    }
+    setOpen(false);
+  };
+
+  if (!editor) return null;
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        title="テキスト整形"
+        aria-label="テキスト整形"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center justify-center w-8 h-8 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <text x="2" y="12" fontSize="11" fontWeight="bold">T</text>
+          <path d="M10 11l3-3-3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="text-transform-dropdown">
+          {TEXT_TRANSFORM_COMMANDS.map((cmd) => (
+            <button
+              key={cmd.id}
+              type="button"
+              className="text-transform-dropdown__item"
+              onClick={() => applyTransform(cmd.transform)}
+            >
+              {cmd.label}
+            </button>
+          ))}
         </div>
       )}
     </div>

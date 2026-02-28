@@ -1049,6 +1049,38 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ===== テキスト整形ドロップダウン（Phase 3） ===== */
+
+.text-transform-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 9000;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem 0;
+  min-width: 11rem;
+}
+
+.text-transform-dropdown__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.375rem 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #374151;
+  font-size: 0.8125rem;
+  transition: background-color 0.1s;
+}
+
+.text-transform-dropdown__item:hover {
+  background-color: #f3f4f6;
+}
+
 /* ===== サイドバータブ（Phase 3） ===== */
 
 .sidebar-tab {
