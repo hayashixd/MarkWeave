@@ -790,6 +790,120 @@
   padding: 1rem;
 }
 
+/* ===== クイックオープン（Phase 3: Ctrl+P） ===== */
+
+.quick-open-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+.quick-open-modal {
+  width: 100%;
+  max-width: 560px;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  max-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.quick-open-modal__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.quick-open-modal__search-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.quick-open-modal__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.9375rem;
+  color: #374151;
+  background: transparent;
+}
+
+.quick-open-modal__input::placeholder {
+  color: #9ca3af;
+}
+
+.quick-open-modal__list {
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.quick-open-modal__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.quick-open-modal__item:hover,
+.quick-open-modal__item--selected {
+  background-color: #eff6ff;
+}
+
+.quick-open-modal__file-icon {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+}
+
+.quick-open-modal__file-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-open-modal__file-path {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: auto;
+  flex-shrink: 0;
+  max-width: 50%;
+}
+
+.quick-open-modal__empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.quick-open-modal__footer {
+  display: flex;
+  gap: 16px;
+  padding: 6px 16px;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.6875rem;
+  color: #9ca3af;
+}
+
 /* ===== サイドバータブ（Phase 3） ===== */
 
 .sidebar-tab {

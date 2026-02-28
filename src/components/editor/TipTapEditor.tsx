@@ -48,6 +48,7 @@ import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
 import { SearchExtension } from '../../extensions/SearchExtension';
 import { SearchBar } from '../Search/SearchBar';
+import { QuickOpenModal } from '../QuickOpen/QuickOpenModal';
 import Image from '@tiptap/extension-image';
 import { MathInline, MathBlock } from '../../extensions/MathExtension';
 import { MermaidBlock } from '../../extensions/MermaidExtension';
@@ -84,6 +85,9 @@ export function MarkdownEditor({
   // 検索バーの状態
   const [searchVisible, setSearchVisible] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
+
+  // クイックオープンの状態
+  const [quickOpenVisible, setQuickOpenVisible] = useState(false);
 
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
@@ -217,6 +221,13 @@ export function MarkdownEditor({
         e.preventDefault();
         setSearchVisible(true);
         setShowReplace(true);
+        return;
+      }
+
+      // Ctrl+P: クイックオープン
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setQuickOpenVisible(true);
         return;
       }
     };
@@ -391,6 +402,10 @@ export function MarkdownEditor({
       <EditorToolbar editor={editor} mode={mode} onToggleMode={toggleMode} />
       {editor && (
         <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />
+      )}
+      {/* クイックオープンモーダル（Ctrl+P） */}
+      {quickOpenVisible && (
+        <QuickOpenModal onClose={() => setQuickOpenVisible(false)} />
       )}
       {mode === 'wysiwyg' ? (
         <div
