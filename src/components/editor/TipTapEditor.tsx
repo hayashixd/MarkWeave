@@ -108,7 +108,7 @@ export function MarkdownEditor({
         nested: true, // ネストしたタスクリストを許可
       }),
       Table.configure({
-        resizable: false, // 列幅リサイズは Phase 2 後半のタスクで実装
+        resizable: true, // Phase 2: 列幅リサイズ（ドラッグ）を有効化
       }),
       TableRow,
       TableCellWithStyle,
