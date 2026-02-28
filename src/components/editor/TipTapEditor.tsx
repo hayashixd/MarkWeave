@@ -517,6 +517,10 @@ function EditorToolbar({
             onClick={() => window.dispatchEvent(new CustomEvent('editor-link-insert'))}
           />
           <ToolbarDivider />
+
+          {/* テーブル挿入 */}
+          <TableInsertButton editor={editor} />
+          <ToolbarDivider />
         </>
       )}
       <ToolbarButton
@@ -610,6 +614,106 @@ function ToolbarButton({
 
 function ToolbarDivider() {
   return <div className="w-px h-5 bg-gray-300 mx-1 flex-shrink-0" />;
+}
+
+/**
+ * テーブル挿入ボタン（行数・列数指定）
+ *
+ * ドロップダウンで行数×列数のグリッドを表示し、
+ * ホバーした位置のテーブルを挿入する。
+ */
+function TableInsertButton({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState<{ rows: number; cols: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const GRID_ROWS = 8;
+  const GRID_COLS = 8;
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const insertTable = (rows: number, cols: number) => {
+    if (!editor) return;
+    editor
+      .chain()
+      .focus()
+      .insertTable({ rows, cols, withHeaderRow: true })
+      .run();
+    setOpen(false);
+    setHovered(null);
+  };
+
+  if (!editor) return null;
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        type="button"
+        title="テーブル挿入"
+        aria-label="テーブル挿入"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
+          editor.isActive('table')
+            ? 'bg-blue-100 text-blue-700'
+            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        }`}
+      >
+        {/* テーブルアイコン */}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <rect x="1" y="1" width="14" height="14" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <line x1="1" y1="5" x2="15" y2="5" stroke="currentColor" strokeWidth="1" />
+          <line x1="1" y1="9" x2="15" y2="9" stroke="currentColor" strokeWidth="1" />
+          <line x1="5.5" y1="1" x2="5.5" y2="15" stroke="currentColor" strokeWidth="1" />
+          <line x1="10.5" y1="1" x2="10.5" y2="15" stroke="currentColor" strokeWidth="1" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label="テーブルサイズ選択"
+          className="table-insert-picker"
+        >
+          <div className="table-insert-picker__label">
+            {hovered ? `${hovered.rows} × ${hovered.cols}` : 'テーブルを挿入'}
+          </div>
+          <div
+            className="table-insert-picker__grid"
+            style={{ gridTemplateColumns: `repeat(${GRID_COLS}, 1.25rem)` }}
+          >
+            {Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => {
+              const row = Math.floor(i / GRID_COLS) + 1;
+              const col = (i % GRID_COLS) + 1;
+              const active =
+                hovered !== null && row <= hovered.rows && col <= hovered.cols;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`${row}行 ${col}列のテーブルを挿入`}
+                  className={`table-insert-picker__cell${active ? ' table-insert-picker__cell--active' : ''}`}
+                  onPointerEnter={() => setHovered({ rows: row, cols: col })}
+                  onPointerLeave={() => setHovered(null)}
+                  onClick={() => insertTable(row, col)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default MarkdownEditor;
