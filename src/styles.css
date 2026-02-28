@@ -1285,3 +1285,43 @@
   background-color: rgba(59, 130, 246, 0.08);
   border-left: 3px solid #3b82f6;
 }
+
+/* ===== 単語補完ポップアップ（Phase 3: Ctrl+Space） ===== */
+
+.word-complete-popup {
+  position: fixed;
+  z-index: 10000;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem 0;
+  min-width: 10rem;
+  max-width: 20rem;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.word-complete-popup__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0.375rem 0.75rem;
+  cursor: pointer;
+  color: #374151;
+  font-size: 0.8125rem;
+  transition: background-color 0.1s;
+}
+
+.word-complete-popup__item:hover,
+.word-complete-popup__item--selected {
+  background-color: #eff6ff;
+  color: #1d4ed8;
+}
+
+.word-complete-popup__count {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}

@@ -57,6 +57,7 @@ import { MermaidBlock } from '../../extensions/MermaidExtension';
 import { ImageDropPasteExtension } from '../../extensions/ImageDropPasteExtension';
 import { TEXT_TRANSFORM_COMMANDS } from '../../core/text-transform';
 import { BookmarkExtension } from '../../extensions/BookmarkExtension';
+import { WordCompleteExtension } from '../../extensions/WordCompleteExtension';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -156,6 +157,7 @@ export function MarkdownEditor({
       MathBlock,
       MermaidBlock,
       BookmarkExtension,
+      WordCompleteExtension,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
