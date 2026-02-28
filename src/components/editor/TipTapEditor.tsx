@@ -49,6 +49,7 @@ import type { TableContextMenuState } from '../Table/TableContextMenu';
 import { SearchExtension } from '../../extensions/SearchExtension';
 import { SearchBar } from '../Search/SearchBar';
 import { MathInline, MathBlock } from '../../extensions/MathExtension';
+import { MermaidBlock } from '../../extensions/MermaidExtension';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -132,6 +133,7 @@ export function MarkdownEditor({
       SearchExtension,
       MathInline,
       MathBlock,
+      MermaidBlock,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない

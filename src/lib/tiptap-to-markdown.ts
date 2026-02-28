@@ -87,6 +87,11 @@ function serializeBlockNode(
       return `$$\n${latex}\n$$`;
     }
 
+    case 'mermaidBlock': {
+      const mermaidCode = (node.attrs?.code as string) ?? '';
+      return `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
+    }
+
     default:
       return '';
   }

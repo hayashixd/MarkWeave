@@ -104,7 +104,16 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
         },
       ];
 
-    case 'code':
+    case 'code': {
+      // mermaid コードブロックは専用ノードに変換
+      if (node.lang === 'mermaid') {
+        return [
+          {
+            type: 'mermaidBlock',
+            attrs: { code: node.value ?? '' },
+          },
+        ];
+      }
       return [
         {
           type: 'codeBlock',
@@ -112,6 +121,7 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
           content: node.value ? [{ type: 'text', text: node.value }] : undefined,
         },
       ];
+    }
 
     case 'math': {
       // remark-math が生成するブロック数式ノード ($$...$$)
