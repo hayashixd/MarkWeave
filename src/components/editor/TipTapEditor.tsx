@@ -32,6 +32,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCellWithStyle, TableHeaderWithStyle } from '../../extensions/TableCellWithStyle';
+import { TableDragExtension } from '../../extensions/TableDragExtension';
 import { common, createLowlight } from 'lowlight';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIMEComposition } from './useIMEComposition';
@@ -112,6 +113,7 @@ export function MarkdownEditor({
       TableRow,
       TableCellWithStyle,
       TableHeaderWithStyle,
+      TableDragExtension,
       SmartPasteExtension,
     ],
     editable: !readOnly,
