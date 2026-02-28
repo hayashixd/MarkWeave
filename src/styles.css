@@ -1470,3 +1470,73 @@
   background-color: #e5e7eb;
   margin: 0.25rem 0;
 }
+
+/* ===== スマートペースト確認バー（Phase 3: ask モード） ===== */
+
+.smart-paste-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+  font-size: 0.8125rem;
+  color: #1e40af;
+  flex-shrink: 0;
+}
+
+.smart-paste-bar__message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.smart-paste-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.smart-paste-bar__btn {
+  padding: 3px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: background-color 0.1s;
+}
+
+.smart-paste-bar__btn--primary {
+  background-color: #3b82f6;
+  color: #ffffff;
+}
+
+.smart-paste-bar__btn--primary:hover {
+  background-color: #2563eb;
+}
+
+.smart-paste-bar__btn--secondary {
+  background-color: #ffffff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.smart-paste-bar__btn--secondary:hover {
+  background-color: #f3f4f6;
+}
+
+.smart-paste-bar__btn--close {
+  background: none;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  padding: 2px 4px;
+}
+
+.smart-paste-bar__btn--close:hover {
+  color: #ef4444;
+}

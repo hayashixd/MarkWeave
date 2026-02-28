@@ -58,6 +58,10 @@ import { ImageDropPasteExtension } from '../../extensions/ImageDropPasteExtensio
 import { TEXT_TRANSFORM_COMMANDS } from '../../core/text-transform';
 import { BookmarkExtension } from '../../extensions/BookmarkExtension';
 import { WordCompleteExtension } from '../../extensions/WordCompleteExtension';
+import { SmartPasteBar } from '../SmartPaste/SmartPasteBar';
+import type { SmartPasteAskEvent } from '../../extensions/SmartPasteExtension';
+import { htmlToMarkdown } from '../../core/converter/smart-paste';
+import { markdownToTipTap as mdToTipTapForPaste } from '../../lib/markdown-to-tiptap';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -99,6 +103,9 @@ export function MarkdownEditor({
 
   // 文書統計ダイアログの状態
   const [textStatsVisible, setTextStatsVisible] = useState(false);
+
+  // スマートペースト ask モードの状態
+  const [smartPasteData, setSmartPasteData] = useState<SmartPasteAskEvent | null>(null);
 
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
@@ -253,6 +260,16 @@ export function MarkdownEditor({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // スマートペースト ask モードのイベントリスナー
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<SmartPasteAskEvent>).detail;
+      setSmartPasteData(detail);
+    };
+    window.addEventListener('smart-paste-ask', handler);
+    return () => window.removeEventListener('smart-paste-ask', handler);
   }, []);
 
   // Ctrl+0〜6 のカスタムイベントハンドラ
@@ -459,6 +476,28 @@ export function MarkdownEditor({
         <TextStatsDialog
           text={editor.state.doc.textContent}
           onClose={() => setTextStatsVisible(false)}
+        />
+      )}
+      {/* スマートペースト確認バー（ask モード） */}
+      {smartPasteData && editor && (
+        <SmartPasteBar
+          onMarkdown={() => {
+            const md = htmlToMarkdown(smartPasteData.html);
+            const doc = mdToTipTapForPaste(md);
+            if (doc.content && doc.content.length > 0) {
+              editor.commands.insertContent(
+                doc.content as unknown as Record<string, unknown>[],
+              );
+            }
+            setSmartPasteData(null);
+          }}
+          onPlainText={() => {
+            if (smartPasteData.plainText) {
+              editor.commands.insertContent(smartPasteData.plainText);
+            }
+            setSmartPasteData(null);
+          }}
+          onDismiss={() => setSmartPasteData(null)}
         />
       )}
       {mode === 'wysiwyg' ? (

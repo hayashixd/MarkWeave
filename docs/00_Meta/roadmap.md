@@ -167,9 +167,9 @@ Excelライクなテーブル操作を実現する。
 
 詳細設計: [smart-paste-design.md](./smart-paste-design.md)
 
-- [ ] `ask` モードの確認バー UI
-- [ ] 画像 data-URI の保存連携
-- [ ] 数式 LaTeX の Turndown カスタムルール
+- [x] `ask` モードの確認バー UI
+- [x] 画像 data-URI の保存連携
+- [x] 数式 LaTeX の Turndown カスタムルール
 
 ---
 

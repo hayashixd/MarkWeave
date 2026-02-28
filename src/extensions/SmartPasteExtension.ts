@@ -9,8 +9,7 @@
  *
  * Ctrl+Shift+V: 常にプレーンテキストとして貼り付け（Typora 互換）。
  *
- * ask モード: Phase 3 で確認 UI を実装予定。
- *   現時点では auto と同様に変換し、トーストで通知する。
+ * ask モード: 確認バー UI を表示してユーザーに選択させる。
  */
 
 import { Extension } from '@tiptap/core';
@@ -18,7 +17,15 @@ import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { htmlToMarkdown } from '../core/converter/smart-paste';
 import { markdownToTipTap } from '../lib/markdown-to-tiptap';
 import { useSettingsStore } from '../store/settingsStore';
-import { useToastStore } from '../store/toastStore';
+
+/**
+ * ask モードのペースト待機データを伝えるカスタムイベント
+ * TipTapEditor でリッスンして確認バーを表示する
+ */
+export interface SmartPasteAskEvent {
+  html: string;
+  plainText: string;
+}
 
 export const SmartPasteExtension = Extension.create({
   name: 'smartPaste',
@@ -54,7 +61,19 @@ export const SmartPasteExtension = Extension.create({
             const html = event.clipboardData?.getData('text/html');
             if (!html) return false;
 
-            // auto / ask モード: Markdown に変換して挿入
+            const plainText = event.clipboardData?.getData('text/plain') ?? '';
+
+            // ask モード: カスタムイベントを発行して確認バーを表示
+            if (smartPasteMode === 'ask') {
+              event.preventDefault();
+              const detail: SmartPasteAskEvent = { html, plainText };
+              window.dispatchEvent(
+                new CustomEvent('smart-paste-ask', { detail }),
+              );
+              return true;
+            }
+
+            // auto モード: Markdown に変換して挿入
             const md = htmlToMarkdown(html);
             const doc = markdownToTipTap(md);
 
@@ -62,13 +81,6 @@ export const SmartPasteExtension = Extension.create({
               editorInstance.commands.insertContent(
                 doc.content as unknown as Record<string, unknown>[],
               );
-            }
-
-            // ask モード: Phase 3 で確認 UI を実装するまでの暫定通知
-            if (smartPasteMode === 'ask') {
-              useToastStore
-                .getState()
-                .show('info', 'HTMLをMarkdownに変換して貼り付けました（確認UIはPhase 3で実装予定）');
             }
 
             return true;
