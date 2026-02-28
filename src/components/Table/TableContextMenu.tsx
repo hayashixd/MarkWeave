@@ -99,6 +99,24 @@ export function TableContextMenu({ editor, menu, onClose }: TableContextMenuProp
         danger
       />
       <MenuDivider />
+      <MenuSection label="列の配置" />
+      <MenuItem
+        label="左揃え"
+        onClick={() => run(() => editor.chain().setCellAttribute('style', 'text-align: left').run())}
+      />
+      <MenuItem
+        label="中央揃え"
+        onClick={() => run(() => editor.chain().setCellAttribute('style', 'text-align: center').run())}
+      />
+      <MenuItem
+        label="右揃え"
+        onClick={() => run(() => editor.chain().setCellAttribute('style', 'text-align: right').run())}
+      />
+      <MenuItem
+        label="配置をリセット"
+        onClick={() => run(() => editor.chain().setCellAttribute('style', null).run())}
+      />
+      <MenuDivider />
       <MenuItem
         label="テーブルを削除"
         onClick={() => run(() => editor.chain().deleteTable().run())}
