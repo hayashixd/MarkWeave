@@ -19,8 +19,10 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import type { Editor } from '@tiptap/react';
 import { TabBar } from '../tabs/TabBar';
 import { Sidebar } from '../sidebar/Sidebar';
+import type { SidebarTab } from '../sidebar/Sidebar';
 import { MarkdownEditor } from '../editor';
 import { PreferencesDialog } from '../preferences/PreferencesDialog';
 import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
@@ -36,9 +38,11 @@ import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
 import { writeFile } from '../../lib/tauri-commands';
 
 export function AppShell() {
-  // Phase 1 ではサイドバーはデフォルト非表示（機能がないため）
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('outline');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  // エディタインスタンスへの参照（アウトラインパネル等で使用）
+  const [currentEditor, setCurrentEditor] = useState<Editor | null>(null);
   const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab } =
     useTabStore();
 
@@ -199,6 +203,29 @@ export function AppShell() {
         }
         return;
       }
+
+      // Ctrl+Shift+L: サイドバー表示/非表示トグル
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'L') {
+        e.preventDefault();
+        setSidebarOpen((v) => !v);
+        return;
+      }
+
+      // Ctrl+Shift+1: アウトラインパネル表示
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === '!') {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('outline');
+        return;
+      }
+
+      // Ctrl+Shift+2: ファイルパネル表示
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === '@') {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('files');
+        return;
+      }
     };
 
     window.addEventListener('keydown', handler);
@@ -216,6 +243,9 @@ export function AppShell() {
         <Sidebar
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen((v) => !v)}
+          activeTab={sidebarTab}
+          onTabChange={setSidebarTab}
+          editor={currentEditor}
         />
 
         {/* エディタエリア */}
@@ -225,6 +255,7 @@ export function AppShell() {
               <MarkdownEditor
                 initialContent={activeTab.content}
                 onContentChange={handleContentChange}
+                onEditorReady={setCurrentEditor}
               />
             </EditorErrorBoundary>
           ) : (

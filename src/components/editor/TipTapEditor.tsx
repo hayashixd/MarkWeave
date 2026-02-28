@@ -17,6 +17,10 @@
  * Phase 2 対応要素:
  * - テーブル（Tab/Shift+Tab セル移動、行・列操作コンテキストメニュー）
  *
+ * Phase 3 対応要素:
+ * - 検索・置換（Ctrl+F / Ctrl+H）
+ * - アウトラインパネル（見出し抽出・ジャンプ）
+ *
  * CLAUDE.md 制約:
  * - IME 入力中の isComposing ガード
  * - パフォーマンスバジェット (入力レイテンシ < 16ms)
@@ -42,6 +46,8 @@ import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
 import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
+import { SearchExtension } from '../../extensions/SearchExtension';
+import { SearchBar } from '../Search/SearchBar';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -54,6 +60,8 @@ export interface EditorProps {
   readOnly?: boolean;
   /** プレースホルダーテキスト */
   placeholder?: string;
+  /** エディタインスタンス作成後のコールバック（外部からアクセスするため） */
+  onEditorReady?: (editor: ReturnType<typeof useEditor>) => void;
 }
 
 export function MarkdownEditor({
@@ -61,12 +69,17 @@ export function MarkdownEditor({
   onContentChange,
   readOnly = false,
   placeholder = 'ここに入力を始めてください...\n\nヒント: ツールバーのボタンや、# + スペースで見出し、- + スペースでリスト、> + スペースで引用を作成できます。',
+  onEditorReady,
 }: EditorProps) {
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
   const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+
+  // 検索バーの状態
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [showReplace, setShowReplace] = useState(false);
 
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
@@ -115,6 +128,7 @@ export function MarkdownEditor({
       TableHeaderWithStyle,
       TableDragExtension,
       SmartPasteExtension,
+      SearchExtension,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
@@ -165,6 +179,38 @@ export function MarkdownEditor({
   });
 
   const ime = useIMEComposition(editor);
+
+  // エディタ準備完了時にコールバック通知
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
+
+  // Ctrl+F / Ctrl+H ショートカット（検索バー表示）
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return;
+
+      // Ctrl+F: 検索バーを開く
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setSearchVisible(true);
+        setShowReplace(false);
+        return;
+      }
+
+      // Ctrl+H: 置換バーを開く
+      if ((e.ctrlKey || e.metaKey) && e.key === 'h' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        setSearchVisible(true);
+        setShowReplace(true);
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Ctrl+0〜6 のカスタムイベントハンドラ
   useEffect(() => {
@@ -337,10 +383,19 @@ export function MarkdownEditor({
       {mode === 'wysiwyg' ? (
         <div
           ref={editorWrapperRef}
-          className="flex-1 overflow-y-auto cursor-text"
+          className="flex-1 overflow-y-auto cursor-text relative"
           onClick={handleEditorAreaClick}
           onContextMenu={handleContextMenu}
         >
+          {/* 検索バー（フローティング） */}
+          {searchVisible && editor && (
+            <SearchBar
+              editor={editor}
+              showReplace={showReplace}
+              onClose={() => setSearchVisible(false)}
+              onToggleReplace={() => setShowReplace((v) => !v)}
+            />
+          )}
           <div className="max-w-[800px] mx-auto px-12 py-8">
             <EditorContent
               editor={editor}

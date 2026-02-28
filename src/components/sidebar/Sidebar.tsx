@@ -1,16 +1,40 @@
 /**
- * サイドバーコンポーネント (Phase 1: 最小版)
+ * サイドバーコンポーネント
  *
- * Phase 1 ではファイルツリーのプレースホルダーのみ。
- * Phase 3 でフォルダを開く機能・ファイルツリー表示を実装予定。
+ * app-shell-design.md §7 に準拠:
+ * - タブ切替でアウトライン / ファイルパネルを表示
+ * - Ctrl+Shift+1 でアウトライン
+ * - Ctrl+Shift+L でサイドバー表示/非表示トグル
+ *
+ * Phase 3 追加:
+ * - アウトラインパネル（見出しナビゲーション）
  */
+
+import { useState } from 'react';
+import type { Editor } from '@tiptap/react';
+import { OutlinePanel } from '../Outline/OutlinePanel';
+
+export type SidebarTab = 'outline' | 'files';
 
 interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
+  activeTab?: SidebarTab;
+  onTabChange?: (tab: SidebarTab) => void;
+  editor?: Editor | null;
 }
 
-export function Sidebar({ isOpen, onToggle }: SidebarProps) {
+export function Sidebar({
+  isOpen,
+  onToggle,
+  activeTab: controlledTab,
+  onTabChange,
+  editor = null,
+}: SidebarProps) {
+  const [internalTab, setInternalTab] = useState<SidebarTab>('outline');
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = onTabChange ?? setInternalTab;
+
   if (!isOpen) {
     return (
       <div className="w-8 flex-shrink-0 border-r border-gray-200 bg-gray-50 flex items-start pt-2 justify-center">
@@ -30,15 +54,41 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   }
 
   return (
-    <aside id="app-sidebar" className="w-60 flex-shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col" aria-label="ファイルサイドバー">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
-        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-          ファイル
-        </span>
+    <aside
+      id="app-sidebar"
+      className="w-60 flex-shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col"
+      aria-label="サイドバー"
+    >
+      {/* ヘッダー: タブ切替 + 閉じるボタン */}
+      <div className="flex items-center justify-between border-b border-gray-200">
+        <div className="flex" role="tablist" aria-label="サイドバーパネル">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'outline'}
+            aria-controls="sidebar-panel-outline"
+            className={`sidebar-tab ${activeTab === 'outline' ? 'sidebar-tab--active' : ''}`}
+            onClick={() => setActiveTab('outline')}
+            title="アウトライン (Ctrl+Shift+1)"
+          >
+            アウトライン
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'files'}
+            aria-controls="sidebar-panel-files"
+            className={`sidebar-tab ${activeTab === 'files' ? 'sidebar-tab--active' : ''}`}
+            onClick={() => setActiveTab('files')}
+            title="ファイル (Ctrl+Shift+2)"
+          >
+            ファイル
+          </button>
+        </div>
         <button
           type="button"
           onClick={onToggle}
-          className="text-gray-400 hover:text-gray-600 text-sm"
+          className="text-gray-400 hover:text-gray-600 text-sm px-2 py-1"
           aria-label="サイドバーを閉じる"
           aria-expanded
           aria-controls="app-sidebar"
@@ -47,9 +97,30 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           <span aria-hidden="true">◀</span>
         </button>
       </div>
-      <div className="flex-1 p-3 text-sm text-gray-400">
-        <p>フォルダを開いてください</p>
-        <p className="text-xs mt-2">Ctrl+Shift+O</p>
+
+      {/* パネルコンテンツ */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {activeTab === 'outline' && (
+          <div
+            id="sidebar-panel-outline"
+            role="tabpanel"
+            aria-labelledby="tab-outline"
+          >
+            <OutlinePanel editor={editor} />
+          </div>
+        )}
+        {activeTab === 'files' && (
+          <div
+            id="sidebar-panel-files"
+            role="tabpanel"
+            aria-labelledby="tab-files"
+          >
+            <div className="p-3 text-sm text-gray-400">
+              <p>フォルダを開いてください</p>
+              <p className="text-xs mt-2">Ctrl+Shift+O</p>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );
