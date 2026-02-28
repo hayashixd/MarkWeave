@@ -19,6 +19,11 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\""
   },
   "dependencies": {
+    "@codemirror/commands": "^6.10.2",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.2",
+    "@codemirror/state": "^6.5.4",
+    "@codemirror/view": "^6.39.15",
     "@tailwindcss/typography": "^0.5.19",
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-dialog": "^2.2.0",

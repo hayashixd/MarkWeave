@@ -62,6 +62,8 @@ import { SmartPasteBar } from '../SmartPaste/SmartPasteBar';
 import type { SmartPasteAskEvent } from '../../extensions/SmartPasteExtension';
 import { htmlToMarkdown } from '../../core/converter/smart-paste';
 import { markdownToTipTap as mdToTipTapForPaste } from '../../lib/markdown-to-tiptap';
+import { SourceEditor } from './SourceEditor';
+import { useToastStore } from '../../store/toastStore';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -375,10 +377,9 @@ export function MarkdownEditor({
     return () => window.removeEventListener('keydown', handler);
   }, [toggleMode]);
 
-  // ソースモードでのテキスト変更
-  const handleSourceChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const value = e.target.value;
+  // ソースモードでのテキスト変更（CodeMirror から直接文字列を受け取る）
+  const handleSourceTextChange = useCallback(
+    (value: string) => {
       setSourceText(value);
       onContentChangeRef.current?.(value);
     },
@@ -430,6 +431,24 @@ export function MarkdownEditor({
       setTableMenu({ visible: true, x: e.clientX, y: e.clientY });
     },
     [editor],
+  );
+
+  // WYSIWYG モードでの Alt+ドラッグ検知
+  // editor-ux-design.md §11.3: ステータスバーにツールチップ表示
+  const rectSelectNotifiedRef = useRef(false);
+  const handleWysiwygMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (e.altKey && !rectSelectNotifiedRef.current) {
+        rectSelectNotifiedRef.current = true;
+        useToastStore.getState().show(
+          'info',
+          '矩形選択はソースモード（Ctrl+/）でのみ利用可能です',
+        );
+        // 3秒後にフラグをリセット（連続通知を防止）
+        setTimeout(() => { rectSelectNotifiedRef.current = false; }, 3000);
+      }
+    },
+    [],
   );
 
   if (!editor) return null;
@@ -506,6 +525,7 @@ export function MarkdownEditor({
           className="flex-1 overflow-y-auto cursor-text relative"
           onClick={handleEditorAreaClick}
           onContextMenu={handleContextMenu}
+          onMouseDown={handleWysiwygMouseDown}
         >
           {/* 検索バー（フローティング） */}
           {searchVisible && editor && (
@@ -524,12 +544,10 @@ export function MarkdownEditor({
           </div>
         </div>
       ) : (
-        <textarea
-          className="flex-1 w-full px-8 py-4 font-mono text-sm bg-gray-50 resize-none focus:outline-none"
+        <SourceEditor
           value={sourceText}
-          onChange={handleSourceChange}
+          onChange={handleSourceTextChange}
           readOnly={readOnly}
-          spellCheck={false}
         />
       )}
       <EditorHandle setMarkdown={setMarkdown} getMarkdown={getMarkdown} />
