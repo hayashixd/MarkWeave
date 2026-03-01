@@ -1,13 +1,13 @@
 /**
  * html-commands.ts
  *
- * HTML編集モード固有のProseMirrorコマンド群。
+ * Phase 5: HTML 編集モード固有のコマンドヘルパー。
  *
- * Markdown編集と共通のコマンド（太字・見出し等）は text-commands.ts / block-commands.ts を参照。
- * ここではHTMLのみに存在する操作を定義する。
+ * 実際のコマンドは TipTap 拡張 (src/extensions/HtmlExtensions.ts) で定義されている。
+ * このモジュールは TipTap Editor インスタンスに対するヘルパー関数を提供する。
  */
 
-import type { Command } from 'prosemirror-state';
+import type { Editor } from '@tiptap/core';
 
 // ---------------------------------------------------------------------------
 // インラインスタイルコマンド
@@ -15,70 +15,51 @@ import type { Command } from 'prosemirror-state';
 
 /**
  * 選択テキストの文字色を設定する。
- * <span style="color: {color}"> を適用する。
- *
- * @param color - CSS color値（例: '#ff0000', 'red'）
  */
-export function setTextColor(color: string): Command {
-  // TODO: ProseMirrorのmarkを使ってspanにstyle属性を付与
-  void color;
-  return (_state, _dispatch) => false;
+export function setTextColor(editor: Editor, color: string): boolean {
+  return (editor.commands as any).setTextColor(color);
 }
 
 /**
  * 選択テキストの背景色を設定する。
- * <span style="background-color: {color}"> を適用する。
- *
- * @param color - CSS color値
  */
-export function setBackgroundColor(color: string): Command {
-  void color;
-  return (_state, _dispatch) => false;
+export function setBackgroundColor(editor: Editor, color: string): boolean {
+  return (editor.commands as any).setBackgroundColor(color);
 }
 
 /**
  * 選択テキストのフォントサイズを設定する。
- * <span style="font-size: {size}"> を適用する。
- *
- * @param size - CSSフォントサイズ（例: '16px', '1.2em'）
  */
-export function setFontSize(size: string): Command {
-  void size;
-  return (_state, _dispatch) => false;
+export function setFontSize(editor: Editor, size: string): boolean {
+  return (editor.commands as any).setFontSize(size);
 }
 
 /**
- * テキストに <mark> タグを付与してハイライトする。
+ * テキストのハイライトをトグルする。
  */
-export const toggleMark: Command = (_state, _dispatch) => {
-  // TODO: <mark> の toggle
-  return false;
-};
+export function toggleHighlight(editor: Editor): boolean {
+  return (editor.commands as any).toggleHighlight();
+}
 
 // ---------------------------------------------------------------------------
 // ブロックコマンド（HTML固有）
 // ---------------------------------------------------------------------------
 
 /**
- * カーソル位置に <div> ブロックを挿入する。
- *
- * @param className - 付与するクラス名（省略可）
+ * div ブロックを挿入する。
  */
-export function insertDiv(className?: string): Command {
-  void className;
-  return (_state, _dispatch) => false;
+export function insertDiv(editor: Editor, className?: string): boolean {
+  return (editor.commands as any).insertDivBlock({ class: className });
 }
 
 /**
- * カーソル位置にセマンティック要素を挿入する。
- *
- * @param tagName - 'section' | 'article' | 'header' | 'footer' | 'nav'
+ * セマンティック要素を挿入する。
  */
 export function insertSemanticBlock(
-  tagName: 'section' | 'article' | 'header' | 'footer' | 'nav'
-): Command {
-  void tagName;
-  return (_state, _dispatch) => false;
+  editor: Editor,
+  tagName: 'section' | 'article' | 'header' | 'footer' | 'nav',
+): boolean {
+  return (editor.commands as any).insertSemanticBlock(tagName);
 }
 
 // ---------------------------------------------------------------------------
@@ -88,11 +69,8 @@ export function insertSemanticBlock(
 export type TextAlign = 'left' | 'center' | 'right' | 'justify';
 
 /**
- * 現在のブロックにテキスト配置スタイルを設定する。
- *
- * @param align - 配置方向
+ * テキスト配置を設定する。
  */
-export function setTextAlign(align: TextAlign): Command {
-  void align;
-  return (_state, _dispatch) => false;
+export function setTextAlign(editor: Editor, align: TextAlign): boolean {
+  return (editor.commands as any).setTextAlign(align);
 }

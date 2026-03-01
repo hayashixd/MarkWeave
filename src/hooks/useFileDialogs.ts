@@ -21,9 +21,14 @@ const MARKDOWN_FILTER = {
   extensions: ['md', 'markdown'],
 };
 
+const HTML_FILTER = {
+  name: 'HTML',
+  extensions: ['html', 'htm'],
+};
+
 const ALL_SUPPORTED_FILTER = {
   name: 'サポートされているファイル',
-  extensions: ['md', 'markdown', 'html'],
+  extensions: ['md', 'markdown', 'html', 'htm'],
 };
 
 /**
@@ -36,7 +41,7 @@ export function useOpenFileDialog() {
   return useCallback(async () => {
     const selected = await open({
       multiple: true,
-      filters: [ALL_SUPPORTED_FILTER, MARKDOWN_FILTER],
+      filters: [ALL_SUPPORTED_FILTER, MARKDOWN_FILTER, HTML_FILTER],
     });
 
     if (!selected) return;
@@ -63,17 +68,20 @@ export function useSaveAsDialog() {
     const tab = getActiveTab();
     if (!tab) return;
 
+    // Phase 5: ファイル種別に応じたフィルターを使用
+    const isHtml = tab.fileType === 'html';
     const selectedPath = await save({
-      filters: [MARKDOWN_FILTER],
+      filters: isHtml ? [HTML_FILTER, ALL_SUPPORTED_FILTER] : [MARKDOWN_FILTER, ALL_SUPPORTED_FILTER],
       defaultPath: tab.filePath ?? undefined,
     });
 
     if (!selectedPath) return; // キャンセル
 
-    // 拡張子が付いていない場合は .md を自動付与
-    const filePath = selectedPath.match(/\.(md|markdown|html)$/i)
+    // 拡張子が付いていない場合は適切な拡張子を自動付与
+    const defaultExt = isHtml ? '.html' : '.md';
+    const filePath = selectedPath.match(/\.(md|markdown|html|htm)$/i)
       ? selectedPath
-      : `${selectedPath}.md`;
+      : `${selectedPath}${defaultExt}`;
 
     try {
       await writeFile(filePath, tab.content);

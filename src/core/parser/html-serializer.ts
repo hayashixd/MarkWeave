@@ -3,11 +3,12 @@
  *
  * 内部AST（hast互換）をHTML文字列にシリアライズするモジュール。
  *
- * 使用ライブラリ:
- *   - rehype-stringify: hast → HTML文字列変換
- *   - rehype-format:    出力HTMLの整形（インデント等）
+ * Phase 5: tiptapToHtml (src/lib/tiptap-to-html.ts) が主要シリアライザ。
+ * このモジュールは hast → HTML 変換が必要な場合に使用する。
  */
 
+import { unified } from 'unified';
+import rehypeStringify from 'rehype-stringify';
 import type { Root } from 'hast';
 
 export interface HtmlSerializeOptions {
@@ -28,22 +29,16 @@ const defaultOptions: HtmlSerializeOptions = {
  * @param ast     - 内部AST（hast Root）
  * @param options - シリアライズオプション
  * @returns HTML文字列
- *
- * @example
- * const html = await serializeHtml(ast);
  */
-export async function serializeHtml(
+export function serializeHtml(
   ast: Root,
   options: Partial<HtmlSerializeOptions> = {}
-): Promise<string> {
+): string {
   const _opts = { ...defaultOptions, ...options };
-  // TODO: rehype-stringify を使ってhastをHTML文字列に変換
-  // const { unified } = await import('unified');
-  // const rehypeStringify = (await import('rehype-stringify')).default;
-  // const rehypeFormat = (await import('rehype-format')).default;
-  // let processor = unified().use(rehypeStringify);
-  // if (opts.format) processor = processor.use(rehypeFormat);
-  // return processor.stringify(ast);
-  void ast;
-  throw new Error('serializeHtml: not implemented yet');
+
+  const processor = unified().use(rehypeStringify, {
+    closeSelfClosing: _opts.selfClosing,
+  });
+
+  return processor.stringify(ast);
 }

@@ -16,6 +16,7 @@ describe('TabBar accessibility', () => {
           savedContent: '',
           encoding: 'UTF-8',
           lineEnding: 'LF',
+          fileType: 'markdown',
         },
         {
           id: 'tab-2',
@@ -26,6 +27,7 @@ describe('TabBar accessibility', () => {
           savedContent: '',
           encoding: 'UTF-8',
           lineEnding: 'LF',
+          fileType: 'markdown',
         },
       ],
       activeTabId: 'tab-1',

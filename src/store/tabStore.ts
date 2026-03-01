@@ -14,16 +14,18 @@ import { create } from 'zustand';
 
 export type FileEncoding = 'UTF-8' | 'UTF-8 BOM' | 'Shift-JIS' | 'EUC-JP';
 export type LineEnding = 'LF' | 'CRLF';
+export type FileType = 'markdown' | 'html';
 
 export interface TabState {
   id: string;
   filePath: string | null; // null = 新規未保存ファイル
   fileName: string;
   isDirty: boolean;
-  content: string; // 現在のエディタ内容 (Markdown)
+  content: string; // 現在のエディタ内容 (Markdown or HTML)
   savedContent: string; // 最後に保存した内容
   encoding: FileEncoding; // ファイルの文字コード
   lineEnding: LineEnding; // 改行コード
+  fileType: FileType; // ファイル種別（Phase 5: HTML WYSIWYG 編集）
 }
 
 interface TabStore {
@@ -31,7 +33,7 @@ interface TabStore {
   activeTabId: string | null;
 
   // タブ操作
-  addTab: (tab: Omit<TabState, 'id' | 'isDirty' | 'encoding' | 'lineEnding'> & { encoding?: FileEncoding; lineEnding?: LineEnding }) => string;
+  addTab: (tab: Omit<TabState, 'id' | 'isDirty' | 'encoding' | 'lineEnding' | 'fileType'> & { encoding?: FileEncoding; lineEnding?: LineEnding; fileType?: FileType }) => string;
   removeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
 
@@ -89,6 +91,10 @@ export const useTabStore = create<TabStore>((set, get) => ({
       set({ _untitledCounter: counter });
     }
 
+    // ファイル拡張子からファイル種別を自動判定
+    const detectedFileType: FileType = tabData.fileType ??
+      detectFileType(tabData.filePath ?? fileName);
+
     const newTab: TabState = {
       id,
       filePath: tabData.filePath,
@@ -98,6 +104,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
       savedContent: tabData.savedContent,
       encoding: tabData.encoding ?? 'UTF-8',
       lineEnding: tabData.lineEnding ?? 'LF',
+      fileType: detectedFileType,
     };
 
     set({
@@ -209,3 +216,15 @@ export const useTabStore = create<TabStore>((set, get) => ({
     return get().tabs.find((t) => t.filePath === filePath);
   },
 }));
+
+/**
+ * ファイルパスまたはファイル名からファイル種別を判定する。
+ * Phase 5: 拡張子による編集モード自動切替
+ */
+function detectFileType(pathOrName: string): FileType {
+  const ext = pathOrName.split('.').pop()?.toLowerCase();
+  if (ext === 'html' || ext === 'htm') {
+    return 'html';
+  }
+  return 'markdown';
+}

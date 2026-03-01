@@ -17,7 +17,7 @@ import { useOpenFileAsTab } from './useOpenFileAsTab';
 import { useToastStore } from '../store/toastStore';
 import { getPathInfo } from '../lib/tauri-commands';
 
-const SUPPORTED_EXTENSIONS = ['md', 'markdown', 'html'];
+const SUPPORTED_EXTENSIONS = ['md', 'markdown', 'html', 'htm'];
 const MAX_DROP_FILES = 10;
 
 export function useDropListener() {

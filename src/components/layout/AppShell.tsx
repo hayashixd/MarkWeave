@@ -24,6 +24,7 @@ import { TabBar } from '../tabs/TabBar';
 import { Sidebar } from '../sidebar/Sidebar';
 import type { SidebarTab } from '../sidebar/Sidebar';
 import { MarkdownEditor } from '../editor';
+import { HtmlEditor } from '../editor';
 import { PreferencesDialog } from '../preferences/PreferencesDialog';
 import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
 import { ToastContainer } from '../toast/ToastContainer';
@@ -286,15 +287,23 @@ export function AppShell() {
           onOpenFolder={openFolderDialog}
         />
 
-        {/* エディタエリア */}
+        {/* エディタエリア - Phase 5: ファイル種別に応じてエディタを切替 */}
         <div className="flex-1 min-w-0 flex flex-col">
           {activeTab ? (
             <EditorErrorBoundary key={activeTab.id}>
-              <MarkdownEditor
-                initialContent={activeTab.content}
-                onContentChange={handleContentChange}
-                onEditorReady={setCurrentEditor}
-              />
+              {activeTab.fileType === 'html' ? (
+                <HtmlEditor
+                  initialContent={activeTab.content}
+                  onContentChange={handleContentChange}
+                  onEditorReady={setCurrentEditor}
+                />
+              ) : (
+                <MarkdownEditor
+                  initialContent={activeTab.content}
+                  onContentChange={handleContentChange}
+                  onEditorReady={setCurrentEditor}
+                />
+              )}
             </EditorErrorBoundary>
           ) : (
             <EmptyState onNewTab={handleNewTab} onOpenFile={() => openFileDialogRef.current()} />
@@ -572,7 +581,7 @@ function StatusBar({ tab }: { tab: ReturnType<typeof useTabStore.getState>['tabs
           </div>
         )}
 
-        <span>Markdown</span>
+        <span>{tab?.fileType === 'html' ? 'HTML' : 'Markdown'}</span>
       </div>
     </div>
   );
