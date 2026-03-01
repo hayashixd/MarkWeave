@@ -104,6 +104,7 @@ export function ExportDialog({ markdown, currentFilePath, onClose }: ExportDialo
       <div
         ref={dialogRef}
         role="dialog"
+        aria-modal="true"
         aria-label="HTML にエクスポート"
         className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4"
       >

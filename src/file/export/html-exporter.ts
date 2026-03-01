@@ -29,18 +29,26 @@ export async function exportToHtml(
   outputPath: string,
   options: Partial<MdToHtmlOptions> = {}
 ): Promise<ExportResult> {
-  // タイトルが未設定の場合は Markdown から抽出
-  if (!options.title) {
-    options.title = extractTitle(markdown) ?? 'Document';
-  }
+  // options を変異させないようコピーして title を補完
+  const opts: Partial<MdToHtmlOptions> = {
+    ...options,
+    title: options.title || extractTitle(markdown) || 'Document',
+  };
 
-  const html = await convertMdToHtml(markdown, options);
+  const html = await convertMdToHtml(markdown, opts);
+  const sizeBytes = new TextEncoder().encode(html).byteLength;
 
   // Tauri plugin-fs でファイルに書き出し
+  let tauriAvailable = false;
   try {
     const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+    tauriAvailable = true;
     await writeTextFile(outputPath, html);
-  } catch {
+  } catch (err) {
+    if (tauriAvailable) {
+      // Tauri は利用可能だがファイル書き込みに失敗 → エラーを伝搬
+      throw err;
+    }
     // Tauri 外（テスト・ブラウザ開発）ではダウンロードにフォールバック
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -50,9 +58,6 @@ export async function exportToHtml(
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  const encoder = new TextEncoder();
-  const sizeBytes = encoder.encode(html).byteLength;
 
   return { filePath: outputPath, sizeBytes };
 }

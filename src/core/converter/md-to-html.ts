@@ -29,11 +29,11 @@ import rehypeKatex from 'rehype-katex';
 import rehypeSlug from 'rehype-slug';
 import rehypeStringify from 'rehype-stringify';
 import juice from 'juice';
-import { loadThemeCss, loadHighlightCss, loadKatexCss } from './theme-loader';
+import { type ExportTheme, loadThemeCss, loadHighlightCss, loadKatexCss } from './theme-loader';
 
 export interface MdToHtmlOptions {
   /** エクスポート用テーマ名 */
-  theme: 'github' | 'document';
+  theme: ExportTheme;
   /** シンタックスハイライトを有効にするか */
   highlight: boolean;
   /** 数式レンダリングを有効にするか */
@@ -71,31 +71,27 @@ export async function convertMdToHtml(
 ): Promise<string> {
   const opts = { ...defaultOptions, ...options };
 
-  // unified パイプラインを組み立て
+  // unified パイプラインを構築
+  // 注: unified の型は .use() チェーンごとに型パラメータが変化するため、
+  // 条件付きプラグイン適用では any 経由の再代入が標準パターン。
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let processor: any = unified()
+  let pipeline: any = unified()
     .use(remarkParse)
     .use(remarkGfm);
 
-  if (opts.math) {
-    processor = processor.use(remarkMath);
-  }
+  if (opts.math) pipeline = pipeline.use(remarkMath);
 
-  processor = processor.use(remarkRehype, { allowDangerousHtml: false });
-  processor = processor.use(rehypeSlug);
+  pipeline = pipeline
+    .use(remarkRehype, { allowDangerousHtml: false })
+    .use(rehypeSlug);
 
-  if (opts.highlight) {
-    processor = processor.use(rehypeHighlight, { detect: true });
-  }
+  if (opts.highlight) pipeline = pipeline.use(rehypeHighlight, { detect: true });
+  if (opts.math) pipeline = pipeline.use(rehypeKatex);
 
-  if (opts.math) {
-    processor = processor.use(rehypeKatex);
-  }
-
-  processor = processor.use(rehypeStringify);
+  pipeline = pipeline.use(rehypeStringify);
 
   // Markdown → HTML コンテンツ変換
-  const result = await processor.process(markdown);
+  const result = await pipeline.process(markdown);
   const contentHtml = String(result);
 
   // HTML テンプレートに注入

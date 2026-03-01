@@ -12,12 +12,25 @@
  * - Ctrl+Alt+↑/↓: マルチカーソル追加
  */
 
-import { useEffect, useRef, useCallback } from 'react';
-import { EditorView, keymap, rectangularSelection, crosshairCursor, drawSelection, highlightActiveLine, lineNumbers } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { useEffect, useRef } from 'react';
+import {
+  EditorView,
+  keymap,
+  rectangularSelection,
+  crosshairCursor,
+  drawSelection,
+  highlightActiveLine,
+  lineNumbers,
+} from '@codemirror/view';
+import { Compartment, EditorState } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching } from '@codemirror/language';
+import {
+  syntaxHighlighting,
+  defaultHighlightStyle,
+  indentOnInput,
+  bracketMatching,
+} from '@codemirror/language';
 import { useSettingsStore } from '../../store/settingsStore';
 
 export interface SourceEditorProps {
@@ -29,6 +42,42 @@ export interface SourceEditorProps {
   readOnly?: boolean;
 }
 
+// Compartment インスタンス（動的に再構成可能なエクステンション領域）
+const tabSizeCompartment = new Compartment();
+const lineNumbersCompartment = new Compartment();
+const readOnlyCompartment = new Compartment();
+const wordWrapCompartment = new Compartment();
+const fontThemeCompartment = new Compartment();
+
+function buildFontTheme(fontSize: number, fontFamily: string) {
+  return EditorView.theme({
+    '&': {
+      height: '100%',
+      fontSize: `${fontSize}px`,
+    },
+    '.cm-content': {
+      fontFamily:
+        fontFamily ||
+        'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
+      padding: '16px 0',
+    },
+    '.cm-gutters': {
+      backgroundColor: '#f9fafb',
+      borderRight: '1px solid #e5e7eb',
+      color: '#9ca3af',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: '#f3f4f6',
+    },
+    '&.cm-focused .cm-cursor': {
+      borderLeftColor: '#1f2937',
+    },
+    '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+      backgroundColor: '#dbeafe',
+    },
+  });
+}
+
 export function SourceEditor({ value, onChange, readOnly = false }: SourceEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -36,9 +85,10 @@ export function SourceEditor({ value, onChange, readOnly = false }: SourceEditor
   onChangeRef.current = onChange;
 
   const { settings } = useSettingsStore();
-  const { sourceTabSize, showLineNumbers } = settings.editor;
+  const { sourceTabSize, showLineNumbers: showLn, wordWrap } = settings.editor;
+  const { codeBlockFontFamily, codeBlockFontSize } = settings.appearance;
 
-  // エディタの初期化
+  // エディタの初期化（一度だけ実行）
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -47,8 +97,6 @@ export function SourceEditor({ value, onChange, readOnly = false }: SourceEditor
         onChangeRef.current(update.state.doc.toString());
       }
     });
-
-    const tabSize = EditorState.tabSize.of(sourceTabSize);
 
     const extensions = [
       // 基本拡張
@@ -69,61 +117,22 @@ export function SourceEditor({ value, onChange, readOnly = false }: SourceEditor
       // キーマップ（Ctrl+F/H を除外してアプリ側の検索 UI に委譲）
       keymap.of([
         ...defaultKeymap.filter(
-          (binding) =>
-            binding.key !== 'Mod-f' &&
-            binding.key !== 'Mod-h',
+          (binding) => binding.key !== 'Mod-f' && binding.key !== 'Mod-h',
         ),
         ...historyKeymap,
         indentWithTab,
       ]),
 
-      // タブサイズ
-      tabSize,
+      // 動的再構成可能な設定（Compartment）
+      tabSizeCompartment.of(EditorState.tabSize.of(sourceTabSize)),
+      lineNumbersCompartment.of(showLn ? lineNumbers() : []),
+      readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
+      wordWrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
+      fontThemeCompartment.of(buildFontTheme(codeBlockFontSize, codeBlockFontFamily)),
 
       // テキスト変更リスナー
       updateListener,
-
-      // 読み取り専用
-      EditorState.readOnly.of(readOnly),
-
-      // テーマ（基本スタイル）
-      EditorView.theme({
-        '&': {
-          height: '100%',
-          fontSize: '14px',
-        },
-        '.cm-content': {
-          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace',
-          padding: '16px 0',
-        },
-        '.cm-gutters': {
-          backgroundColor: '#f9fafb',
-          borderRight: '1px solid #e5e7eb',
-          color: '#9ca3af',
-        },
-        '.cm-activeLineGutter': {
-          backgroundColor: '#f3f4f6',
-        },
-        '&.cm-focused .cm-cursor': {
-          borderLeftColor: '#1f2937',
-        },
-        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-          backgroundColor: '#dbeafe',
-        },
-        // 矩形選択時のスタイル
-        '.cm-selectionBackground': {
-          backgroundColor: '#dbeafe !important',
-        },
-      }),
-
-      // ワードラップ
-      ...(settings.editor.wordWrap ? [EditorView.lineWrapping] : []),
     ];
-
-    // 行番号表示
-    if (showLineNumbers) {
-      extensions.unshift(lineNumbers());
-    }
 
     const state = EditorState.create({
       doc: value,
@@ -141,9 +150,43 @@ export function SourceEditor({ value, onChange, readOnly = false }: SourceEditor
       view.destroy();
       viewRef.current = null;
     };
-    // 初期化は一度だけ実行する
+    // 初期化は一度だけ。設定変更は Compartment 経由で反映する。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // --- 設定変更を Compartment で動的に反映 ---
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: tabSizeCompartment.reconfigure(EditorState.tabSize.of(sourceTabSize)),
+    });
+  }, [sourceTabSize]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: lineNumbersCompartment.reconfigure(showLn ? lineNumbers() : []),
+    });
+  }, [showLn]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(readOnly)),
+    });
+  }, [readOnly]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: wordWrapCompartment.reconfigure(wordWrap ? EditorView.lineWrapping : []),
+    });
+  }, [wordWrap]);
+
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: fontThemeCompartment.reconfigure(
+        buildFontTheme(codeBlockFontSize, codeBlockFontFamily),
+      ),
+    });
+  }, [codeBlockFontSize, codeBlockFontFamily]);
 
   // 外部から value が変わった場合にエディタを同期
   useEffect(() => {
@@ -162,20 +205,10 @@ export function SourceEditor({ value, onChange, readOnly = false }: SourceEditor
     }
   }, [value]);
 
-  // Ctrl+/ によるモード切替はアプリレイヤーで処理するため、
-  // CodeMirror には渡さない（keyboard-shortcuts.md §2-2 準拠）
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
-      // CodeMirror に伝播させない（アプリの GlobalKeyHandler で処理される）
-      return;
-    }
-  }, []);
-
   return (
     <div
       ref={containerRef}
       className="flex-1 w-full bg-gray-50 overflow-auto source-editor"
-      onKeyDown={handleKeyDown}
       data-testid="source-editor"
     />
   );
