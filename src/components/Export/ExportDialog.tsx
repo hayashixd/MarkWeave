@@ -5,8 +5,9 @@
  * テーマ選択、TOC 生成、CSS インライン化、数式レンダリングの各オプションを提供する。
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { MdToHtmlOptions } from '../../core/converter/md-to-html';
+import { themeList } from '../../core/converter/theme-loader';
 import { exportToHtml } from '../../file/export/html-exporter';
 import { useToastStore } from '../../store/toastStore';
 
@@ -28,6 +29,11 @@ export function ExportDialog({ markdown, currentFilePath, onClose }: ExportDialo
   const [exporting, setExporting] = useState(false);
 
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  const selectedThemeInfo = useMemo(
+    () => themeList.find((t) => t.id === theme) ?? themeList[0],
+    [theme],
+  );
 
   // Esc キーでダイアログを閉じる
   useEffect(() => {
@@ -106,7 +112,7 @@ export function ExportDialog({ markdown, currentFilePath, onClose }: ExportDialo
         role="dialog"
         aria-modal="true"
         aria-label="HTML にエクスポート"
-        className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4"
+        className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
@@ -126,42 +132,20 @@ export function ExportDialog({ markdown, currentFilePath, onClose }: ExportDialo
           {/* テーマ選択 */}
           <fieldset>
             <legend className="text-sm font-medium text-gray-700 mb-2">テーマ</legend>
-            <div className="space-y-1.5">
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="theme"
-                  value="github"
-                  checked={theme === 'github'}
-                  onChange={() => setTheme('github')}
-                  className="accent-blue-600"
+            <div className="space-y-2">
+              {themeList.map((t) => (
+                <ThemeCard
+                  key={t.id}
+                  info={t}
+                  selected={theme === t.id}
+                  onSelect={() => setTheme(t.id)}
                 />
-                GitHub スタイル
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="theme"
-                  value="document"
-                  checked={theme === 'document'}
-                  onChange={() => setTheme('document')}
-                  className="accent-blue-600"
-                />
-                ドキュメントスタイル（書籍風）
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="theme"
-                  value="presentation"
-                  checked={theme === 'presentation'}
-                  onChange={() => setTheme('presentation')}
-                  className="accent-blue-600"
-                />
-                プレゼンテーションスタイル
-              </label>
+              ))}
             </div>
           </fieldset>
+
+          {/* テーマプレビュー */}
+          <ThemePreview themeInfo={selectedThemeInfo} />
 
           {/* オプション */}
           <fieldset>
@@ -208,6 +192,126 @@ export function ExportDialog({ markdown, currentFilePath, onClose }: ExportDialo
           >
             {exporting ? 'エクスポート中...' : 'エクスポート'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** テーマ選択カード */
+function ThemeCard({
+  info,
+  selected,
+  onSelect,
+}: {
+  info: (typeof themeList)[number];
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+        selected
+          ? 'border-blue-500 bg-blue-50'
+          : 'border-gray-200 hover:border-gray-300 bg-white'
+      }`}
+    >
+      <input
+        type="radio"
+        name="theme"
+        value={info.id}
+        checked={selected}
+        onChange={onSelect}
+        className="accent-blue-600 mt-0.5"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block w-3 h-3 rounded-full flex-shrink-0"
+            style={{ backgroundColor: info.accentColor }}
+            aria-hidden="true"
+          />
+          <span className="text-sm font-medium text-gray-900">{info.label}</span>
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{info.description}</p>
+      </div>
+    </label>
+  );
+}
+
+/** 選択テーマのミニプレビュー */
+function ThemePreview({ themeInfo }: { themeInfo: (typeof themeList)[number] }) {
+  const isPresentation = themeInfo.id === 'presentation';
+  const isDocument = themeInfo.id === 'document';
+
+  return (
+    <div className="rounded-lg border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-200">
+        <span className="text-xs text-gray-500 font-medium">プレビュー</span>
+        <span className="text-xs text-gray-400">{themeInfo.fontHint}</span>
+      </div>
+      <div
+        className="p-4"
+        style={{
+          backgroundColor: '#ffffff',
+          fontFamily: isDocument
+            ? "Georgia, 'Noto Serif CJK JP', serif"
+            : "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        }}
+      >
+        {/* 見出し */}
+        <div
+          style={{
+            fontSize: isPresentation ? 18 : isDocument ? 16 : 15,
+            fontWeight: 700,
+            color: themeInfo.headingColor,
+            borderBottom: `${isPresentation ? 3 : isDocument ? 2 : 1}px solid ${themeInfo.headingColor}`,
+            paddingBottom: 4,
+            marginBottom: 8,
+            textAlign: isPresentation || isDocument ? 'center' : undefined,
+          }}
+        >
+          Sample Heading
+        </div>
+        {/* 本文 */}
+        <div
+          style={{
+            fontSize: isPresentation ? 12 : 11,
+            lineHeight: 1.6,
+            color: isDocument ? '#2c3e50' : '#1f2328',
+            textAlign: isDocument ? 'justify' : undefined,
+            marginBottom: 8,
+          }}
+        >
+          ここにドキュメントの本文が表示されます。テーマによってフォント、サイズ、配色が変わります。
+        </div>
+        {/* コードブロック */}
+        <div
+          style={{
+            fontSize: 10,
+            fontFamily: "'SFMono-Regular', Consolas, monospace",
+            backgroundColor: isPresentation ? '#2d2d2d' : '#f6f8fa',
+            color: isPresentation ? '#f8f8f2' : '#1f2328',
+            borderRadius: isPresentation ? 6 : 4,
+            border: isDocument ? '1px solid #e0e0e0' : undefined,
+            padding: '4px 8px',
+            marginBottom: 8,
+          }}
+        >
+          const theme = &quot;{themeInfo.id}&quot;;
+        </div>
+        {/* 引用 */}
+        <div
+          style={{
+            fontSize: 10,
+            borderLeft: `3px solid ${themeInfo.accentColor}`,
+            paddingLeft: 8,
+            color: isDocument ? '#555' : '#59636e',
+            fontStyle: isDocument ? 'italic' : undefined,
+            backgroundColor: isPresentation || isDocument ? '#f8f9fa' : undefined,
+          }}
+        >
+          引用テキストのサンプルです。
         </div>
       </div>
     </div>
