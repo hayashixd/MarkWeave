@@ -9,14 +9,16 @@
 
 import githubThemeCss from '../../themes/default/html-export.css?raw';
 import documentThemeCss from '../../themes/document/html-export.css?raw';
+import presentationThemeCss from '../../themes/presentation/html-export.css?raw';
 import highlightCss from 'highlight.js/styles/github.css?raw';
 import katexCss from 'katex/dist/katex.min.css?raw';
 
-export type ExportTheme = 'github' | 'document';
+export type ExportTheme = 'github' | 'document' | 'presentation';
 
 const themeCssMap: Record<ExportTheme, string> = {
   github: githubThemeCss,
   document: documentThemeCss,
+  presentation: presentationThemeCss,
 };
 
 /**

@@ -149,6 +149,17 @@ export function ExportDialog({ markdown, currentFilePath, onClose }: ExportDialo
                 />
                 ドキュメントスタイル（書籍風）
               </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="radio"
+                  name="theme"
+                  value="presentation"
+                  checked={theme === 'presentation'}
+                  onChange={() => setTheme('presentation')}
+                  className="accent-blue-600"
+                />
+                プレゼンテーションスタイル
+              </label>
             </div>
           </fieldset>
 
