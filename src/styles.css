@@ -1540,3 +1540,23 @@
 .smart-paste-bar__btn--close:hover {
   color: #ef4444;
 }
+
+/* ===== Typora式フォーカス時ソース表示 ===== */
+
+/* 見出しプレフィックス（# / ## / ### 等） */
+.typora-focus-prefix {
+  color: #9ca3af;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-weight: 400;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* インラインマークのデリミタ（** * ~~ ` []() 等） */
+.typora-focus-delimiter {
+  color: #9ca3af;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  user-select: none;
+  pointer-events: none;
+}

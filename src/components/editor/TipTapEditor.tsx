@@ -64,6 +64,7 @@ import { htmlToMarkdown } from '../../core/converter/smart-paste';
 import { markdownToTipTap as mdToTipTapForPaste } from '../../lib/markdown-to-tiptap';
 import { SourceEditor } from './SourceEditor';
 import { useToastStore } from '../../store/toastStore';
+import { TyporaFocusExtension } from '../../extensions/TyporaFocusExtension';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -167,6 +168,7 @@ export function MarkdownEditor({
       MermaidBlock,
       BookmarkExtension,
       WordCompleteExtension,
+      TyporaFocusExtension,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
