@@ -266,15 +266,31 @@ export function HtmlEditor({
         mode={mode}
         onSwitchMode={switchMode}
         onToggleMetadata={() => setMetadataPanelOpen((v) => !v)}
+        metadataOpen={metadataPanelOpen}
       />
 
       {/* メタデータパネル */}
       {metadataPanelOpen && (
-        <div className="border-b border-gray-200 bg-gray-50 p-4 flex-shrink-0 max-h-64 overflow-auto">
-          <MetadataPanel
-            metadata={metaPanelData}
-            onChange={handleMetadataChange}
-          />
+        <div className="border-b border-gray-200 bg-gray-50 flex-shrink-0 max-h-64 overflow-auto">
+          <div className="flex items-center justify-between px-4 pt-3 pb-1">
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">ページ設定</h3>
+            <button
+              type="button"
+              onClick={() => setMetadataPanelOpen(false)}
+              aria-label="ページ設定を閉じる"
+              className="text-gray-400 hover:text-gray-600 transition-colors w-5 h-5 flex items-center justify-center rounded hover:bg-gray-200"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <path d="M3.17 3.17a.5.5 0 01.7 0L6 5.3l2.13-2.13a.5.5 0 01.7.7L6.71 6l2.12 2.13a.5.5 0 01-.7.7L6 6.71 3.87 8.83a.5.5 0 01-.7-.7L5.3 6 3.17 3.87a.5.5 0 010-.7z" />
+              </svg>
+            </button>
+          </div>
+          <div className="px-4 pb-3">
+            <MetadataPanel
+              metadata={metaPanelData}
+              onChange={handleMetadataChange}
+            />
+          </div>
         </div>
       )}
 

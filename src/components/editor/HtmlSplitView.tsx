@@ -4,7 +4,7 @@
  * Phase 5 スプリットモード:
  * - ソースコードとプレビューの並列表示
  * - 同期スクロール
- * - ドラッグリサイズ
+ * - ドラッグリサイズ（マウス + タッチ対応）
  *
  * 設計書: docs/05_Features/HTML/html-editing-design.md §3.1, §8.3
  */
@@ -29,15 +29,17 @@ export function HtmlSplitView({
 }: HtmlSplitViewProps) {
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [syncScroll, setSyncScroll] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
-  // ドラッグリサイズハンドラ
+  // ドラッグリサイズハンドラ（マウス対応）
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       isDraggingRef.current = true;
+      setIsDragging(true);
 
       const startX = e.clientX;
       const startRatio = splitRatio;
@@ -56,12 +58,51 @@ export function HtmlSplitView({
 
       const handleMouseUp = () => {
         isDraggingRef.current = false;
+        setIsDragging(false);
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
       };
 
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
+    },
+    [splitRatio],
+  );
+
+  // タッチ対応
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      const touch = e.touches[0];
+      if (!touch) return;
+      isDraggingRef.current = true;
+      setIsDragging(true);
+
+      const startX = touch.clientX;
+      const startRatio = splitRatio;
+      const containerWidth =
+        containerRef.current?.getBoundingClientRect().width ?? 1;
+
+      const handleTouchMove = (ev: TouchEvent) => {
+        if (!isDraggingRef.current) return;
+        const t = ev.touches[0];
+        if (!t) return;
+        const dx = t.clientX - startX;
+        const newRatio = Math.max(
+          0.2,
+          Math.min(0.8, startRatio + dx / containerWidth),
+        );
+        setSplitRatio(newRatio);
+      };
+
+      const handleTouchEnd = () => {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+
+      document.addEventListener('touchmove', handleTouchMove, { passive: true });
+      document.addEventListener('touchend', handleTouchEnd);
     },
     [splitRatio],
   );
@@ -77,7 +118,6 @@ export function HtmlSplitView({
   // プレビュー更新（<style>タグの内容も適用）
   useEffect(() => {
     if (!previewRef.current) return;
-    // shadow DOM等ではなく直接innerHTMLに設定
     // DOMPurifyでサニタイズ済みなのでXSSリスクは低い
     previewRef.current.innerHTML = sanitizedHtml;
   }, [sanitizedHtml]);
@@ -85,14 +125,12 @@ export function HtmlSplitView({
   // 同期スクロール
   const handleSourceScroll = useCallback(() => {
     if (!syncScroll || !previewRef.current) return;
-    // CodeMirrorのスクロール位置をプレビューに同期
-    // 比率ベースの同期
     const sourceEl = containerRef.current?.querySelector('.source-editor .cm-scroller');
     if (!sourceEl || !previewRef.current) return;
 
-    const scrollRatio =
-      sourceEl.scrollTop /
-      (sourceEl.scrollHeight - sourceEl.clientHeight || 1);
+    const maxSourceScroll = sourceEl.scrollHeight - sourceEl.clientHeight;
+    if (maxSourceScroll <= 0) return;
+    const scrollRatio = sourceEl.scrollTop / maxSourceScroll;
     const previewMaxScroll =
       previewRef.current.scrollHeight - previewRef.current.clientHeight;
     previewRef.current.scrollTop = scrollRatio * previewMaxScroll;
@@ -114,6 +152,7 @@ export function HtmlSplitView({
       ref={containerRef}
       className="flex flex-1 min-h-0 relative"
       data-testid="html-split-view"
+      style={isDragging ? { userSelect: 'none' } : undefined}
     >
       {/* 左ペイン: ソースエディタ */}
       <div
@@ -129,12 +168,27 @@ export function HtmlSplitView({
 
       {/* リサイズハンドル */}
       <div
-        className="w-1 bg-gray-300 hover:bg-blue-400 cursor-col-resize flex-shrink-0 transition-colors"
+        className={`w-1.5 cursor-col-resize flex-shrink-0 transition-colors relative group ${
+          isDragging ? 'bg-blue-500' : 'bg-gray-200 hover:bg-blue-400'
+        }`}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         role="separator"
         aria-label="分割位置の調整"
         aria-orientation="vertical"
-      />
+        tabIndex={0}
+      >
+        {/* ドラッグ領域を広げる透明オーバーレイ */}
+        <div className="absolute inset-y-0 -left-1 -right-1" />
+        {/* 中央のグリップインジケーター */}
+        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-0.5 ${
+          isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        } transition-opacity`}>
+          <div className="w-1 h-1 rounded-full bg-white/80" />
+          <div className="w-1 h-1 rounded-full bg-white/80" />
+          <div className="w-1 h-1 rounded-full bg-white/80" />
+        </div>
+      </div>
 
       {/* 右ペイン: プレビュー */}
       <div
@@ -146,12 +200,12 @@ export function HtmlSplitView({
           <span className="text-xs text-gray-500 font-medium">
             プレビュー
           </span>
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer">
+          <label className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none hover:text-gray-700 transition-colors">
             <input
               type="checkbox"
               checked={syncScroll}
               onChange={(e) => setSyncScroll(e.target.checked)}
-              className="w-3 h-3"
+              className="w-3.5 h-3.5 rounded border-gray-300 text-blue-500 focus:ring-blue-400 focus:ring-1"
             />
             同期スクロール
           </label>
@@ -160,7 +214,7 @@ export function HtmlSplitView({
         {/* プレビュー本体 */}
         <div
           ref={previewRef}
-          className="flex-1 overflow-auto p-6 bg-white prose prose-neutral max-w-none"
+          className="flex-1 overflow-auto p-6 bg-white"
           data-testid="html-preview"
         />
       </div>

@@ -77,12 +77,10 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
   };
 
   return (
-    <div className="space-y-3 text-sm">
-      <h3 className="text-sm font-medium text-gray-700 mb-2">ページ設定</h3>
-
-      {/* タイトル */}
-      <div className="flex items-center gap-2">
-        <label htmlFor="meta-title" className="text-xs text-gray-500 w-24 flex-shrink-0">
+    <div className="text-sm">
+      {/* 基本情報セクション */}
+      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center mb-3">
+        <label htmlFor="meta-title" className="text-xs text-gray-500 font-medium">
           タイトル
         </label>
         <input
@@ -91,13 +89,10 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
           value={metadata.title}
           onChange={handleTitleChange}
           placeholder="ページタイトルを入力"
-          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-colors"
         />
-      </div>
 
-      {/* ディスクリプション */}
-      <div className="flex items-center gap-2">
-        <label htmlFor="meta-description" className="text-xs text-gray-500 w-24 flex-shrink-0">
+        <label htmlFor="meta-description" className="text-xs text-gray-500 font-medium">
           説明
         </label>
         <input
@@ -106,85 +101,98 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
           value={metadata.description}
           onChange={handleDescriptionChange}
           placeholder="ページの説明を入力"
-          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-colors"
         />
       </div>
 
-      {/* CSSリンク */}
-      <div>
-        <div className="text-xs text-gray-500 mb-1">CSS ファイル</div>
-        {metadata.cssLinks.length > 0 && (
-          <ul className="space-y-1 mb-1">
-            {metadata.cssLinks.map((link, i) => (
-              <li key={i} className="flex items-center gap-1 pl-2">
-                <span className="text-xs text-gray-600 font-mono truncate flex-1">{link}</span>
-                <button
-                  type="button"
-                  onClick={() => removeCssLink(i)}
-                  aria-label="CSS リンクを削除"
-                  className="text-gray-400 hover:text-red-500 text-xs px-1"
-                >
-                  &times;
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex items-center gap-1">
-          <input
-            type="text"
-            value={newCssLink}
-            onChange={(e) => setNewCssLink(e.target.value)}
-            onKeyDown={handleCssKeyDown}
-            placeholder="CSS ファイルのパスまたは URL"
-            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
-          <button
-            type="button"
-            onClick={addCssLink}
-            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200"
-          >
-            追加
-          </button>
+      {/* リソースリンクセクション */}
+      <div className="flex gap-4">
+        {/* CSSリンク */}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs text-gray-500 font-medium mb-1.5">CSS ファイル</div>
+          {metadata.cssLinks.length > 0 ? (
+            <ul className="space-y-1 mb-1.5">
+              {metadata.cssLinks.map((link, i) => (
+                <li key={i} className="flex items-center gap-1 group bg-white border border-gray-200 rounded px-2 py-0.5">
+                  <span className="text-xs text-gray-600 font-mono truncate flex-1" title={link}>{link}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeCssLink(i)}
+                    aria-label={`${link} を削除`}
+                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                      <path d="M3.17 3.17a.5.5 0 01.7 0L6 5.3l2.13-2.13a.5.5 0 01.7.7L6.71 6l2.12 2.13a.5.5 0 01-.7.7L6 6.71 3.87 8.83a.5.5 0 01-.7-.7L5.3 6 3.17 3.87a.5.5 0 010-.7z" />
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-xs text-gray-400 mb-1.5 italic">なし</div>
+          )}
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={newCssLink}
+              onChange={(e) => setNewCssLink(e.target.value)}
+              onKeyDown={handleCssKeyDown}
+              placeholder="パスまたは URL を入力して Enter"
+              className="flex-1 min-w-0 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={addCssLink}
+              disabled={!newCssLink.trim()}
+              className="px-2 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              追加
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* JSリンク */}
-      <div>
-        <div className="text-xs text-gray-500 mb-1">JavaScript ファイル</div>
-        {metadata.jsLinks.length > 0 && (
-          <ul className="space-y-1 mb-1">
-            {metadata.jsLinks.map((link, i) => (
-              <li key={i} className="flex items-center gap-1 pl-2">
-                <span className="text-xs text-gray-600 font-mono truncate flex-1">{link}</span>
-                <button
-                  type="button"
-                  onClick={() => removeJsLink(i)}
-                  aria-label="JS リンクを削除"
-                  className="text-gray-400 hover:text-red-500 text-xs px-1"
-                >
-                  &times;
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex items-center gap-1">
-          <input
-            type="text"
-            value={newJsLink}
-            onChange={(e) => setNewJsLink(e.target.value)}
-            onKeyDown={handleJsKeyDown}
-            placeholder="JS ファイルのパスまたは URL"
-            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-          />
-          <button
-            type="button"
-            onClick={addJsLink}
-            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200"
-          >
-            追加
-          </button>
+        {/* JSリンク */}
+        <div className="flex-1 min-w-0">
+          <div className="text-xs text-gray-500 font-medium mb-1.5">JavaScript ファイル</div>
+          {metadata.jsLinks.length > 0 ? (
+            <ul className="space-y-1 mb-1.5">
+              {metadata.jsLinks.map((link, i) => (
+                <li key={i} className="flex items-center gap-1 group bg-white border border-gray-200 rounded px-2 py-0.5">
+                  <span className="text-xs text-gray-600 font-mono truncate flex-1" title={link}>{link}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeJsLink(i)}
+                    aria-label={`${link} を削除`}
+                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 w-5 h-5 flex items-center justify-center rounded hover:bg-red-50"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                      <path d="M3.17 3.17a.5.5 0 01.7 0L6 5.3l2.13-2.13a.5.5 0 01.7.7L6.71 6l2.12 2.13a.5.5 0 01-.7.7L6 6.71 3.87 8.83a.5.5 0 01-.7-.7L5.3 6 3.17 3.87a.5.5 0 010-.7z" />
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-xs text-gray-400 mb-1.5 italic">なし</div>
+          )}
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={newJsLink}
+              onChange={(e) => setNewJsLink(e.target.value)}
+              onKeyDown={handleJsKeyDown}
+              placeholder="パスまたは URL を入力して Enter"
+              className="flex-1 min-w-0 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={addJsLink}
+              disabled={!newJsLink.trim()}
+              className="px-2 py-1 text-xs bg-gray-100 text-gray-700 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              追加
+            </button>
+          </div>
         </div>
       </div>
     </div>

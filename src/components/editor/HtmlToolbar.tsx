@@ -23,6 +23,7 @@ interface HtmlToolbarProps {
   mode: HtmlEditorMode;
   onSwitchMode: (mode: HtmlEditorMode) => void;
   onToggleMetadata: () => void;
+  metadataOpen?: boolean;
 }
 
 export function HtmlToolbar({
@@ -30,6 +31,7 @@ export function HtmlToolbar({
   mode,
   onSwitchMode,
   onToggleMetadata,
+  metadataOpen = false,
 }: HtmlToolbarProps) {
   return (
     <div
@@ -186,7 +188,7 @@ export function HtmlToolbar({
               </svg>
             }
             tooltip="ページ設定（メタデータ）"
-            active={false}
+            active={metadataOpen}
             onClick={onToggleMetadata}
           />
           <ToolbarDivider />
@@ -322,6 +324,19 @@ function ColorPickerButton({
     '#ec4899', '#14b8a6', '#6366f1', '#a855f7', '#f43f5e', '#0ea5e9',
   ];
 
+  // 現在適用中の色を取得
+  const getCurrentColor = (): string | null => {
+    if (type === 'text') {
+      const attrs = editor.getAttributes('textColor');
+      return attrs?.color ?? null;
+    } else {
+      const attrs = editor.getAttributes('backgroundColor');
+      return attrs?.color ?? null;
+    }
+  };
+
+  const currentColor = getCurrentColor();
+
   useEffect(() => {
     if (!open) return;
     const handlePointerDown = (e: PointerEvent) => {
@@ -329,8 +344,17 @@ function ColorPickerButton({
         setOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    };
     document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [open]);
 
   const applyColor = useCallback(
@@ -355,6 +379,7 @@ function ColorPickerButton({
   }, [editor, type]);
 
   const isText = type === 'text';
+  const indicatorColor = currentColor || (isText ? '#374151' : 'transparent');
 
   return (
     <div ref={containerRef} className="relative inline-block">
@@ -365,12 +390,32 @@ function ColorPickerButton({
         aria-haspopup="true"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-center w-8 h-8 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+        className={`flex flex-col items-center justify-center w-8 h-8 rounded transition-colors ${
+          open
+            ? 'bg-blue-100 text-blue-700'
+            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        }`}
       >
         {isText ? (
-          <span className="text-sm font-bold" style={{ borderBottom: '3px solid #ef4444' }}>A</span>
+          <>
+            <span className="text-sm font-bold leading-none">A</span>
+            <span
+              className="w-4 h-1 rounded-sm mt-0.5"
+              style={{ backgroundColor: indicatorColor }}
+            />
+          </>
         ) : (
-          <span className="text-sm font-bold bg-yellow-200 px-1 rounded">A</span>
+          <>
+            <span
+              className="text-sm font-bold leading-none px-1 rounded"
+              style={{
+                backgroundColor: currentColor || '#fef08a',
+                color: currentColor ? getContrastText(currentColor) : undefined,
+              }}
+            >
+              A
+            </span>
+          </>
         )}
       </button>
 
@@ -385,7 +430,11 @@ function ColorPickerButton({
                 key={color}
                 type="button"
                 aria-label={`${color} を設定`}
-                className="w-6 h-6 rounded border border-gray-200 hover:ring-2 hover:ring-blue-400 transition-all"
+                className={`w-6 h-6 rounded border transition-all ${
+                  currentColor === color
+                    ? 'ring-2 ring-blue-500 border-blue-500'
+                    : 'border-gray-200 hover:ring-2 hover:ring-blue-400'
+                }`}
                 style={{ backgroundColor: color }}
                 onClick={() => applyColor(color)}
               />
@@ -394,15 +443,16 @@ function ColorPickerButton({
           <button
             type="button"
             onClick={clearColor}
-            className="w-full text-xs text-gray-500 hover:text-gray-700 py-1"
+            className="w-full text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 py-1 rounded transition-colors"
           >
             色をクリア
           </button>
-          <div className="mt-1 flex items-center gap-1">
+          <div className="mt-1 pt-1 border-t border-gray-100 flex items-center gap-2">
             <label className="text-xs text-gray-500">カスタム:</label>
             <input
               type="color"
-              className="w-6 h-6 cursor-pointer border-0 p-0"
+              value={currentColor || '#000000'}
+              className="w-6 h-6 cursor-pointer border-0 p-0 rounded"
               onChange={(e) => applyColor(e.target.value)}
             />
           </div>
@@ -412,12 +462,24 @@ function ColorPickerButton({
   );
 }
 
+/** 背景色に対してコントラストのあるテキスト色を返す */
+function getContrastText(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
 // ---------------------------------------------------------------------------
 // フォントサイズ選択
 // ---------------------------------------------------------------------------
 
 function FontSizeSelect({ editor }: { editor: Editor }) {
   const sizes = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '36px', '48px'];
+
+  // 現在のフォントサイズを取得
+  const currentSize = editor.getAttributes('fontSize')?.size ?? '';
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -426,13 +488,14 @@ function FontSizeSelect({ editor }: { editor: Editor }) {
     } else {
       (editor.commands as any).setFontSize(value);
     }
+    editor.chain().focus().run();
   };
 
   return (
     <select
+      value={currentSize}
       onChange={handleChange}
-      defaultValue=""
-      className="text-xs border border-gray-300 rounded px-1 py-1 bg-white text-gray-700 cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400 w-16"
+      className="text-xs border border-gray-300 rounded px-1 py-1 bg-white text-gray-700 cursor-pointer hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400 w-[72px]"
       title="フォントサイズ"
       aria-label="フォントサイズ"
     >
@@ -530,6 +593,11 @@ function SemanticBlockDropdown({ editor }: { editor: Editor }) {
     { tag: 'nav', label: 'nav' },
   ];
 
+  // 現在カーソル位置のセマンティック要素タグを取得
+  const activeTag = editor.isActive('semanticBlock')
+    ? (editor.getAttributes('semanticBlock')?.tag as string) || 'section'
+    : null;
+
   useEffect(() => {
     if (!open) return;
     const handlePointerDown = (e: PointerEvent) => {
@@ -537,8 +605,17 @@ function SemanticBlockDropdown({ editor }: { editor: Editor }) {
         setOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    };
     document.addEventListener('pointerdown', handlePointerDown);
-    return () => document.removeEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [open]);
 
   return (
@@ -550,9 +627,20 @@ function SemanticBlockDropdown({ editor }: { editor: Editor }) {
         aria-haspopup="true"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-center px-1.5 h-8 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+        className={`flex items-center gap-0.5 px-1.5 h-8 rounded transition-colors ${
+          activeTag
+            ? 'bg-blue-100 text-blue-700'
+            : open
+              ? 'bg-gray-100 text-gray-900'
+              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        }`}
       >
-        <span className="text-[10px] font-mono">&lt;section&gt;</span>
+        <span className="text-[10px] font-mono">
+          &lt;{activeTag || 'section'}&gt;
+        </span>
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" className="opacity-50">
+          <path d="M1 3l3 3 3-3H1z" />
+        </svg>
       </button>
 
       {open && (
@@ -561,7 +649,11 @@ function SemanticBlockDropdown({ editor }: { editor: Editor }) {
             <button
               key={tag}
               type="button"
-              className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+              className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                activeTag === tag
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
               onClick={() => {
                 (editor.commands as any).insertSemanticBlock(tag);
                 setOpen(false);

@@ -95,31 +95,65 @@ function buildFontTheme(fontSize: number, fontFamily: string) {
 
 /**
  * HTMLの簡易リンター: 未閉じタグや基本的な構文エラーを検出する。
+ *
+ * コメント (<!-- -->)、DOCTYPE、CDATA セクションはスキップし、
+ * void 要素 (self-closing tags) は閉じタグ不要として扱う。
  */
 function htmlLinter(view: EditorView): Diagnostic[] {
   const doc = view.state.doc.toString();
   const diagnostics: Diagnostic[] = [];
 
-  // 開きタグと閉じタグのスタックベース検証
-  const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*\/?>/g;
-  const selfClosingTags = new Set([
+  // void 要素（閉じタグ不要）
+  const voidTags = new Set([
     'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
     'link', 'meta', 'param', 'source', 'track', 'wbr',
   ]);
+
+  // raw content を持つタグ（中身をパースしない）
+  const rawContentTags = new Set(['script', 'style', 'textarea']);
+
+  // コメント・DOCTYPE・CDATAを除外した上でタグを検出
+  // まずコメント等の位置を記録
+  const skipRanges: Array<{ from: number; to: number }> = [];
+  const commentRegex = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<!DOCTYPE[^>]*>/gi;
+  let cm: RegExpExecArray | null;
+  while ((cm = commentRegex.exec(doc)) !== null) {
+    skipRanges.push({ from: cm.index, to: cm.index + cm[0].length });
+  }
+
+  const isInSkipRange = (pos: number): boolean =>
+    skipRanges.some((r) => pos >= r.from && pos < r.to);
+
+  const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*\/?>/g;
   const stack: { tag: string; from: number; to: number }[] = [];
 
   let match: RegExpExecArray | null;
   while ((match = tagRegex.exec(doc)) !== null) {
+    // コメント・DOCTYPE 内のタグはスキップ
+    if (isInSkipRange(match.index)) continue;
+
     const fullMatch = match[0]!;
     const tagName = match[1]!.toLowerCase();
     const isClosing = fullMatch.startsWith('</');
     const isSelfClosing =
-      fullMatch.endsWith('/>') || selfClosingTags.has(tagName);
+      fullMatch.endsWith('/>') || voidTags.has(tagName);
 
+    // void 要素の開きタグはスキップ
     if (isSelfClosing && !isClosing) continue;
 
+    // raw content タグの開きタグを検出した場合、対応する閉じタグまでスキップ
+    if (!isClosing && rawContentTags.has(tagName)) {
+      const closePattern = new RegExp(`</${tagName}\\s*>`, 'i');
+      const rest = doc.slice(match.index + fullMatch.length);
+      const closeMatch = closePattern.exec(rest);
+      if (closeMatch) {
+        // 閉じタグの直後まで regex のインデックスを進める
+        tagRegex.lastIndex = match.index + fullMatch.length + closeMatch.index + closeMatch[0].length;
+      }
+      continue;
+    }
+
     if (isClosing) {
-      // 閉じタグ: スタックから対応する開きタグを探す
       let lastIdx = -1;
       for (let i = stack.length - 1; i >= 0; i--) {
         if (stack[i]!.tag === tagName) { lastIdx = i; break; }
@@ -132,7 +166,6 @@ function htmlLinter(view: EditorView): Diagnostic[] {
           message: `対応する開きタグがありません: </${tagName}>`,
         });
       } else {
-        // その間のタグは未閉じ
         const unclosed = stack.splice(lastIdx);
         for (let i = 1; i < unclosed.length; i++) {
           diagnostics.push({
@@ -201,9 +234,9 @@ export function HtmlSourceEditor({
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       autocompletion(),
 
-      // HTMLリンター（エラー表示）
+      // HTMLリンター（エラー表示）- 入力中の過剰更新を防ぐためデバウンス
       lintGutter(),
-      linter(htmlLinter),
+      linter(htmlLinter, { delay: 500 }),
 
       // キーマップ
       keymap.of([
