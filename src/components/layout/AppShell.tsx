@@ -42,6 +42,8 @@ import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
 import { writeFile } from '../../lib/tauri-commands';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ExportDialog } from '../Export/ExportDialog';
+import { ConversionDialog } from '../Conversion/ConversionDialog';
+import { useConvertFile } from '../../hooks/useConvertFile';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -77,6 +79,20 @@ export function AppShell() {
   const openFileDialog = useOpenFileDialog();
   const saveAsDialog = useSaveAsDialog();
   const { openWorkspace } = useWorkspaceStore();
+
+  // HTML ↔ MD 変換フック（Phase 6）
+  const {
+    conversionState,
+    startSaveAsMarkdown,
+    startSaveAsHtml,
+    closeDialog: closeConversionDialog,
+    convertAndSave,
+    convertAndOpenTab,
+  } = useConvertFile();
+  const startSaveAsMarkdownRef = useRef(startSaveAsMarkdown);
+  startSaveAsMarkdownRef.current = startSaveAsMarkdown;
+  const startSaveAsHtmlRef = useRef(startSaveAsHtml);
+  startSaveAsHtmlRef.current = startSaveAsHtml;
 
   // フォルダを開くダイアログ（Ctrl+Shift+O）
   const openFolderDialog = useCallback(async () => {
@@ -262,6 +278,20 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Shift+M: Markdownとして保存（HTML→MD変換）(html-editing-design.md §5.3)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
+        e.preventDefault();
+        startSaveAsMarkdownRef.current();
+        return;
+      }
+
+      // Ctrl+Shift+H: HTMLとして保存（MD→HTML変換）(html-editing-design.md §5.3)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'H') {
+        e.preventDefault();
+        startSaveAsHtmlRef.current();
+        return;
+      }
+
       // Ctrl+Shift+E: HTML エクスポートダイアログ (export-interop-design.md §4.2)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'E') {
         e.preventDefault();
@@ -316,7 +346,11 @@ export function AppShell() {
       </main>
 
       {/* ステータスバー */}
-      <StatusBar tab={activeTab ?? null} />
+      <StatusBar
+        tab={activeTab ?? null}
+        onSaveAsMarkdown={startSaveAsMarkdown}
+        onSaveAsHtml={startSaveAsHtml}
+      />
 
       {/* プリファレンスダイアログ */}
       <PreferencesDialog
@@ -330,6 +364,19 @@ export function AppShell() {
           markdown={activeTab.content}
           currentFilePath={activeTab.filePath ?? undefined}
           onClose={() => setExportDialogOpen(false)}
+        />
+      )}
+
+      {/* HTML ↔ MD 変換ダイアログ（Phase 6） */}
+      {conversionState.isOpen && activeTab && (
+        <ConversionDialog
+          direction={conversionState.direction}
+          warnings={conversionState.warnings}
+          currentFileName={activeTab.fileName}
+          onClose={closeConversionDialog}
+          onConvertAndSave={convertAndSave}
+          onConvertAndOpenTab={convertAndOpenTab}
+          isConverting={conversionState.isConverting}
         />
       )}
 
@@ -429,15 +476,21 @@ function EmptyState({ onNewTab, onOpenFile }: { onNewTab: () => void; onOpenFile
   );
 }
 
-function StatusBar({ tab }: { tab: ReturnType<typeof useTabStore.getState>['tabs'][number] | null }) {
+function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
+  tab: ReturnType<typeof useTabStore.getState>['tabs'][number] | null;
+  onSaveAsMarkdown?: () => void;
+  onSaveAsHtml?: () => void;
+}) {
   const [encodingPopover, setEncodingPopover] = useState(false);
   const [lineEndingPopover, setLineEndingPopover] = useState(false);
   const [indentPopover, setIndentPopover] = useState(false);
+  const [fileTypePopover, setFileTypePopover] = useState(false);
   const { updateEncoding, updateLineEnding } = useTabStore();
   const { settings, updateSettings } = useSettingsStore();
   const encodingRef = useRef<HTMLDivElement>(null);
   const lineEndingRef = useRef<HTMLDivElement>(null);
   const indentRef = useRef<HTMLDivElement>(null);
+  const fileTypeRef = useRef<HTMLDivElement>(null);
 
   // ポップオーバー外クリックで閉じる
   useEffect(() => {
@@ -451,10 +504,13 @@ function StatusBar({ tab }: { tab: ReturnType<typeof useTabStore.getState>['tabs
       if (indentPopover && indentRef.current && !indentRef.current.contains(e.target as Node)) {
         setIndentPopover(false);
       }
+      if (fileTypePopover && fileTypeRef.current && !fileTypeRef.current.contains(e.target as Node)) {
+        setFileTypePopover(false);
+      }
     };
     document.addEventListener('pointerdown', handler);
     return () => document.removeEventListener('pointerdown', handler);
-  }, [encodingPopover, lineEndingPopover, indentPopover]);
+  }, [encodingPopover, lineEndingPopover, indentPopover, fileTypePopover]);
 
   const encodings: FileEncoding[] = ['UTF-8', 'UTF-8 BOM', 'Shift-JIS', 'EUC-JP'];
   const lineEndings: LineEnding[] = ['LF', 'CRLF'];
@@ -585,7 +641,45 @@ function StatusBar({ tab }: { tab: ReturnType<typeof useTabStore.getState>['tabs
           </div>
         )}
 
-        <span>{tab?.fileType === 'html' ? 'HTML' : 'Markdown'}</span>
+        {/* ファイル形式 + 変換メニュー（Phase 6） */}
+        <div ref={fileTypeRef} className="relative">
+          <button
+            type="button"
+            className="status-bar__button"
+            onClick={() => { setFileTypePopover((v) => !v); setEncodingPopover(false); setLineEndingPopover(false); setIndentPopover(false); }}
+            title="ファイル形式（クリックで変換メニュー）"
+          >
+            {tab?.fileType === 'html' ? 'HTML' : 'Markdown'}
+          </button>
+          {fileTypePopover && tab && (
+            <div className="status-bar__popover">
+              <div className="status-bar__popover-title">別名で保存</div>
+              {tab.fileType === 'html' ? (
+                <button
+                  type="button"
+                  className="status-bar__popover-item"
+                  onClick={() => {
+                    setFileTypePopover(false);
+                    onSaveAsMarkdown?.();
+                  }}
+                >
+                  Markdown として保存 (.md)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="status-bar__popover-item"
+                  onClick={() => {
+                    setFileTypePopover(false);
+                    onSaveAsHtml?.();
+                  }}
+                >
+                  HTML として保存 (.html)
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
