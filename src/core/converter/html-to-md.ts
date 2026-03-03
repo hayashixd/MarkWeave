@@ -24,11 +24,12 @@ export interface HtmlToMdOptions {
   bulletListMarker: '-' | '*' | '+';
 }
 
-const defaultOptions: HtmlToMdOptions = {
-  gfm: true,
-  headingStyle: 'atx',
-  bulletListMarker: '-',
-};
+// TODO: 変換ロジック実装時に使用する
+// const defaultOptions: HtmlToMdOptions = {
+//   gfm: true,
+//   headingStyle: 'atx',
+//   bulletListMarker: '-',
+// };
 
 /**
  * HTML → Markdown 変換時に情報が失われる要素の種類。
@@ -71,7 +72,7 @@ export async function convertHtmlToMd(
   html: string,
   options: Partial<HtmlToMdOptions> = {}
 ): Promise<HtmlToMdResult> {
-  const _opts = { ...defaultOptions, ...options };
+  void options; // TODO: オプションを使った変換ロジックを実装
   // TODO: turndown + turndown-plugin-gfm を使って変換
   // const TurndownService = (await import('turndown')).default;
   // const { gfm } = await import('turndown-plugin-gfm');

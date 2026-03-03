@@ -26,7 +26,7 @@ export const defaultSerializeOptions: SerializeOptions = {
 /**
  * ASTをマークダウンテキストに変換する
  */
-export function serializeToMarkdown(ast: Root, options?: Partial<SerializeOptions>): string {
+export function serializeToMarkdown(_ast: Root, _options?: Partial<SerializeOptions>): string {
   // TODO: unified + remark-stringify で実装
   throw new Error('Not implemented');
 }

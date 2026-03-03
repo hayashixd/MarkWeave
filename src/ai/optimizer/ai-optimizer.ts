@@ -153,7 +153,7 @@ export async function optimizeAndCopy(
 
   try {
     await navigator.clipboard.writeText(result.optimizedText);
-  } catch (err) {
+  } catch {
     // クリップボードAPIが使えない環境のフォールバック
     fallbackCopyToClipboard(result.optimizedText);
   }

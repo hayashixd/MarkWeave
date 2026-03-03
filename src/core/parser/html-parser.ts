@@ -18,11 +18,6 @@ export interface HtmlParseOptions {
   strict: boolean;
 }
 
-const defaultOptions: HtmlParseOptions = {
-  fragment: false,
-  strict: false,
-};
-
 const parser = unified().use(rehypeParse);
 
 /**

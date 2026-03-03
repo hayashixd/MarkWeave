@@ -31,7 +31,7 @@ export const defaultParseOptions: ParseOptions = {
 /**
  * マークダウンテキストをASTに変換する
  */
-export function parseMarkdown(text: string, options?: Partial<ParseOptions>): Root {
+export function parseMarkdown(_text: string, _options?: Partial<ParseOptions>): Root {
   // TODO: unified + remark で実装
   throw new Error('Not implemented');
 }

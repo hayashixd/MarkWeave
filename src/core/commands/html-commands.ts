@@ -17,28 +17,28 @@ import type { Editor } from '@tiptap/core';
  * 選択テキストの文字色を設定する。
  */
 export function setTextColor(editor: Editor, color: string): boolean {
-  return (editor.commands as any).setTextColor(color);
+  return editor.commands.setTextColor(color);
 }
 
 /**
  * 選択テキストの背景色を設定する。
  */
 export function setBackgroundColor(editor: Editor, color: string): boolean {
-  return (editor.commands as any).setBackgroundColor(color);
+  return editor.commands.setBackgroundColor(color);
 }
 
 /**
  * 選択テキストのフォントサイズを設定する。
  */
 export function setFontSize(editor: Editor, size: string): boolean {
-  return (editor.commands as any).setFontSize(size);
+  return editor.commands.setFontSize(size);
 }
 
 /**
  * テキストのハイライトをトグルする。
  */
 export function toggleHighlight(editor: Editor): boolean {
-  return (editor.commands as any).toggleHighlight();
+  return editor.commands.toggleHighlight();
 }
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ export function toggleHighlight(editor: Editor): boolean {
  * div ブロックを挿入する。
  */
 export function insertDiv(editor: Editor, className?: string): boolean {
-  return (editor.commands as any).insertDivBlock({ class: className });
+  return editor.commands.insertDivBlock({ class: className });
 }
 
 /**
@@ -59,7 +59,7 @@ export function insertSemanticBlock(
   editor: Editor,
   tagName: 'section' | 'article' | 'header' | 'footer' | 'nav',
 ): boolean {
-  return (editor.commands as any).insertSemanticBlock(tagName);
+  return editor.commands.insertSemanticBlock(tagName);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,5 +72,5 @@ export type TextAlign = 'left' | 'center' | 'right' | 'justify';
  * テキスト配置を設定する。
  */
 export function setTextAlign(editor: Editor, align: TextAlign): boolean {
-  return (editor.commands as any).setTextAlign(align);
+  return editor.commands.setTextAlign(align);
 }

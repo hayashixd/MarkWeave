@@ -21,7 +21,7 @@ export const TableCommands = {
   /**
    * 行を追加する
    */
-  addRow(pos: 'before' | 'after', rowIndex: number): void {
+  addRow(_pos: 'before' | 'after', _rowIndex: number): void {
     // TODO: ProseMirrorトランザクションで実装
     throw new Error('Not implemented');
   },
@@ -29,42 +29,42 @@ export const TableCommands = {
   /**
    * 行を削除する
    */
-  removeRow(rowIndex: number): void {
+  removeRow(_rowIndex: number): void {
     throw new Error('Not implemented');
   },
 
   /**
    * 列を追加する
    */
-  addColumn(pos: 'before' | 'after', colIndex: number): void {
+  addColumn(_pos: 'before' | 'after', _colIndex: number): void {
     throw new Error('Not implemented');
   },
 
   /**
    * 列を削除する
    */
-  removeColumn(colIndex: number): void {
+  removeColumn(_colIndex: number): void {
     throw new Error('Not implemented');
   },
 
   /**
    * 行を並び替える
    */
-  moveRow(from: number, to: number): void {
+  moveRow(_from: number, _to: number): void {
     throw new Error('Not implemented');
   },
 
   /**
    * 列を並び替える
    */
-  moveColumn(from: number, to: number): void {
+  moveColumn(_from: number, _to: number): void {
     throw new Error('Not implemented');
   },
 
   /**
    * 列の配置を設定する
    */
-  setAlignment(colIndex: number, align: ColumnAlignment): void {
+  setAlignment(_colIndex: number, _align: ColumnAlignment): void {
     throw new Error('Not implemented');
   },
 };

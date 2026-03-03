@@ -77,19 +77,19 @@ export function HtmlToolbar({
             icon={<span className="bg-yellow-200 px-0.5 text-xs">M</span>}
             tooltip="ハイライト (mark)"
             active={editor.isActive('highlight')}
-            onClick={() => (editor.commands as any).toggleHighlight()}
+            onClick={() => editor.commands.toggleHighlight()}
           />
           <ToolbarButton
             icon={<span className="text-xs">X<sup className="text-[8px]">2</sup></span>}
             tooltip="上付き文字 (sup)"
             active={editor.isActive('superscript')}
-            onClick={() => (editor.commands as any).toggleSuperscript()}
+            onClick={() => editor.commands.toggleSuperscript()}
           />
           <ToolbarButton
             icon={<span className="text-xs">X<sub className="text-[8px]">2</sub></span>}
             tooltip="下付き文字 (sub)"
             active={editor.isActive('subscript')}
-            onClick={() => (editor.commands as any).toggleSubscript()}
+            onClick={() => editor.commands.toggleSubscript()}
           />
           <ToolbarDivider />
 
@@ -174,7 +174,7 @@ export function HtmlToolbar({
             icon={<span className="text-xs font-mono">&lt;div&gt;</span>}
             tooltip="div ブロック挿入"
             active={editor.isActive('divBlock')}
-            onClick={() => (editor.commands as any).insertDivBlock()}
+            onClick={() => editor.commands.insertDivBlock()}
           />
           {/* セマンティック要素 */}
           <SemanticBlockDropdown editor={editor} />
@@ -360,9 +360,9 @@ function ColorPickerButton({
   const applyColor = useCallback(
     (color: string) => {
       if (type === 'text') {
-        (editor.commands as any).setTextColor(color);
+        editor.commands.setTextColor(color);
       } else {
-        (editor.commands as any).setBackgroundColor(color);
+        editor.commands.setBackgroundColor(color);
       }
       setOpen(false);
     },
@@ -371,9 +371,9 @@ function ColorPickerButton({
 
   const clearColor = useCallback(() => {
     if (type === 'text') {
-      (editor.commands as any).unsetTextColor();
+      editor.commands.unsetTextColor();
     } else {
-      (editor.commands as any).unsetBackgroundColor();
+      editor.commands.unsetBackgroundColor();
     }
     setOpen(false);
   }, [editor, type]);
@@ -484,9 +484,9 @@ function FontSizeSelect({ editor }: { editor: Editor }) {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     if (value === '') {
-      (editor.commands as any).unsetFontSize();
+      editor.commands.unsetFontSize();
     } else {
-      (editor.commands as any).setFontSize(value);
+      editor.commands.setFontSize(value);
     }
     editor.chain().focus().run();
   };
@@ -570,7 +570,7 @@ function TextAlignButtons({ editor }: { editor: Editor }) {
           icon={icon}
           tooltip={label}
           active={editor.isActive({ textAlign: value })}
-          onClick={() => (editor.commands as any).setTextAlign(value)}
+          onClick={() => editor.commands.setTextAlign(value)}
         />
       ))}
     </>
@@ -655,7 +655,7 @@ function SemanticBlockDropdown({ editor }: { editor: Editor }) {
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
               onClick={() => {
-                (editor.commands as any).insertSemanticBlock(tag);
+                editor.commands.insertSemanticBlock(tag);
                 setOpen(false);
               }}
             >

@@ -12,8 +12,10 @@ describe("App", () => {
     });
   });
 
-  it("renders the status bar", () => {
+  it("renders the status bar", async () => {
     render(<App />);
-    expect(screen.getByText("Markdown")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Markdown")).toBeInTheDocument();
+    });
   });
 });

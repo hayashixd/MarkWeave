@@ -57,6 +57,8 @@ export function useCloseGuard() {
     .filter((t) => t.isDirty)
     .map((t) => t.fileName);
 
+  const dirtyKey = dirtyFileNames.join(',');
+
   useEffect(() => {
     // Tauri 環境以外（ブラウザ開発時）では何もしない
     if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
@@ -97,5 +99,5 @@ export function useCloseGuard() {
       cancelled = true;
       unlistenPromise.then((f) => f());
     };
-  }, [dirtyFileNames.join(',')]); // dirtyFileNames の中身が変わったときだけ再登録
+  }, [dirtyFileNames, dirtyKey]); // dirtyFileNames の中身が変わったときだけ再登録
 }
