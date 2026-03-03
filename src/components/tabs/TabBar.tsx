@@ -9,8 +9,11 @@
  * UI 改善:
  * - 閉じるボタンを常時表示（ホバー時のみだと見つけにくい）
  * - アクティブタブの視認性向上（下ボーダーに青色アクセント）
+ * - タブバー空き領域のダブルクリックでウィンドウ最大化トグル
+ * - タブバー空き領域をドラッグ領域として使用（data-tauri-drag-region）
  */
 
+import { useCallback } from 'react';
 import { useTabStore } from '../../store/tabStore';
 
 interface TabBarProps {
@@ -20,6 +23,18 @@ interface TabBarProps {
 
 export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
   const { tabs, activeTabId, setActiveTab } = useTabStore();
+
+  // タブバー空き領域のダブルクリックでウィンドウ最大化/元のサイズに切り替え
+  const handleDragAreaDoubleClick = useCallback(() => {
+    (async () => {
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        await getCurrentWebviewWindow().toggleMaximize();
+      } catch {
+        // Tauri 外（ブラウザ開発時）ではスキップ
+      }
+    })();
+  }, []);
 
   const moveFocusToTab = (index: number) => {
     const nextTab = tabs[index];
@@ -64,7 +79,7 @@ export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
   return (
     <div className="tab-bar flex items-center bg-gray-100 border-b border-gray-200 overflow-x-auto flex-shrink-0">
       <div
-        className="flex items-center min-w-0 flex-1"
+        className="flex items-center min-w-0"
         role="tablist"
         aria-label="開いているファイル"
       >
@@ -114,6 +129,12 @@ export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
           );
         })}
       </div>
+      {/* ドラッグ可能な空き領域 — ダブルクリックでウィンドウ最大化トグル */}
+      <div
+        className="flex-1 self-stretch"
+        data-tauri-drag-region
+        onDoubleClick={handleDragAreaDoubleClick}
+      />
       <button
         type="button"
         className="px-3 py-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 text-lg flex-shrink-0"

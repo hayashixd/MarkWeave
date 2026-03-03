@@ -36,6 +36,7 @@ import { useCloseGuard } from '../../hooks/useCloseGuard';
 import { useSessionRestore } from '../../hooks/useSessionRestore';
 import { useFileOpenListener } from '../../hooks/useFileOpenListener';
 import { useAutoSave } from '../../hooks/useAutoSave';
+import { useWindowState } from '../../hooks/useWindowState';
 import { useDropListener } from '../../hooks/useDropListener';
 import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
 import { writeFile } from '../../lib/tauri-commands';
@@ -59,6 +60,9 @@ export function AppShell() {
 
   // ウィンドウクローズ時の未保存ガード
   useCloseGuard();
+
+  // ウィンドウ状態（位置・サイズ・最大化）の復元
+  useWindowState();
 
   // セッション復元（前回開いていたタブを復元、なければ空タブ）
   useSessionRestore();

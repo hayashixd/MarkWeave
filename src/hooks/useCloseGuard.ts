@@ -16,6 +16,7 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useTabStore } from '../store/tabStore';
 import { saveSession } from '../store/session';
+import { captureAndSaveWindowState } from './useWindowState';
 
 /** 現在のタブ状態からセッション情報を生成する */
 function getCurrentSession() {
@@ -68,7 +69,8 @@ export function useCloseGuard() {
       if (cancelled) return;
 
       if (dirtyFileNames.length === 0) {
-        // 未保存なし → セッション保存してそのまま閉じる
+        // 未保存なし → ウィンドウ状態 + セッション保存してそのまま閉じる
+        await captureAndSaveWindowState().catch(() => {});
         await saveSession(getCurrentSession()).catch(() => {});
         return;
       }
@@ -79,11 +81,13 @@ export function useCloseGuard() {
         const confirmed = await showUnsavedConfirmation(dirtyFileNames);
 
         if (confirmed) {
+          await captureAndSaveWindowState().catch(() => {});
           await saveSession(getCurrentSession()).catch(() => {});
           appWindow.destroy(); // onCloseRequested を再トリガーしないよう destroy を使う
         }
       } catch {
         // ダイアログ表示自体が完全に失敗した場合は、安全にウィンドウを閉じる
+        await captureAndSaveWindowState().catch(() => {});
         await saveSession(getCurrentSession()).catch(() => {});
         appWindow.destroy();
       }
