@@ -415,6 +415,38 @@ interface AppVersion {
 const version = await invoke<AppVersion>('get_app_version');
 ```
 
+### `print_to_pdf`
+
+```typescript
+// export-interop-design.md §3.2 に準拠
+
+interface PdfOptions {
+  paperSize: 'A4' | 'Letter' | 'A3';
+  orientation: 'portrait' | 'landscape';
+  marginTop: number;     // mm 単位
+  marginBottom: number;
+  marginLeft: number;
+  marginRight: number;
+  printHeaderFooter: boolean;
+}
+
+// Rust シグネチャ: pub async fn print_to_pdf(app: AppHandle, html_content: String, output_path: String, options: PdfOptions) -> Result<u64, String>
+const sizeBytes = await invoke<number>('print_to_pdf', {
+  htmlContent: '<html>...</html>',
+  outputPath: '/path/to/output.pdf',
+  options: {
+    paperSize: 'A4',
+    orientation: 'portrait',
+    marginTop: 20,
+    marginBottom: 20,
+    marginLeft: 25,
+    marginRight: 25,
+    printHeaderFooter: false,
+  },
+});
+// 戻り値: PDF ファイルのバイト数
+```
+
 ---
 
 ## 10. エラー型定義

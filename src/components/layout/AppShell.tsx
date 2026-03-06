@@ -42,6 +42,7 @@ import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
 import { writeFile } from '../../lib/tauri-commands';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ExportDialog } from '../Export/ExportDialog';
+import { PdfExportDialog } from '../Export/PdfExportDialog';
 import { ConversionDialog } from '../Conversion/ConversionDialog';
 import { useConvertFile } from '../../hooks/useConvertFile';
 
@@ -50,6 +51,7 @@ export function AppShell() {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('outline');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [pdfExportDialogOpen, setPdfExportDialogOpen] = useState(false);
   // エディタインスタンスへの参照（アウトラインパネル等で使用）
   const [currentEditor, setCurrentEditor] = useState<Editor | null>(null);
   const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab } =
@@ -298,6 +300,13 @@ export function AppShell() {
         setExportDialogOpen(true);
         return;
       }
+
+      // Ctrl+Alt+P: PDF エクスポートダイアログ (export-interop-design.md §3)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'p') {
+        e.preventDefault();
+        setPdfExportDialogOpen(true);
+        return;
+      }
     };
 
     window.addEventListener('keydown', handler);
@@ -364,6 +373,15 @@ export function AppShell() {
           markdown={activeTab.content}
           currentFilePath={activeTab.filePath ?? undefined}
           onClose={() => setExportDialogOpen(false)}
+        />
+      )}
+
+      {/* PDF エクスポートダイアログ（Phase 7） */}
+      {pdfExportDialogOpen && activeTab && (
+        <PdfExportDialog
+          markdown={activeTab.content}
+          currentFilePath={activeTab.filePath ?? undefined}
+          onClose={() => setPdfExportDialogOpen(false)}
         />
       )}
 

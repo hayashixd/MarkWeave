@@ -4,6 +4,7 @@ mod fs;
 mod menu;
 mod models;
 
+use commands::export_commands;
 use commands::fs_commands;
 use commands::window_commands;
 use tauri::{Emitter, Manager};
@@ -28,6 +29,7 @@ pub fn run() {
             }
         }))
         .invoke_handler(tauri::generate_handler![
+            export_commands::print_to_pdf,
             fs_commands::read_file,
             fs_commands::write_file,
             fs_commands::file_exists,
