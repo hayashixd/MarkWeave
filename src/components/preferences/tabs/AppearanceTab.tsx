@@ -4,17 +4,31 @@
  * user-settings-design.md §5.1 に準拠。
  * テーマ・フォント・行間・段落余白の設定。
  * 変更は即時反映・即時保存（OK/キャンセルなし）。
+ *
+ * Phase 7: テーマシステム拡張
+ * - ビルトインテーマ一覧（light / dark / system / github / solarized-light / solarized-dark）
+ * - テーマカスタマイザー（CSS 変数のオーバーライド GUI）
  */
 
+import { useState } from 'react';
 import { useSettingsStore } from '../../../store/settingsStore';
 import type { AppearanceSettings } from '../../../settings/types';
+import { BUILTIN_THEMES, themeManager } from '../../../themes/theme-manager';
+import type { AppTheme } from '../../../themes/theme-manager';
+import { ThemeCustomizer } from '../../ThemeCustomizer/ThemeCustomizer';
 
 export function AppearanceTab() {
   const { settings, updateSettings } = useSettingsStore();
   const appearance = settings.appearance;
+  const [showCustomizer, setShowCustomizer] = useState(false);
 
   const update = (partial: Partial<AppearanceSettings>) => {
     updateSettings({ appearance: partial });
+
+    // テーマ変更時は即時反映
+    if (partial.theme) {
+      themeManager.applyTheme(partial.theme);
+    }
   };
 
   return (
@@ -24,24 +38,44 @@ export function AppearanceTab() {
       {/* カラーテーマ */}
       <fieldset>
         <legend className="text-sm font-medium mb-2">カラーテーマ</legend>
-        <div className="flex gap-4">
-          {(['light', 'dark', 'system'] as const).map((value) => (
-            <label key={value} className="flex items-center gap-1.5 cursor-pointer">
+        <div className="grid grid-cols-2 gap-2">
+          {BUILTIN_THEMES.map(({ id, label, description }) => (
+            <label
+              key={id}
+              className={`flex items-start gap-2 p-2 rounded border cursor-pointer transition-colors ${
+                appearance.theme === id
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+            >
               <input
                 type="radio"
                 name="theme"
-                value={value}
-                checked={appearance.theme === value}
-                onChange={() => update({ theme: value })}
-                className="accent-blue-600"
+                value={id}
+                checked={appearance.theme === id}
+                onChange={() => update({ theme: id as AppTheme })}
+                className="accent-blue-600 mt-0.5"
               />
-              <span className="text-sm">
-                {value === 'light' ? 'ライト' : value === 'dark' ? 'ダーク' : 'システムに追従'}
-              </span>
+              <div>
+                <span className="text-sm font-medium">{label}</span>
+                <p className="text-xs text-gray-500">{description}</p>
+              </div>
             </label>
           ))}
         </div>
       </fieldset>
+
+      {/* テーマカスタマイザートグル */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowCustomizer(!showCustomizer)}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          {showCustomizer ? 'カスタマイザーを閉じる' : 'テーマをカスタマイズ...'}
+        </button>
+        {showCustomizer && <ThemeCustomizer />}
+      </div>
 
       {/* エディタフォント */}
       <div>

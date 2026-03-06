@@ -5,9 +5,10 @@
  */
 
 import type { ImageStorageSettings } from '../file/imageStorage';
+import type { AppTheme } from '../themes/theme-manager';
 
 export interface AppearanceSettings {
-  theme: 'light' | 'dark' | 'system';
+  theme: AppTheme;
   /** UI 表示言語。'auto' は OS ロケールに自動追従（詳細: i18n-design.md） */
   language: 'auto' | 'ja' | 'en';
   editorFontFamily: string;
