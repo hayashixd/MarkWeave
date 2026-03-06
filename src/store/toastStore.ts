@@ -11,7 +11,7 @@
 
 import { create } from 'zustand';
 
-export type ToastSeverity = 'info' | 'warning' | 'error';
+export type ToastSeverity = 'info' | 'success' | 'warning' | 'error';
 
 export interface Toast {
   id: string;
@@ -36,7 +36,7 @@ export const useToastStore = create<ToastStore>((set) => ({
     }));
 
     // 自動消去タイマー
-    const delay = severity === 'info' ? 3000 : severity === 'warning' ? 8000 : 0;
+    const delay = severity === 'info' || severity === 'success' ? 3000 : severity === 'warning' ? 8000 : 0;
     if (delay > 0) {
       setTimeout(
         () => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),

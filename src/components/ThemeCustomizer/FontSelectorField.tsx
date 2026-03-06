@@ -5,8 +5,6 @@
  * よく使われるフォント候補 + カスタム入力。
  */
 
-import React from 'react';
-
 const COMMON_FONTS = [
   { value: '', label: 'テーマデフォルト' },
   { value: '"Noto Sans JP", sans-serif', label: 'Noto Sans JP' },

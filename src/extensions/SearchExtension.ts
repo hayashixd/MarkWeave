@@ -184,7 +184,8 @@ export function gotoNextMatch(view: EditorView): number {
   });
   view.dispatch(tr);
 
-  scrollToMatch(view, state.matches[nextIndex]);
+  const nextMatch = state.matches[nextIndex];
+  if (nextMatch) scrollToMatch(view, nextMatch);
   return nextIndex;
 }
 
@@ -200,7 +201,8 @@ export function gotoPrevMatch(view: EditorView): number {
   });
   view.dispatch(tr);
 
-  scrollToMatch(view, state.matches[prevIndex]);
+  const prevMatch = state.matches[prevIndex];
+  if (prevMatch) scrollToMatch(view, prevMatch);
   return prevIndex;
 }
 

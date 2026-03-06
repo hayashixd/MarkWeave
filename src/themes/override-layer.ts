@@ -35,7 +35,7 @@ export function readCurrentOverrideVars(): Record<string, string> {
 
   const result: Record<string, string> = {};
   for (const match of el.textContent.matchAll(/\s*(--[\w-]+):\s*([^;]+);/g)) {
-    result[match[1].trim()] = match[2].trim();
+    result[match[1]!.trim()] = match[2]!.trim();
   }
   return result;
 }

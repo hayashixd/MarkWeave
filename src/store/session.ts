@@ -38,7 +38,7 @@ const STORE_FILE = 'session.json';
  * セッションの保存（ウィンドウクローズ前に呼ぶ）。
  */
 export async function saveSession(state: SessionState): Promise<void> {
-  const store = await load(STORE_FILE, { autoSave: false });
+  const store = await load(STORE_FILE, { defaults: {}, autoSave: false });
   await store.set('openFiles', state.openFiles);
   await store.set('activeFilePath', state.activeFilePath);
   await store.set('sidebarVisible', state.sidebarVisible);
@@ -49,7 +49,7 @@ export async function saveSession(state: SessionState): Promise<void> {
  * ウィンドウ状態（位置・サイズ・最大化）の保存。
  */
 export async function saveWindowState(state: WindowState): Promise<void> {
-  const store = await load(STORE_FILE, { autoSave: false });
+  const store = await load(STORE_FILE, { defaults: {}, autoSave: false });
   await store.set('windowState', state);
   await store.save();
 }
@@ -59,7 +59,7 @@ export async function saveWindowState(state: WindowState): Promise<void> {
  * 保存されていない場合は null を返す。
  */
 export async function loadWindowState(): Promise<WindowState | null> {
-  const store = await load(STORE_FILE, { autoSave: false });
+  const store = await load(STORE_FILE, { defaults: {}, autoSave: false });
   return (await store.get<WindowState>('windowState')) ?? null;
 }
 
@@ -68,7 +68,7 @@ export async function loadWindowState(): Promise<WindowState | null> {
  * ファイルが実際に存在するか確認してから復元する。
  */
 export async function loadSession(): Promise<SessionState | null> {
-  const store = await load(STORE_FILE, { autoSave: false });
+  const store = await load(STORE_FILE, { defaults: {}, autoSave: false });
   const openFiles = await store.get<FileSession[]>('openFiles');
   if (!openFiles || openFiles.length === 0) return null;
 
