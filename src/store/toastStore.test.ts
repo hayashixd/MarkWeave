@@ -14,8 +14,8 @@ describe('toastStore', () => {
   it('show でトーストを追加できる', () => {
     useToastStore.getState().show('info', 'テスト通知');
     expect(useToastStore.getState().toasts).toHaveLength(1);
-    expect(useToastStore.getState().toasts[0].severity).toBe('info');
-    expect(useToastStore.getState().toasts[0].message).toBe('テスト通知');
+    expect(useToastStore.getState().toasts[0]!.severity).toBe('info');
+    expect(useToastStore.getState().toasts[0]!.message).toBe('テスト通知');
   });
 
   it('最大3件まで保持する', () => {
@@ -26,12 +26,12 @@ describe('toastStore', () => {
     show('info', '4');
     expect(useToastStore.getState().toasts).toHaveLength(3);
     // 最新の3件が残る
-    expect(useToastStore.getState().toasts[2].message).toBe('4');
+    expect(useToastStore.getState().toasts[2]!.message).toBe('4');
   });
 
   it('dismiss でトーストを削除できる', () => {
     useToastStore.getState().show('error', 'エラー');
-    const id = useToastStore.getState().toasts[0].id;
+    const id = useToastStore.getState().toasts[0]!.id;
     useToastStore.getState().dismiss(id);
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
@@ -39,6 +39,6 @@ describe('toastStore', () => {
   it('action 付きトーストを作成できる', () => {
     const action = { label: '詳細', onClick: () => {} };
     useToastStore.getState().show('warning', '警告', action);
-    expect(useToastStore.getState().toasts[0].action).toEqual(action);
+    expect(useToastStore.getState().toasts[0]!.action).toEqual(action);
   });
 });

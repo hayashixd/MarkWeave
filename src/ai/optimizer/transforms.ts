@@ -44,8 +44,8 @@ export function normalizeHeadings(text: string): TransformResult {
       continue;
     }
 
-    const currentLevel = match[1].length;
-    const content = match[2];
+    const currentLevel = match[1]!.length;
+    const content = match[2]!;
 
     // 前のレベルから2以上飛んでいたら補正
     if (prevLevel > 0 && currentLevel > prevLevel + 1) {

@@ -31,7 +31,7 @@ export function ExportDialog({ markdown, currentFilePath, onClose }: ExportDialo
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const selectedThemeInfo = useMemo(
-    () => themeList.find((t) => t.id === theme) ?? themeList[0],
+    () => themeList.find((t) => t.id === theme) ?? themeList[0]!,
     [theme],
   );
 

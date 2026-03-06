@@ -7,7 +7,7 @@
  */
 export function deepMerge<T extends Record<string, unknown>>(
   target: T,
-  source: Partial<T>,
+  source: Partial<{ [K in keyof T]: unknown }>,
 ): T {
   const result = { ...target };
 
