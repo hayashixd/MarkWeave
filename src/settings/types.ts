@@ -30,6 +30,12 @@ export interface EditorSettings {
   highlightCurrentLine: boolean;
   /** インデントスタイル: スペース or タブ */
   indentStyle: 'spaces' | 'tabs';
+  /** フォーカスモード: カーソル外のブロックを薄く表示して集中執筆を支援 */
+  focusMode: boolean;
+  /** タイプライターモード: カーソル行を常に画面中央に保つ */
+  typewriterMode: boolean;
+  /** Zen モード: UI を完全に隠してフルスクリーン執筆 */
+  zenMode: boolean;
 }
 
 export interface MarkdownSettings {

@@ -1560,3 +1560,74 @@
   user-select: none;
   pointer-events: none;
 }
+
+/* ===== フォーカスモード (Phase 7) ===== */
+/* ペルソナ: 知識管理者・一般ライター — 今書いているブロックに集中させる */
+
+.focus-mode-enabled .ProseMirror > * {
+  opacity: 0.3;
+  transition: opacity 0.15s ease;
+}
+
+.focus-mode-enabled .ProseMirror > [data-pm-focused="true"] {
+  opacity: 1;
+}
+
+/* フォーカス外れ時もホバーで少し見えるように */
+.focus-mode-enabled .ProseMirror > *:hover {
+  opacity: 0.6;
+}
+
+/* フォーカスモードインジケーター（ツールバーボタンアクティブ状態） */
+.focus-mode-indicator {
+  color: var(--color-accent);
+}
+
+/* ===== タイプライターモード (Phase 7) ===== */
+/* ペルソナ: 知識管理者・テクニカルライター — カーソルを常に中央に保ち首が疲れない */
+
+/* タイプライターモード有効時のエディタ領域スクロール挙動 */
+.typewriter-mode-enabled {
+  scroll-behavior: smooth;
+}
+
+/* ===== Zen Mode / 集中モード (Phase 7) ===== */
+/* ペルソナ: 一般ライター・知識管理者 — UI を完全に隠して執筆に没頭 */
+
+/* Zen モード: タブバー・サイドバー・ステータスバーを非表示 */
+.app-shell.zen-mode .editor-toolbar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.app-shell.zen-mode .editor-toolbar:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Zen モード時は TabBar / Sidebar / StatusBar を非表示 */
+.app-shell.zen-mode > [role="application"] > .tabbar-container,
+.app-shell.zen-mode .status-bar,
+.app-shell.zen-mode .sidebar {
+  display: none;
+}
+
+/* Zen モード時のエディタ本文エリア: コンテンツ幅を広げる */
+.app-shell.zen-mode .max-w-\[800px\] {
+  max-width: 680px;
+}
+
+/* Zen モードインジケーター: ステータスバーに表示 */
+.zen-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  background: var(--color-accent);
+  color: white;
+  border-radius: 3px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}

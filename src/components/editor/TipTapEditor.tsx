@@ -65,6 +65,8 @@ import { markdownToTipTap as mdToTipTapForPaste } from '../../lib/markdown-to-ti
 import { SourceEditor } from './SourceEditor';
 import { useToastStore } from '../../store/toastStore';
 import { TyporaFocusExtension } from '../../extensions/TyporaFocusExtension';
+import { FocusModeExtension } from '../../extensions/FocusModeExtension';
+import { useSettingsStore } from '../../store/settingsStore';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -93,6 +95,11 @@ export function MarkdownEditor({
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+
+  // 集中モード系の設定を取得
+  const { settings, updateSettings } = useSettingsStore();
+  const focusMode = settings.editor.focusMode;
+  const typewriterMode = settings.editor.typewriterMode;
 
   // 検索バーの状態
   const [searchVisible, setSearchVisible] = useState(false);
@@ -169,6 +176,7 @@ export function MarkdownEditor({
       BookmarkExtension,
       WordCompleteExtension,
       TyporaFocusExtension,
+      FocusModeExtension.configure({ enabled: focusMode }),
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
@@ -347,6 +355,53 @@ export function MarkdownEditor({
     };
   }, [editor, ime]);
 
+  // タイプライターモード: カーソル行を常に画面中央に保つ
+  useEffect(() => {
+    if (!editor || !typewriterMode || mode !== 'wysiwyg') return;
+
+    const handleSelectionUpdate = () => {
+      const { state, view } = editor;
+      const { from } = state.selection;
+      const coords = view.coordsAtPos(from);
+      const wrapper = editorWrapperRef.current;
+      if (!wrapper) return;
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const targetY = wrapperRect.top + wrapperRect.height / 2;
+      const offset = coords.top - targetY;
+
+      wrapper.scrollBy({ top: offset, behavior: 'smooth' });
+    };
+
+    editor.on('selectionUpdate', handleSelectionUpdate);
+    return () => {
+      editor.off('selectionUpdate', handleSelectionUpdate);
+    };
+  }, [editor, typewriterMode, mode]);
+
+  // フォーカスモード / タイプライターモードのキーボードショートカット
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return;
+
+      // Ctrl+Shift+F: フォーカスモードのトグル (zen-mode-design.md に準拠)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        updateSettings({ editor: { focusMode: !settings.editor.focusMode } });
+        return;
+      }
+
+      // Ctrl+Shift+T: タイプライターモードのトグル
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault();
+        updateSettings({ editor: { typewriterMode: !settings.editor.typewriterMode } });
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [settings.editor.focusMode, settings.editor.typewriterMode, updateSettings]);
+
   // Ctrl+/ でソースモード切替
   // keyboard-shortcuts.md §1-5, §4-2 に準拠
   const toggleMode = useCallback(() => {
@@ -524,7 +579,11 @@ export function MarkdownEditor({
       {mode === 'wysiwyg' ? (
         <div
           ref={editorWrapperRef}
-          className="flex-1 overflow-y-auto cursor-text relative"
+          className={[
+            'flex-1 overflow-y-auto cursor-text relative',
+            focusMode ? 'focus-mode-enabled' : '',
+            typewriterMode ? 'typewriter-mode-enabled' : '',
+          ].filter(Boolean).join(' ')}
           onClick={handleEditorAreaClick}
           onContextMenu={handleContextMenu}
           onMouseDown={handleWysiwygMouseDown}
@@ -574,6 +633,7 @@ function EditorHandle(_props: {
  * ペルソナ:
  * - マークダウンが分からないけどマークダウンで書きたいエンジニア
  * - マークダウンでの編集を楽に行いたいエンジニア
+ * - 知識管理者・一般ライター: 集中モードのトグルボタン（フォーカス/タイプライター/Zen）
  */
 function EditorToolbar({
   editor,
@@ -584,6 +644,11 @@ function EditorToolbar({
   mode: EditorMode;
   onToggleMode: () => void;
 }) {
+  const { settings, updateSettings } = useSettingsStore();
+  const focusMode = settings.editor.focusMode;
+  const typewriterMode = settings.editor.typewriterMode;
+  const zenMode = settings.editor.zenMode;
+
   if (!editor) return null;
 
   return (
@@ -734,6 +799,51 @@ function EditorToolbar({
         tooltip={`${mode === 'wysiwyg' ? 'ソースモード' : 'WYSIWYG モード'}に切替 (Ctrl+/)`}
         active={mode === 'source'}
         onClick={onToggleMode}
+      />
+
+      {/* 集中・執筆モードボタン群 (Phase 7) */}
+      {/* ペルソナ: 知識管理者・一般ライター・AIパワーユーザー */}
+      <ToolbarDivider />
+      <ToolbarButton
+        icon={
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="7.5" cy="7.5" r="2" />
+            <line x1="7.5" y1="1" x2="7.5" y2="3.5" />
+            <line x1="7.5" y1="11.5" x2="7.5" y2="14" />
+            <line x1="1" y1="7.5" x2="3.5" y2="7.5" />
+            <line x1="11.5" y1="7.5" x2="14" y2="7.5" />
+          </svg>
+        }
+        tooltip={`フォーカスモード${focusMode ? '（ON）' : '（OFF）'} (Ctrl+Shift+F)`}
+        active={focusMode}
+        onClick={() => updateSettings({ editor: { focusMode: !focusMode } })}
+      />
+      <ToolbarButton
+        icon={
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <line x1="3" y1="7.5" x2="12" y2="7.5" />
+            <line x1="1" y1="4" x2="14" y2="4" strokeOpacity="0.4" />
+            <line x1="1" y1="11" x2="14" y2="11" strokeOpacity="0.4" />
+            <polyline points="5.5,5.5 3,7.5 5.5,9.5" />
+            <polyline points="9.5,5.5 12,7.5 9.5,9.5" />
+          </svg>
+        }
+        tooltip={`タイプライターモード${typewriterMode ? '（ON）' : '（OFF）'} (Ctrl+Shift+T)`}
+        active={typewriterMode}
+        onClick={() => updateSettings({ editor: { typewriterMode: !typewriterMode } })}
+      />
+      <ToolbarButton
+        icon={
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="1.5" y="1.5" width="12" height="12" rx="1" />
+            <line x1="4" y1="5.5" x2="11" y2="5.5" />
+            <line x1="4" y1="7.5" x2="11" y2="7.5" />
+            <line x1="4" y1="9.5" x2="8" y2="9.5" />
+          </svg>
+        }
+        tooltip={`Zen モード${zenMode ? '（ON）' : '（OFF）'} (F11)`}
+        active={zenMode}
+        onClick={() => updateSettings({ editor: { zenMode: !zenMode } })}
       />
     </div>
   );

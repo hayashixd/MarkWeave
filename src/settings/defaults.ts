@@ -31,6 +31,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     wordWrap: true,
     highlightCurrentLine: true,
     indentStyle: 'spaces',
+    focusMode: false,
+    typewriterMode: false,
+    zenMode: false,
   },
   markdown: {
     enableMath: true,
