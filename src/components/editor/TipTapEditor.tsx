@@ -64,9 +64,12 @@ import { htmlToMarkdown } from '../../core/converter/smart-paste';
 import { markdownToTipTap as mdToTipTapForPaste } from '../../lib/markdown-to-tiptap';
 import { SourceEditor } from './SourceEditor';
 import { useToastStore } from '../../store/toastStore';
+import { AiCopyButton } from '../AiPanel/AiCopyButton';
 import { TyporaFocusExtension } from '../../extensions/TyporaFocusExtension';
 import { FocusModeExtension } from '../../extensions/FocusModeExtension';
 import { useSettingsStore } from '../../store/settingsStore';
+import { SlashCommandsExtension, type SlashCommandState } from '../../extensions/SlashCommandsExtension';
+import { SlashCommandMenu } from '../SlashCommands/SlashCommandMenu';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -116,6 +119,14 @@ export function MarkdownEditor({
 
   // スマートペースト ask モードの状態
   const [smartPasteData, setSmartPasteData] = useState<SmartPasteAskEvent | null>(null);
+
+  // スラッシュコマンドの状態
+  const [slashState, setSlashState] = useState<SlashCommandState>({
+    active: false,
+    query: '',
+    from: -1,
+    coords: null,
+  });
 
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
@@ -177,6 +188,7 @@ export function MarkdownEditor({
       WordCompleteExtension,
       TyporaFocusExtension,
       FocusModeExtension.configure({ enabled: focusMode }),
+      SlashCommandsExtension.configure({ onStateChange: setSlashState }),
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
@@ -512,7 +524,12 @@ export function MarkdownEditor({
 
   return (
     <div className="editor-container flex flex-col h-full">
-      <EditorToolbar editor={editor} mode={mode} onToggleMode={toggleMode} />
+      <EditorToolbar
+        editor={editor}
+        mode={mode}
+        onToggleMode={toggleMode}
+        getMarkdown={() => getMarkdown() ?? ''}
+      />
       {editor && (
         <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />
       )}
@@ -597,6 +614,14 @@ export function MarkdownEditor({
               onToggleReplace={() => setShowReplace((v) => !v)}
             />
           )}
+          {/* スラッシュコマンドメニュー (Phase 7) */}
+          {slashState.active && editor && (
+            <SlashCommandMenu
+              editor={editor}
+              slashState={slashState}
+              onClose={() => setSlashState({ active: false, query: '', from: -1, coords: null })}
+            />
+          )}
           <div className="max-w-[800px] mx-auto px-12 py-8">
             <EditorContent
               editor={editor}
@@ -639,10 +664,13 @@ function EditorToolbar({
   editor,
   mode,
   onToggleMode,
+  getMarkdown,
 }: {
   editor: ReturnType<typeof useEditor>;
   mode: EditorMode;
   onToggleMode: () => void;
+  /** AIコピーボタン用: 現在の Markdown を取得する関数 */
+  getMarkdown?: () => string;
 }) {
   const { settings, updateSettings } = useSettingsStore();
   const focusMode = settings.editor.focusMode;
@@ -845,6 +873,18 @@ function EditorToolbar({
         active={zenMode}
         onClick={() => updateSettings({ editor: { zenMode: !zenMode } })}
       />
+
+      {/* AIコピーボタン (Phase 8) */}
+      {/* ペルソナ: AIパワーユーザー — Markdownを最適化してClaudeやChatGPTに渡す */}
+      {getMarkdown && mode === 'wysiwyg' && (
+        <>
+          <ToolbarDivider />
+          <AiCopyButton
+            getMarkdown={getMarkdown}
+            label="✨ AI コピー"
+          />
+        </>
+      )}
     </div>
   );
 }

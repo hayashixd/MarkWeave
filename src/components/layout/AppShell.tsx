@@ -45,7 +45,6 @@ import { ExportDialog } from '../Export/ExportDialog';
 import { PdfExportDialog } from '../Export/PdfExportDialog';
 import { ConversionDialog } from '../Conversion/ConversionDialog';
 import { useConvertFile } from '../../hooks/useConvertFile';
-import { useSettingsStore } from '../../store/settingsStore';
 import { useRecentFilesStore } from '../../store/recentFilesStore';
 import { useOpenFileAsTab } from '../../hooks/useOpenFileAsTab';
 
@@ -116,6 +115,16 @@ export function AppShell() {
   startSaveAsMarkdownRef.current = startSaveAsMarkdown;
   const startSaveAsHtmlRef = useRef(startSaveAsHtml);
   startSaveAsHtmlRef.current = startSaveAsHtml;
+
+  // スラッシュコマンドからAIパネルを開くイベント受信 (Phase 7/8)
+  useEffect(() => {
+    const handler = () => {
+      setSidebarOpen(true);
+      setSidebarTab('ai');
+    };
+    window.addEventListener('open-ai-templates', handler);
+    return () => window.removeEventListener('open-ai-templates', handler);
+  }, []);
 
   // フォルダを開くダイアログ（Ctrl+Shift+O）
   const openFolderDialog = useCallback(async () => {
@@ -298,6 +307,14 @@ export function AppShell() {
         e.preventDefault();
         setSidebarOpen(true);
         setSidebarTab('files');
+        return;
+      }
+
+      // Ctrl+Shift+3 / Ctrl+Shift+A: AIテンプレートパネル表示 (Phase 8)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '#' || e.key === 'A')) {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('ai');
         return;
       }
 
