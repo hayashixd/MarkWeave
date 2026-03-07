@@ -12,6 +12,9 @@
  * Phase 8 追加:
  * - AI タブ（AIテンプレートパネル）
  * - ペルソナ: AIパワーユーザー — テンプレートからMarkdownの足場を高速生成
+ *
+ * Phase 7.5 追加:
+ * - バックリンクタブ（知識管理者: 現在ファイルへの逆参照を表示）
  */
 
 import { useState, useCallback } from 'react';
@@ -19,8 +22,9 @@ import type { Editor } from '@tiptap/react';
 import { OutlinePanel } from '../Outline/OutlinePanel';
 import { FileTreePanel } from './FileTreePanel';
 import { TemplatePanel } from '../AiPanel/TemplatePanel';
+import { BacklinksPanel } from './BacklinksPanel';
 
-export type SidebarTab = 'outline' | 'files' | 'ai';
+export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -29,6 +33,10 @@ interface SidebarProps {
   onTabChange?: (tab: SidebarTab) => void;
   editor?: Editor | null;
   onOpenFolder?: () => void;
+  /** バックリンクパネル用: アクティブなタブのファイルパス */
+  currentFilePath?: string | null;
+  /** バックリンクパネル用: アクティブなタブのファイル名 */
+  currentFileName?: string;
 }
 
 export function Sidebar({
@@ -38,6 +46,8 @@ export function Sidebar({
   onTabChange,
   editor = null,
   onOpenFolder,
+  currentFilePath = null,
+  currentFileName = '',
 }: SidebarProps) {
   const [internalTab, setInternalTab] = useState<SidebarTab>('outline');
   const activeTab = controlledTab ?? internalTab;
@@ -117,6 +127,17 @@ export function Sidebar({
           >
             ✨ AI
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'backlinks'}
+            aria-controls="sidebar-panel-backlinks"
+            className={`sidebar-tab ${activeTab === 'backlinks' ? 'sidebar-tab--active' : ''} whitespace-nowrap`}
+            onClick={() => setActiveTab('backlinks')}
+            title="バックリンク (Ctrl+Shift+4)"
+          >
+            🔗 Links
+          </button>
         </div>
         <button
           type="button"
@@ -161,6 +182,18 @@ export function Sidebar({
             <TemplatePanel
               onClose={() => setActiveTab('outline')}
               onInsert={handleTemplateInsert}
+            />
+          </div>
+        )}
+        {activeTab === 'backlinks' && (
+          <div
+            id="sidebar-panel-backlinks"
+            role="tabpanel"
+            aria-labelledby="tab-backlinks"
+          >
+            <BacklinksPanel
+              currentFilePath={currentFilePath}
+              currentFileName={currentFileName}
             />
           </div>
         )}

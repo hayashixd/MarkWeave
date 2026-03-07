@@ -75,6 +75,7 @@ import { parseFrontMatter, serializeFrontMatter } from '../../lib/frontmatter';
 import { WikilinkExtension, type WikilinkAutoState } from '../../extensions/WikilinkExtension';
 import { WikilinkPopup } from './WikilinkPopup';
 import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useRecentFilesStore } from '../../store/recentFilesStore';
 import { AmbientSoundControl } from './AmbientSoundControl';
 
 export type EditorMode = 'wysiwyg' | 'source';
@@ -152,7 +153,10 @@ export function MarkdownEditor({
 
   // ワークスペースのファイル一覧をオートコンプリート候補として使う
   const { tree } = useWorkspaceStore();
-  const wikilinkCandidates = (() => {
+  const { recentFiles } = useRecentFilesStore();
+
+  // ファイル一覧をフラット化
+  const workspaceFiles = (() => {
     const files: { name: string; path: string }[] = [];
     const walk = (nodes: typeof tree) => {
       for (const node of nodes) {
@@ -166,6 +170,19 @@ export function MarkdownEditor({
     walk(tree);
     return files;
   })();
+
+  // LRU ソート: 最近開いたファイルを先頭に
+  const recentPathSet = new Map<string, number>(recentFiles.map((r, i): [string, number] => [r.path, i]));
+  const wikilinkCandidates = [...workspaceFiles].sort((a, b) => {
+    const ai: number = recentPathSet.get(a.path) ?? Infinity;
+    const bi: number = recentPathSet.get(b.path) ?? Infinity;
+    return ai - bi;
+  });
+
+  // Wikilink 解決状態チェック用: 拡張子なしファイル名の Set
+  const resolvedFileNames = new Set(
+    workspaceFiles.map((f) => f.name.replace(/\.(md|html|txt)$/i, '').toLowerCase()),
+  );
 
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
@@ -233,6 +250,10 @@ export function MarkdownEditor({
           window.dispatchEvent(new CustomEvent('open-wikilink', { detail: { target } }));
         },
         onAutoStateChange: setWikilinkAutoState,
+        isTargetResolved: (target) => {
+          if (resolvedFileNames.size === 0) return true; // ワークスペース未読込時は中立
+          return resolvedFileNames.has(target.toLowerCase());
+        },
       }),
     ],
     editable: !readOnly,

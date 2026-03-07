@@ -330,6 +330,14 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Shift+4 / Ctrl+Shift+B: バックリンクパネル表示 (Phase 7.5)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '$' || e.key === 'B')) {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('backlinks');
+        return;
+      }
+
       // Ctrl+Shift+M: Markdownとして保存（HTML→MD変換）(html-editing-design.md §5.3)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         e.preventDefault();
@@ -396,6 +404,8 @@ export function AppShell() {
           onTabChange={setSidebarTab}
           editor={currentEditor}
           onOpenFolder={openFolderDialog}
+          currentFilePath={activeTab?.filePath ?? null}
+          currentFileName={activeTab?.fileName ?? ''}
         />
 
         {/* エディタエリア - Phase 5: ファイル種別に応じてエディタを切替 */}

@@ -32,6 +32,8 @@ export interface WikilinkOptions {
   onLinkClick?: (target: string) => void;
   /** オートコンプリート状態変化コールバック */
   onAutoStateChange?: (state: WikilinkAutoState) => void;
+  /** リンクターゲットが実在するか判定するコールバック（解決済み=青/未解決=赤点線） */
+  isTargetResolved?: (target: string) => boolean;
   HTMLAttributes: Record<string, unknown>;
 }
 
@@ -50,6 +52,7 @@ export const WikilinkExtension = Node.create<WikilinkOptions>({
     return {
       onLinkClick: undefined,
       onAutoStateChange: undefined,
+      isTargetResolved: undefined,
       HTMLAttributes: {},
     };
   },
@@ -84,9 +87,14 @@ export const WikilinkExtension = Node.create<WikilinkOptions>({
     return ({ node, HTMLAttributes }) => {
       const dom = document.createElement('span');
       dom.setAttribute('data-wikilink', node.attrs.target as string);
-      dom.className = 'wikilink';
-      dom.title = `[[${node.attrs.target}]] — Ctrl+クリックで開く`;
-      dom.textContent = (node.attrs.label ?? node.attrs.target) as string;
+      const target = node.attrs.target as string;
+      const resolved = this.options.isTargetResolved?.(target);
+      dom.className = [
+        'wikilink',
+        resolved === true ? 'wikilink--resolved' : resolved === false ? 'wikilink--unresolved' : '',
+      ].filter(Boolean).join(' ');
+      dom.title = `[[${target}]] — Ctrl+クリックで開く`;
+      dom.textContent = (node.attrs.label ?? target) as string;
 
       // クリックでリンクを開く
       dom.addEventListener('click', (e) => {
