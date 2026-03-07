@@ -65,11 +65,29 @@ const defaultOptions: MdToHtmlOptions = {
  * @example
  * const html = await convertMdToHtml('# Hello\n\nWorld', { title: 'Hello' });
  */
+/**
+ * Wikiリンク記法 [[target]] / [[target|label]] を通常の Markdown リンクに変換する。
+ * エクスポート時にリンクを保持するための前処理。
+ * Phase 7.5: エクスポート時の Wikiリンク → 通常リンク変換
+ */
+export function resolveWikilinksForExport(markdown: string): string {
+  // [[target|label]] → [label](target.md)
+  // [[target]]       → [target](target.md)
+  return markdown.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (_, target: string, label?: string) => {
+    const slug = target.trim().replace(/\s+/g, '-');
+    const display = label?.trim() ?? target.trim();
+    return `[${display}](${slug}.md)`;
+  });
+}
+
 export async function convertMdToHtml(
   markdown: string,
   options: Partial<MdToHtmlOptions> = {}
 ): Promise<string> {
   const opts = { ...defaultOptions, ...options };
+
+  // Wikiリンクを通常リンクに変換してからパイプラインに渡す (Phase 7.5)
+  const processedMarkdown = resolveWikilinksForExport(markdown);
 
   // unified パイプラインを構築
   // 注: unified の型は .use() チェーンごとに型パラメータが変化するため、
@@ -91,7 +109,7 @@ export async function convertMdToHtml(
   pipeline = pipeline.use(rehypeStringify);
 
   // Markdown → HTML コンテンツ変換
-  const result = await pipeline.process(markdown);
+  const result = await pipeline.process(processedMarkdown);
   const contentHtml = String(result);
 
   // HTML テンプレートに注入

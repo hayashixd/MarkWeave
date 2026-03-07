@@ -45,6 +45,9 @@ import { ExportDialog } from '../Export/ExportDialog';
 import { PdfExportDialog } from '../Export/PdfExportDialog';
 import { ConversionDialog } from '../Conversion/ConversionDialog';
 import { useConvertFile } from '../../hooks/useConvertFile';
+import { useRecentFilesStore } from '../../store/recentFilesStore';
+import { useOpenFileAsTab } from '../../hooks/useOpenFileAsTab';
+import { parseFrontMatter, parseYamlFields } from '../../lib/frontmatter';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -54,10 +57,28 @@ export function AppShell() {
   const [pdfExportDialogOpen, setPdfExportDialogOpen] = useState(false);
   // エディタインスタンスへの参照（アウトラインパネル等で使用）
   const [currentEditor, setCurrentEditor] = useState<Editor | null>(null);
+
+  // Zen Mode / 設定
+  const { settings, updateSettings } = useSettingsStore();
+  const zenMode = settings.editor.zenMode;
+
+  // 最近使ったファイル
+  const { recentFiles, loadRecentFiles, addRecentFile } = useRecentFilesStore();
+  useEffect(() => {
+    loadRecentFiles();
+  }, [loadRecentFiles]);
   const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab } =
     useTabStore();
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
+
+  // アクティブタブが保存済みのファイルになったら最近使ったファイルに追加
+  useEffect(() => {
+    if (activeTab?.filePath && !activeTab.isDirty) {
+      addRecentFile(activeTab.filePath, activeTab.fileName);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab?.filePath, activeTab?.isDirty]);
 
   // タイトルバーにアクティブタブの未保存マーカーを反映
   useTitleBar();
@@ -95,6 +116,28 @@ export function AppShell() {
   startSaveAsMarkdownRef.current = startSaveAsMarkdown;
   const startSaveAsHtmlRef = useRef(startSaveAsHtml);
   startSaveAsHtmlRef.current = startSaveAsHtml;
+
+  // スラッシュコマンドからAIパネルを開くイベント受信 (Phase 7/8)
+  useEffect(() => {
+    const handler = () => {
+      setSidebarOpen(true);
+      setSidebarTab('ai');
+    };
+    window.addEventListener('open-ai-templates', handler);
+    return () => window.removeEventListener('open-ai-templates', handler);
+  }, []);
+
+  // Wikilink クリックでファイルを開く (Phase 7.5)
+  const openFileAsTab = useOpenFileAsTab();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { target } = (e as CustomEvent<{ target: string }>).detail;
+      // フルパスでなければワークスペース相対として解決を試みる（ベストエフォート）
+      openFileAsTab(target);
+    };
+    window.addEventListener('open-wikilink', handler);
+    return () => window.removeEventListener('open-wikilink', handler);
+  }, [openFileAsTab]);
 
   // フォルダを開くダイアログ（Ctrl+Shift+O）
   const openFolderDialog = useCallback(async () => {
@@ -280,6 +323,22 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Shift+3 / Ctrl+Shift+A: AIテンプレートパネル表示 (Phase 8)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '#' || e.key === 'A')) {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('ai');
+        return;
+      }
+
+      // Ctrl+Shift+4 / Ctrl+Shift+B: バックリンクパネル表示 (Phase 7.5)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '$' || e.key === 'B')) {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('backlinks');
+        return;
+      }
+
       // Ctrl+Shift+M: Markdownとして保存（HTML→MD変換）(html-editing-design.md §5.3)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         e.preventDefault();
@@ -307,14 +366,87 @@ export function AppShell() {
         setPdfExportDialogOpen(true);
         return;
       }
+
+      // Ctrl+Alt+D: デイリーノート作成 (知識管理者ペルソナ向け)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'd') {
+        e.preventDefault();
+        createDailyNote();
+        return;
+      }
+
+      // F11: Zen モードのトグル (zen-mode-design.md に準拠)
+      if (e.key === 'F11') {
+        e.preventDefault();
+        updateSettings({ editor: { zenMode: !settings.editor.zenMode } });
+        return;
+      }
+
+      // Escape: Zen モードを解除
+      if (e.key === 'Escape' && settings.editor.zenMode) {
+        e.preventDefault();
+        updateSettings({ editor: { zenMode: false } });
+        return;
+      }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow]);
+  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow, settings.editor.zenMode, updateSettings]);
+
+  // デイリーノート作成関数 (知識管理者ペルソナ向け)
+  const createDailyNote = useCallback(() => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    const dayName = dayNames[now.getDay()];
+
+    const content = [
+      '---',
+      `title: ${dateStr} (${dayName})`,
+      `date: ${dateStr}`,
+      'tags: [daily]',
+      'draft: true',
+      '---',
+      '',
+      `# ${dateStr} (${dayName})`,
+      '',
+      '## 今日のタスク',
+      '',
+      '- [ ] ',
+      '',
+      '## メモ',
+      '',
+      '',
+      '',
+      '## 振り返り',
+      '',
+      '',
+    ].join('\n');
+
+    addTab({
+      filePath: null,
+      fileName: `${dateStr}.md`,
+      content,
+      savedContent: '',
+    });
+  }, [addTab]);
+
+  // カスタムイベント: create-daily-note (スラッシュコマンドから)
+  useEffect(() => {
+    const handler = () => createDailyNote();
+    window.addEventListener('create-daily-note', handler);
+    return () => window.removeEventListener('create-daily-note', handler);
+  }, [createDailyNote]);
 
   return (
-    <div className="app-shell flex flex-col h-screen relative" role="application" aria-label="Markdown エディタ">
+    <div
+      className={['app-shell flex flex-col h-screen relative', zenMode ? 'zen-mode' : ''].filter(Boolean).join(' ')}
+      role="application"
+      aria-label="Markdown エディタ"
+    >
       {/* タブバー */}
       <TabBar onCloseTab={handleCloseTab} onNewTab={handleNewTab} />
 
@@ -328,6 +460,8 @@ export function AppShell() {
           onTabChange={setSidebarTab}
           editor={currentEditor}
           onOpenFolder={openFolderDialog}
+          currentFilePath={activeTab?.filePath ?? null}
+          currentFileName={activeTab?.fileName ?? ''}
         />
 
         {/* エディタエリア - Phase 5: ファイル種別に応じてエディタを切替 */}
@@ -349,7 +483,11 @@ export function AppShell() {
               )}
             </EditorErrorBoundary>
           ) : (
-            <EmptyState onNewTab={handleNewTab} onOpenFile={() => openFileDialogRef.current()} />
+            <EmptyState
+              onNewTab={handleNewTab}
+              onOpenFile={() => openFileDialogRef.current()}
+              recentFiles={recentFiles}
+            />
           )}
         </div>
       </main>
@@ -441,57 +579,151 @@ function DropOverlay() {
 }
 
 /**
- * ファイルが開かれていない時の空状態
+ * ファイルが開かれていない時のウェルカム画面
+ *
+ * ペルソナ対応:
+ * - 全ペルソナ: 最近使ったファイルをすぐ再開できる
+ * - 一般ライター: 操作ヒントで学習コストを削減
+ * - AIパワーユーザー: AIコピー・テンプレート機能への導線
  */
-function EmptyState({ onNewTab, onOpenFile }: { onNewTab: () => void; onOpenFile: () => void }) {
+function EmptyState({
+  onNewTab,
+  onOpenFile,
+  recentFiles,
+}: {
+  onNewTab: () => void;
+  onOpenFile: () => void;
+  recentFiles: import('../../store/recentFilesStore').RecentFileEntry[];
+}) {
+  const { addTab } = useTabStore();
+  const { addRecentFile: _addRecent } = useRecentFilesStore();
+  const openFileAsTab = useOpenFileAsTab();
+
+  const handleOpenRecent = useCallback(async (path: string) => {
+    await openFileAsTab(path);
+  }, [openFileAsTab]);
+
+  const formatRelativeTime = (ms: number) => {
+    const diff = Date.now() - ms;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (minutes < 1) return 'たった今';
+    if (minutes < 60) return `${minutes}分前`;
+    if (hours < 24) return `${hours}時間前`;
+    if (days < 7) return `${days}日前`;
+    return new Date(ms).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+  };
+
   return (
-    <div className="flex-1 flex items-center justify-center bg-gray-50">
-      <div className="text-center max-w-md px-8">
-        <div className="text-6xl mb-6 text-gray-300">
-          <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mx-auto">
+    <div className="flex-1 flex items-center justify-center bg-gray-50 overflow-y-auto">
+      <div className="w-full max-w-2xl px-8 py-12">
+        {/* ロゴ・キャッチコピー */}
+        <div className="text-center mb-10">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="mx-auto mb-4 text-blue-400">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
             <line x1="16" y1="13" x2="8" y2="13" />
             <line x1="16" y1="17" x2="8" y2="17" />
-            <polyline points="10 9 9 9 8 9" />
           </svg>
+          <h1 className="text-2xl font-bold text-gray-800 mb-1">Markdown Editor</h1>
+          <p className="text-sm text-gray-400">書く・変換する・AIに渡す — 全部ここで</p>
         </div>
-        <p className="text-lg text-gray-500 mb-2">ファイルが開かれていません</p>
-        <p className="text-sm text-gray-400 mb-6">
-          新しいファイルを作成するか、既存のファイルを開いてください
-        </p>
-        <div className="flex flex-col items-center gap-3">
+
+        {/* アクション */}
+        <div className="flex gap-3 justify-center mb-10">
           <button
             type="button"
             onClick={onNewTab}
-            className="px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium shadow-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium shadow-sm"
           >
-            新しいファイルを作成
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="7" y1="1" x2="7" y2="13" />
+              <line x1="1" y1="7" x2="13" y2="7" />
+            </svg>
+            新しいファイル
           </button>
           <button
             type="button"
             onClick={onOpenFile}
-            className="px-6 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium shadow-sm"
           >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
             ファイルを開く
           </button>
-          <p className="text-xs text-gray-400 mt-2">
-            またはファイルをウィンドウにドラッグ&ドロップ
-          </p>
-          <div className="flex items-center gap-4 text-xs text-gray-400 mt-1">
-            <span>
-              <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+N</kbd>
-              {' '}新規作成
-            </span>
-            <span>
-              <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+O</kbd>
-              {' '}ファイルを開く
-            </span>
+        </div>
+
+        {/* 最近使ったファイル */}
+        {recentFiles.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">最近使ったファイル</h2>
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              {recentFiles.slice(0, 8).map((entry) => {
+                const fileExt = entry.name.split('.').pop()?.toUpperCase() ?? 'MD';
+                const isHtml = fileExt === 'HTML' || fileExt === 'HTM';
+                return (
+                  <button
+                    key={entry.path}
+                    type="button"
+                    onClick={() => handleOpenRecent(entry.path)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left group"
+                  >
+                    <span className={`flex-shrink-0 w-7 h-7 flex items-center justify-center rounded text-xs font-bold ${isHtml ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                      {isHtml ? 'H' : 'M'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-gray-800 font-medium truncate group-hover:text-blue-600 transition-colors">
+                        {entry.name}
+                      </div>
+                      <div className="text-xs text-gray-400 truncate">{entry.path}</div>
+                    </div>
+                    <span className="flex-shrink-0 text-xs text-gray-400">
+                      {formatRelativeTime(entry.lastOpened)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        )}
+
+        {/* ヒント行 */}
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-400">
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+N</kbd>
+            {' '}新規
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+O</kbd>
+            {' '}開く
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">F11</kbd>
+            {' '}Zen モード
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+Shift+F</kbd>
+            {' '}フォーカスモード
+          </span>
+          <span className="text-gray-300">またはここにファイルをドロップ</span>
         </div>
       </div>
     </div>
   );
+}
+
+/** YAML Front Matter と Markdown 記号を除いた純テキスト文字数を返す */
+function countWritingChars(content: string): number {
+  const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+  const text = body
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[*_`~]/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^>\s+/gm, '')
+    .replace(/\s+/g, '');
+  return text.length;
 }
 
 function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
@@ -537,6 +769,27 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
     ? `タブ: ${settings.editor.sourceTabSize}`
     : `スペース: ${settings.editor.sourceTabSize}`;
 
+  // 執筆目標文字数
+  const writingGoal = settings.editor.writingGoal;
+  const charCount = tab ? countWritingChars(tab.content) : 0;
+  const goalProgress = writingGoal > 0 ? Math.min(charCount / writingGoal, 1) : 0;
+  const goalReached = writingGoal > 0 && charCount >= writingGoal;
+
+  // YAML Front Matter のドラフト状態（下書きバッジ表示）
+  const isDraft = (() => {
+    if (!tab || tab.fileType !== 'markdown') return false;
+    try {
+      const { yaml } = parseFrontMatter(tab.content);
+      if (!yaml) return false;
+      return parseYamlFields(yaml).draft === true;
+    } catch {
+      return false;
+    }
+  })();
+
+  // 読了時間の推定（日本語: 約500文字/分）
+  const readingTimeMin = charCount > 0 ? Math.max(1, Math.ceil(charCount / 500)) : 0;
+
   return (
     <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-600" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
@@ -546,12 +799,39 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
             {tab.isDirty && (
               <span className="text-orange-500">● 変更あり</span>
             )}
+            {/* 下書きバッジ (YAML Front Matter: draft: true) */}
+            {isDraft && (
+              <span className="status-bar__draft-badge" title="YAML Front Matter に draft: true が設定されています">
+                下書き
+              </span>
+            )}
+            {/* 執筆目標進捗 */}
+            {writingGoal > 0 && (
+              <div className="flex items-center gap-1.5" title={`執筆目標: ${charCount.toLocaleString()} / ${writingGoal.toLocaleString()}文字`}>
+                <span className={goalReached ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                  {charCount.toLocaleString()} / {writingGoal.toLocaleString()}文字
+                </span>
+                <div className="w-20 h-1.5 bg-gray-300 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${goalReached ? 'bg-green-500' : 'bg-blue-400'}`}
+                    style={{ width: `${goalProgress * 100}%` }}
+                  />
+                </div>
+                {goalReached && <span className="text-green-600">✓</span>}
+              </div>
+            )}
           </>
         ) : (
           <span>準備完了</span>
         )}
       </div>
       <div className="flex items-center gap-3">
+        {/* 読了時間 (ブロガー向け) */}
+        {tab && readingTimeMin > 0 && (
+          <span className="text-gray-400" title={`推定読了時間（約500文字/分で計算）: ${charCount.toLocaleString()}文字`}>
+            {readingTimeMin}分で読了
+          </span>
+        )}
         {/* インデント設定 */}
         <div ref={indentRef} className="relative">
           <button

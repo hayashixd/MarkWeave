@@ -30,6 +30,24 @@ export interface EditorSettings {
   highlightCurrentLine: boolean;
   /** インデントスタイル: スペース or タブ */
   indentStyle: 'spaces' | 'tabs';
+  /** フォーカスモード: カーソル外のブロックを薄く表示して集中執筆を支援 */
+  focusMode: boolean;
+  /** タイプライターモード: カーソル行を常に画面中央に保つ */
+  typewriterMode: boolean;
+  /** Zen モード: UI を完全に隠してフルスクリーン執筆 */
+  zenMode: boolean;
+  /** 執筆目標文字数 (0 = 無効). ステータスバーにカウンターと進捗バーを表示 */
+  writingGoal: number;
+  /** アンビエントサウンド種別 ('off' | 'white' | 'brown' | 'rain' | 'cafe') */
+  ambientSound: 'off' | 'white' | 'brown' | 'rain' | 'cafe';
+  /** アンビエントサウンド音量 (0.0–1.0) */
+  ambientVolume: number;
+  /** タイプライター打鍵音フィードバックの有効/無効 */
+  typewriterSound: boolean;
+  /** タイプライター打鍵音のスタイル */
+  typewriterStyle: 'mechanical' | 'soft' | 'typewriter';
+  /** タイプライター打鍵音の音量 (0.0–1.0) */
+  typewriterVolume: number;
 }
 
 export interface MarkdownSettings {
@@ -63,6 +81,13 @@ export interface AiCopySettings {
   analyzePromptStructure: boolean;
 }
 
+export interface SlashCommandSettings {
+  /** スラッシュコマンド機能の有効/無効 */
+  enabled: boolean;
+  /** AIテンプレートコマンドをスラッシュコマンドメニューに含めるか */
+  showAiTemplates: boolean;
+}
+
 /** アプリ設定の全体型 */
 export interface AppSettings {
   /** 設定ファイルのバージョン。マイグレーションに使用 */
@@ -72,6 +97,7 @@ export interface AppSettings {
   markdown: MarkdownSettings;
   file: FileSettings;
   aiCopy: AiCopySettings;
+  slashCommands: SlashCommandSettings;
 }
 
 /** ネストされたオブジェクトの部分更新用ユーティリティ型 */

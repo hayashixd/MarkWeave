@@ -282,6 +282,13 @@ function serializeInlineContent(nodes?: TipTapNode[]): string {
       continue;
     }
 
+    if (node.type === 'wikilink') {
+      const target = (node.attrs?.target as string) ?? '';
+      const label = node.attrs?.label as string | null | undefined;
+      result.push(label ? `[[${target}|${label}]]` : `[[${target}]]`);
+      continue;
+    }
+
     if (node.type !== 'text' || node.text == null) continue;
 
     let text = node.text;

@@ -11,12 +11,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AppearanceTab } from './tabs/AppearanceTab';
 import { EditorTab } from './tabs/EditorTab';
+import { WritingTab } from './tabs/WritingTab';
 
-type TabId = 'appearance' | 'editor';
+type TabId = 'appearance' | 'editor' | 'writing';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'appearance', label: '外観' },
   { id: 'editor', label: 'エディタ' },
+  { id: 'writing', label: '執筆スタイル' },
 ];
 
 interface PreferencesDialogProps {
@@ -92,6 +94,7 @@ export function PreferencesDialog({ isOpen, onClose }: PreferencesDialogProps) {
           <div className="flex-1 p-4 overflow-y-auto">
             {activeTab === 'appearance' && <AppearanceTab />}
             {activeTab === 'editor' && <EditorTab />}
+            {activeTab === 'writing' && <WritingTab />}
           </div>
         </div>
       </div>

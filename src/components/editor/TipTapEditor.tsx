@@ -64,7 +64,20 @@ import { htmlToMarkdown } from '../../core/converter/smart-paste';
 import { markdownToTipTap as mdToTipTapForPaste } from '../../lib/markdown-to-tiptap';
 import { SourceEditor } from './SourceEditor';
 import { useToastStore } from '../../store/toastStore';
+import { AiCopyButton } from '../AiPanel/AiCopyButton';
 import { TyporaFocusExtension } from '../../extensions/TyporaFocusExtension';
+import { FocusModeExtension } from '../../extensions/FocusModeExtension';
+import { useSettingsStore } from '../../store/settingsStore';
+import { SlashCommandsExtension, type SlashCommandState } from '../../extensions/SlashCommandsExtension';
+import { SlashCommandMenu } from '../SlashCommands/SlashCommandMenu';
+import { FrontMatterPanel } from './FrontMatterPanel';
+import { parseFrontMatter, serializeFrontMatter } from '../../lib/frontmatter';
+import { WikilinkExtension, type WikilinkAutoState } from '../../extensions/WikilinkExtension';
+import { WikilinkPopup } from './WikilinkPopup';
+import { useWorkspaceStore } from '../../store/workspaceStore';
+import { useRecentFilesStore } from '../../store/recentFilesStore';
+import { AmbientSoundControl } from './AmbientSoundControl';
+import { typewriterPlayer } from '../../lib/typewriter-sound';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -89,10 +102,23 @@ export function MarkdownEditor({
   onEditorReady,
 }: EditorProps) {
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
+
+  // YAML Front Matter を本文から分離して管理
+  const { yaml: initYaml, body: initBody } = parseFrontMatter(initialContent);
+  const [frontMatterYaml, setFrontMatterYaml] = useState(initYaml);
+  // Front Matter なしの本文を initialContent として使う
   const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+  // フロントマター変更時に参照するために ref に保持
+  const frontMatterYamlRef = useRef(frontMatterYaml);
+  frontMatterYamlRef.current = frontMatterYaml;
+
+  // 集中モード系の設定を取得
+  const { settings, updateSettings } = useSettingsStore();
+  const focusMode = settings.editor.focusMode;
+  const typewriterMode = settings.editor.typewriterMode;
 
   // 検索バーの状態
   const [searchVisible, setSearchVisible] = useState(false);
@@ -109,6 +135,55 @@ export function MarkdownEditor({
 
   // スマートペースト ask モードの状態
   const [smartPasteData, setSmartPasteData] = useState<SmartPasteAskEvent | null>(null);
+
+  // スラッシュコマンドの状態
+  const [slashState, setSlashState] = useState<SlashCommandState>({
+    active: false,
+    query: '',
+    from: -1,
+    coords: null,
+  });
+
+  // Wikilink オートコンプリートの状態
+  const [wikilinkAutoState, setWikilinkAutoState] = useState<WikilinkAutoState>({
+    active: false,
+    query: '',
+    from: -1,
+    coords: null,
+  });
+
+  // ワークスペースのファイル一覧をオートコンプリート候補として使う
+  const { tree } = useWorkspaceStore();
+  const { recentFiles } = useRecentFilesStore();
+
+  // ファイル一覧をフラット化
+  const workspaceFiles = (() => {
+    const files: { name: string; path: string }[] = [];
+    const walk = (nodes: typeof tree) => {
+      for (const node of nodes) {
+        if (node.type === 'file') {
+          files.push({ name: node.name, path: node.path });
+        } else if (node.children) {
+          walk(node.children);
+        }
+      }
+    };
+    walk(tree);
+    return files;
+  })();
+
+  // LRU ソート: 最近開いたファイルを先頭に
+  const recentPathSet = new Map<string, number>(recentFiles.map((r, i): [string, number] => [r.path, i]));
+  const wikilinkCandidates = [...workspaceFiles].sort((a, b) => {
+    const ai: number = recentPathSet.get(a.path) ?? Infinity;
+    const bi: number = recentPathSet.get(b.path) ?? Infinity;
+    return ai - bi;
+  });
+
+  // Wikilink 解決状態チェック用: 拡張子なしファイル名の Set
+  const resolvedFileNames = new Set(
+    workspaceFiles.map((f) => f.name.replace(/\.(md|html|txt)$/i, '').toLowerCase()),
+  );
 
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
@@ -169,6 +244,18 @@ export function MarkdownEditor({
       BookmarkExtension,
       WordCompleteExtension,
       TyporaFocusExtension,
+      FocusModeExtension.configure({ enabled: focusMode }),
+      ...(settings.slashCommands?.enabled !== false ? [SlashCommandsExtension.configure({ onStateChange: setSlashState })] : []),
+      WikilinkExtension.configure({
+        onLinkClick: (target) => {
+          window.dispatchEvent(new CustomEvent('open-wikilink', { detail: { target } }));
+        },
+        onAutoStateChange: setWikilinkAutoState,
+        isTargetResolved: (target) => {
+          if (resolvedFileNames.size === 0) return true; // ワークスペース未読込時は中立
+          return resolvedFileNames.has(target.toLowerCase());
+        },
+      }),
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
@@ -320,11 +407,15 @@ export function MarkdownEditor({
     return () => window.removeEventListener('editor-link-insert', handler);
   }, [editor]);
 
-  // 初期コンテンツの設定
+  // 初期コンテンツの設定（タブ切り替え時も含む）
   useEffect(() => {
-    if (!editor || !initialContent) return;
+    if (!editor) return;
 
-    const doc = markdownToTipTap(initialContent);
+    // Front Matter を抽出して本文のみ TipTap に渡す
+    const { yaml, body } = parseFrontMatter(initialContent);
+    setFrontMatterYaml(yaml);
+
+    const doc = markdownToTipTap(body || '');
     editor.commands.setContent(doc as unknown as Record<string, unknown>);
   }, [editor, initialContent]);
 
@@ -338,7 +429,8 @@ export function MarkdownEditor({
 
       const json = editor.getJSON() as unknown as TipTapDoc;
       const markdown = tiptapToMarkdown(json);
-      onContentChangeRef.current?.(markdown);
+      // Front Matter を先頭に付けて完全な Markdown として通知
+      onContentChangeRef.current?.(serializeFrontMatter(frontMatterYamlRef.current, markdown));
     };
 
     editor.on('update', handler);
@@ -347,20 +439,70 @@ export function MarkdownEditor({
     };
   }, [editor, ime]);
 
+  // タイプライターモード: カーソル行を常に画面中央に保つ
+  useEffect(() => {
+    if (!editor || !typewriterMode || mode !== 'wysiwyg') return;
+
+    const handleSelectionUpdate = () => {
+      const { state, view } = editor;
+      const { from } = state.selection;
+      const coords = view.coordsAtPos(from);
+      const wrapper = editorWrapperRef.current;
+      if (!wrapper) return;
+
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const targetY = wrapperRect.top + wrapperRect.height / 2;
+      const offset = coords.top - targetY;
+
+      wrapper.scrollBy({ top: offset, behavior: 'smooth' });
+    };
+
+    editor.on('selectionUpdate', handleSelectionUpdate);
+    return () => {
+      editor.off('selectionUpdate', handleSelectionUpdate);
+    };
+  }, [editor, typewriterMode, mode]);
+
+  // フォーカスモード / タイプライターモードのキーボードショートカット
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return;
+
+      // Ctrl+Shift+F: フォーカスモードのトグル (zen-mode-design.md に準拠)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        updateSettings({ editor: { focusMode: !settings.editor.focusMode } });
+        return;
+      }
+
+      // Ctrl+Shift+T: タイプライターモードのトグル
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault();
+        updateSettings({ editor: { typewriterMode: !settings.editor.typewriterMode } });
+        return;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [settings.editor.focusMode, settings.editor.typewriterMode, updateSettings]);
+
   // Ctrl+/ でソースモード切替
   // keyboard-shortcuts.md §1-5, §4-2 に準拠
   const toggleMode = useCallback(() => {
     if (!editor) return;
 
     if (mode === 'wysiwyg') {
-      // WYSIWYG → ソース: 現在のエディタ内容を Markdown に変換
+      // WYSIWYG → ソース: Front Matter を含む完全な Markdown をソースに表示
       const json = editor.getJSON() as unknown as TipTapDoc;
-      const markdown = tiptapToMarkdown(json);
-      setSourceText(markdown);
+      const body = tiptapToMarkdown(json);
+      const full = serializeFrontMatter(frontMatterYamlRef.current, body);
+      setSourceText(full);
       setMode('source');
     } else {
-      // ソース → WYSIWYG: Markdown を TipTap JSON に変換してエディタに設定
-      const doc = markdownToTipTap(sourceText);
+      // ソース → WYSIWYG: ソース内の Front Matter を抽出して本文を TipTap に設定
+      const { yaml, body } = parseFrontMatter(sourceText);
+      setFrontMatterYaml(yaml);
+      const doc = markdownToTipTap(body || '');
       editor.commands.setContent(doc as unknown as Record<string, unknown>);
       onContentChangeRef.current?.(sourceText);
       setMode('wysiwyg');
@@ -378,6 +520,61 @@ export function MarkdownEditor({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [toggleMode]);
+
+  // タイプライター打鍵音フィードバック (Phase 7)
+  useEffect(() => {
+    if (!settings.editor.typewriterSound) return;
+    const handler = (e: KeyboardEvent) => {
+      // IME 入力中・修飾キー単体・機能キーでは発音しない
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // 文字入力・スペース・バックスペース・エンターのみ
+      const isPrintable = e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Delete';
+      if (!isPrintable) return;
+      typewriterPlayer.playKey(settings.editor.typewriterStyle, settings.editor.typewriterVolume);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [settings.editor.typewriterSound, settings.editor.typewriterStyle, settings.editor.typewriterVolume]);
+
+  // コードブロックにコピーボタンを自動付与 (テクニカルライター/開発者ペルソナ向け)
+  useEffect(() => {
+    if (!editor || mode !== 'wysiwyg') return;
+    const editorDom = editor.view.dom;
+
+    const addCopyButtons = () => {
+      const preElements = editorDom.querySelectorAll('pre');
+      preElements.forEach((pre) => {
+        if (pre.querySelector('.code-copy-btn')) return;
+        const btn = document.createElement('button');
+        btn.className = 'code-copy-btn';
+        btn.textContent = 'Copy';
+        btn.title = 'コードをコピー';
+        btn.contentEditable = 'false';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const code = pre.querySelector('code');
+          if (code) {
+            void navigator.clipboard.writeText(code.textContent ?? '');
+            btn.textContent = '✓ Copied';
+            btn.classList.add('code-copy-btn--copied');
+            setTimeout(() => {
+              btn.textContent = 'Copy';
+              btn.classList.remove('code-copy-btn--copied');
+            }, 1500);
+          }
+        });
+        pre.style.position = 'relative';
+        pre.appendChild(btn);
+      });
+    };
+
+    addCopyButtons();
+    const observer = new MutationObserver(addCopyButtons);
+    observer.observe(editorDom, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [editor, mode]);
 
   // ソースモードでのテキスト変更（CodeMirror から直接文字列を受け取る）
   const handleSourceTextChange = useCallback(
@@ -404,20 +601,23 @@ export function MarkdownEditor({
   const setMarkdown = useCallback(
     (markdown: string) => {
       if (!editor) return;
-      const doc = markdownToTipTap(markdown);
+      const { yaml, body } = parseFrontMatter(markdown);
+      setFrontMatterYaml(yaml);
+      const doc = markdownToTipTap(body || '');
       editor.commands.setContent(doc as unknown as Record<string, unknown>);
     },
     [editor],
   );
 
-  // 現在の Markdown を取得するメソッド
+  // 現在の Markdown を取得するメソッド（Front Matter 含む）
   const getMarkdown = useCallback((): string | null => {
     if (!editor) return null;
     // IME 変換中はシリアライズしない
     if (!ime.canProcess()) return null;
 
     const json = editor.getJSON() as unknown as TipTapDoc;
-    return tiptapToMarkdown(json);
+    const body = tiptapToMarkdown(json);
+    return serializeFrontMatter(frontMatterYamlRef.current, body);
   }, [editor, ime]);
 
   // テーブルセル右クリック → コンテキストメニュー表示
@@ -457,7 +657,12 @@ export function MarkdownEditor({
 
   return (
     <div className="editor-container flex flex-col h-full">
-      <EditorToolbar editor={editor} mode={mode} onToggleMode={toggleMode} />
+      <EditorToolbar
+        editor={editor}
+        mode={mode}
+        onToggleMode={toggleMode}
+        getMarkdown={() => getMarkdown() ?? ''}
+      />
       {editor && (
         <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />
       )}
@@ -524,11 +729,31 @@ export function MarkdownEditor({
       {mode === 'wysiwyg' ? (
         <div
           ref={editorWrapperRef}
-          className="flex-1 overflow-y-auto cursor-text relative"
+          className={[
+            'flex-1 overflow-y-auto cursor-text relative',
+            focusMode ? 'focus-mode-enabled' : '',
+            typewriterMode ? 'typewriter-mode-enabled' : '',
+          ].filter(Boolean).join(' ')}
           onClick={handleEditorAreaClick}
           onContextMenu={handleContextMenu}
           onMouseDown={handleWysiwygMouseDown}
         >
+          {/* YAML Front Matter パネル (Phase 7) */}
+          <div className="max-w-[800px] mx-auto px-12 pt-6">
+            <FrontMatterPanel
+              yaml={frontMatterYaml}
+              onChange={(newYaml) => {
+                setFrontMatterYaml(newYaml);
+                frontMatterYamlRef.current = newYaml;
+                // Front Matter 変更を本文と合わせて親に通知
+                const json = editor?.getJSON() as unknown as TipTapDoc | undefined;
+                if (json) {
+                  const body = tiptapToMarkdown(json);
+                  onContentChangeRef.current?.(serializeFrontMatter(newYaml, body));
+                }
+              }}
+            />
+          </div>
           {/* 検索バー（フローティング） */}
           {searchVisible && editor && (
             <SearchBar
@@ -536,6 +761,23 @@ export function MarkdownEditor({
               showReplace={showReplace}
               onClose={() => setSearchVisible(false)}
               onToggleReplace={() => setShowReplace((v) => !v)}
+            />
+          )}
+          {/* スラッシュコマンドメニュー (Phase 7) */}
+          {slashState.active && editor && (
+            <SlashCommandMenu
+              editor={editor}
+              slashState={slashState}
+              onClose={() => setSlashState({ active: false, query: '', from: -1, coords: null })}
+            />
+          )}
+          {/* Wikilink オートコンプリートポップアップ (Phase 7.5) */}
+          {wikilinkAutoState.active && editor && (
+            <WikilinkPopup
+              editor={editor}
+              autoState={wikilinkAutoState}
+              candidates={wikilinkCandidates}
+              onClose={() => setWikilinkAutoState({ active: false, query: '', from: -1, coords: null })}
             />
           )}
           <div className="max-w-[800px] mx-auto px-12 py-8">
@@ -574,16 +816,25 @@ function EditorHandle(_props: {
  * ペルソナ:
  * - マークダウンが分からないけどマークダウンで書きたいエンジニア
  * - マークダウンでの編集を楽に行いたいエンジニア
+ * - 知識管理者・一般ライター: 集中モードのトグルボタン（フォーカス/タイプライター/Zen）
  */
 function EditorToolbar({
   editor,
   mode,
   onToggleMode,
+  getMarkdown,
 }: {
   editor: ReturnType<typeof useEditor>;
   mode: EditorMode;
   onToggleMode: () => void;
+  /** AIコピーボタン用: 現在の Markdown を取得する関数 */
+  getMarkdown?: () => string;
 }) {
+  const { settings, updateSettings } = useSettingsStore();
+  const focusMode = settings.editor.focusMode;
+  const typewriterMode = settings.editor.typewriterMode;
+  const zenMode = settings.editor.zenMode;
+
   if (!editor) return null;
 
   return (
@@ -735,6 +986,68 @@ function EditorToolbar({
         active={mode === 'source'}
         onClick={onToggleMode}
       />
+
+      {/* 集中・執筆モードボタン群 (Phase 7) */}
+      {/* ペルソナ: 知識管理者・一般ライター・AIパワーユーザー */}
+      <ToolbarDivider />
+      <ToolbarButton
+        icon={
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <circle cx="7.5" cy="7.5" r="2" />
+            <line x1="7.5" y1="1" x2="7.5" y2="3.5" />
+            <line x1="7.5" y1="11.5" x2="7.5" y2="14" />
+            <line x1="1" y1="7.5" x2="3.5" y2="7.5" />
+            <line x1="11.5" y1="7.5" x2="14" y2="7.5" />
+          </svg>
+        }
+        tooltip={`フォーカスモード${focusMode ? '（ON）' : '（OFF）'} (Ctrl+Shift+F)`}
+        active={focusMode}
+        onClick={() => updateSettings({ editor: { focusMode: !focusMode } })}
+      />
+      <ToolbarButton
+        icon={
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <line x1="3" y1="7.5" x2="12" y2="7.5" />
+            <line x1="1" y1="4" x2="14" y2="4" strokeOpacity="0.4" />
+            <line x1="1" y1="11" x2="14" y2="11" strokeOpacity="0.4" />
+            <polyline points="5.5,5.5 3,7.5 5.5,9.5" />
+            <polyline points="9.5,5.5 12,7.5 9.5,9.5" />
+          </svg>
+        }
+        tooltip={`タイプライターモード${typewriterMode ? '（ON）' : '（OFF）'} (Ctrl+Shift+T)`}
+        active={typewriterMode}
+        onClick={() => updateSettings({ editor: { typewriterMode: !typewriterMode } })}
+      />
+      <ToolbarButton
+        icon={
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="1.5" y="1.5" width="12" height="12" rx="1" />
+            <line x1="4" y1="5.5" x2="11" y2="5.5" />
+            <line x1="4" y1="7.5" x2="11" y2="7.5" />
+            <line x1="4" y1="9.5" x2="8" y2="9.5" />
+          </svg>
+        }
+        tooltip={`Zen モード${zenMode ? '（ON）' : '（OFF）'} (F11)`}
+        active={zenMode}
+        onClick={() => updateSettings({ editor: { zenMode: !zenMode } })}
+      />
+
+      {/* アンビエントサウンド (Phase 7) */}
+      {/* ペルソナ: 一般ライター・知識管理者 — 執筆集中のための環境音 */}
+      <ToolbarDivider />
+      <AmbientSoundControl />
+
+      {/* AIコピーボタン (Phase 8) */}
+      {/* ペルソナ: AIパワーユーザー — Markdownを最適化してClaudeやChatGPTに渡す */}
+      {getMarkdown && mode === 'wysiwyg' && (
+        <>
+          <ToolbarDivider />
+          <AiCopyButton
+            getMarkdown={getMarkdown}
+            label="✨ AI コピー"
+          />
+        </>
+      )}
     </div>
   );
 }

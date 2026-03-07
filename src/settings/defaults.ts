@@ -31,6 +31,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
     wordWrap: true,
     highlightCurrentLine: true,
     indentStyle: 'spaces',
+    focusMode: false,
+    typewriterMode: false,
+    zenMode: false,
+    writingGoal: 0,
+    ambientSound: 'off',
+    ambientVolume: 0.4,
+    typewriterSound: false,
+    typewriterStyle: 'mechanical',
+    typewriterVolume: 0.3,
   },
   markdown: {
     enableMath: true,
@@ -58,5 +67,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     annotateLinks: false,
     normalizeCodeFences: true,
     analyzePromptStructure: false,
+  },
+  slashCommands: {
+    enabled: true,
+    showAiTemplates: true,
   },
 };
