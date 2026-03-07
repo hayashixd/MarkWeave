@@ -2368,3 +2368,167 @@
   color: #667eea;
   font-weight: 600;
 }
+
+/* ===== YAML Front Matter Panel (Phase 7) ===== */
+
+.front-matter-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  margin-bottom: 12px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  overflow: hidden;
+}
+
+.front-matter-panel--empty {
+  background: transparent;
+  border: 1px dashed #cbd5e1;
+}
+
+.front-matter-panel--expanded {
+  border-color: #94a3b8;
+  background: #fff;
+}
+
+.front-matter-panel__add-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+  width: 100%;
+}
+
+.front-matter-panel__add-btn:hover {
+  color: #64748b;
+}
+
+.front-matter-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.front-matter-panel__header:hover {
+  background: #f1f5f9;
+}
+
+.front-matter-panel__icon {
+  flex-shrink: 0;
+  color: #94a3b8;
+}
+
+.front-matter-panel__label {
+  font-weight: 600;
+  color: #475569;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+}
+
+.front-matter-panel__summary {
+  flex: 1;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.front-matter-panel__chevron {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 0.65rem;
+  margin-left: auto;
+}
+
+.front-matter-panel__delete {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  color: #94a3b8;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  margin-left: 4px;
+}
+
+.front-matter-panel__delete:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.front-matter-panel__body {
+  padding: 4px 10px 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.front-matter-panel__delimiter {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  padding: 2px 0;
+  user-select: none;
+}
+
+.front-matter-panel__textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: #1e293b;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  line-height: 1.6;
+}
+
+.front-matter-panel__textarea::placeholder {
+  color: #cbd5e1;
+}
+
+/* ===== Wikilinks [[]] (Phase 7.5) ===== */
+
+.wikilink {
+  display: inline;
+  color: #3b82f6;
+  text-decoration: none;
+  border-bottom: 1px solid #93c5fd;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+.wikilink:hover {
+  color: #1d4ed8;
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+/* 未解決リンク（将来対応: data-resolved="false"） */
+.wikilink[data-resolved="false"] {
+  color: #ef4444;
+  border-bottom-style: dashed;
+  border-color: #fca5a5;
+}
+
+.wikilink[data-resolved="false"]:hover {
+  color: #dc2626;
+  background: #fef2f2;
+}

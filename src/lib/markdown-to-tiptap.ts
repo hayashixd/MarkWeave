@@ -255,11 +255,9 @@ function convertInlineNodes(
   for (const node of nodes) {
     switch (node.type) {
       case 'text': {
-        const textNode: TipTapNode = { type: 'text', text: node.value };
-        if (parentMarks.length > 0) {
-          textNode.marks = [...parentMarks];
-        }
-        result.push(textNode);
+        // [[ファイル名]] / [[ファイル名|表示テキスト]] をインライン wikilink ノードに変換
+        const wikilinkNodes = parseWikilinks(node.value, parentMarks);
+        result.push(...wikilinkNodes);
         break;
       }
 
@@ -336,6 +334,51 @@ function convertInlineNodes(
         // 未対応のインライン要素は無視
         break;
     }
+  }
+
+  return result;
+}
+
+/**
+ * テキスト内の [[...]] パターンを wikilink ノードに分解する。
+ * 例: "前のテキスト [[PageA|表示]] 後のテキスト"
+ *   → [text("前のテキスト "), wikilink(target="PageA", label="表示"), text(" 後のテキスト")]
+ */
+function parseWikilinks(text: string, marks: TipTapMark[]): TipTapNode[] {
+  const WIKILINK_RE = /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g;
+  const result: TipTapNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = WIKILINK_RE.exec(text)) !== null) {
+    // リンク前のテキスト
+    if (match.index > lastIndex) {
+      const before = text.slice(lastIndex, match.index);
+      const node: TipTapNode = { type: 'text', text: before };
+      if (marks.length > 0) node.marks = [...marks];
+      result.push(node);
+    }
+
+    const target = match[1].trim();
+    const label = match[2]?.trim() ?? null;
+    result.push({ type: 'wikilink', attrs: { target, label } });
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // リンク後の残りテキスト
+  if (lastIndex < text.length) {
+    const after = text.slice(lastIndex);
+    const node: TipTapNode = { type: 'text', text: after };
+    if (marks.length > 0) node.marks = [...marks];
+    result.push(node);
+  }
+
+  // Wikilink が一つもなかった場合は元の text ノードを返す
+  if (result.length === 0) {
+    const node: TipTapNode = { type: 'text', text };
+    if (marks.length > 0) node.marks = [...marks];
+    result.push(node);
   }
 
   return result;

@@ -70,6 +70,9 @@ import { FocusModeExtension } from '../../extensions/FocusModeExtension';
 import { useSettingsStore } from '../../store/settingsStore';
 import { SlashCommandsExtension, type SlashCommandState } from '../../extensions/SlashCommandsExtension';
 import { SlashCommandMenu } from '../SlashCommands/SlashCommandMenu';
+import { FrontMatterPanel } from './FrontMatterPanel';
+import { parseFrontMatter, serializeFrontMatter } from '../../lib/frontmatter';
+import { WikilinkExtension } from '../../extensions/WikilinkExtension';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -94,10 +97,18 @@ export function MarkdownEditor({
   onEditorReady,
 }: EditorProps) {
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
+
+  // YAML Front Matter を本文から分離して管理
+  const { yaml: initYaml, body: initBody } = parseFrontMatter(initialContent);
+  const [frontMatterYaml, setFrontMatterYaml] = useState(initYaml);
+  // Front Matter なしの本文を initialContent として使う
   const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+  // フロントマター変更時に参照するために ref に保持
+  const frontMatterYamlRef = useRef(frontMatterYaml);
+  frontMatterYamlRef.current = frontMatterYaml;
 
   // 集中モード系の設定を取得
   const { settings, updateSettings } = useSettingsStore();
@@ -189,6 +200,12 @@ export function MarkdownEditor({
       TyporaFocusExtension,
       FocusModeExtension.configure({ enabled: focusMode }),
       SlashCommandsExtension.configure({ onStateChange: setSlashState }),
+      WikilinkExtension.configure({
+        onLinkClick: (target) => {
+          // AppShell 経由でファイルを開く（カスタムイベント）
+          window.dispatchEvent(new CustomEvent('open-wikilink', { detail: { target } }));
+        },
+      }),
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
@@ -340,11 +357,15 @@ export function MarkdownEditor({
     return () => window.removeEventListener('editor-link-insert', handler);
   }, [editor]);
 
-  // 初期コンテンツの設定
+  // 初期コンテンツの設定（タブ切り替え時も含む）
   useEffect(() => {
-    if (!editor || !initialContent) return;
+    if (!editor) return;
 
-    const doc = markdownToTipTap(initialContent);
+    // Front Matter を抽出して本文のみ TipTap に渡す
+    const { yaml, body } = parseFrontMatter(initialContent);
+    setFrontMatterYaml(yaml);
+
+    const doc = markdownToTipTap(body || '');
     editor.commands.setContent(doc as unknown as Record<string, unknown>);
   }, [editor, initialContent]);
 
@@ -358,7 +379,8 @@ export function MarkdownEditor({
 
       const json = editor.getJSON() as unknown as TipTapDoc;
       const markdown = tiptapToMarkdown(json);
-      onContentChangeRef.current?.(markdown);
+      // Front Matter を先頭に付けて完全な Markdown として通知
+      onContentChangeRef.current?.(serializeFrontMatter(frontMatterYamlRef.current, markdown));
     };
 
     editor.on('update', handler);
@@ -420,14 +442,17 @@ export function MarkdownEditor({
     if (!editor) return;
 
     if (mode === 'wysiwyg') {
-      // WYSIWYG → ソース: 現在のエディタ内容を Markdown に変換
+      // WYSIWYG → ソース: Front Matter を含む完全な Markdown をソースに表示
       const json = editor.getJSON() as unknown as TipTapDoc;
-      const markdown = tiptapToMarkdown(json);
-      setSourceText(markdown);
+      const body = tiptapToMarkdown(json);
+      const full = serializeFrontMatter(frontMatterYamlRef.current, body);
+      setSourceText(full);
       setMode('source');
     } else {
-      // ソース → WYSIWYG: Markdown を TipTap JSON に変換してエディタに設定
-      const doc = markdownToTipTap(sourceText);
+      // ソース → WYSIWYG: ソース内の Front Matter を抽出して本文を TipTap に設定
+      const { yaml, body } = parseFrontMatter(sourceText);
+      setFrontMatterYaml(yaml);
+      const doc = markdownToTipTap(body || '');
       editor.commands.setContent(doc as unknown as Record<string, unknown>);
       onContentChangeRef.current?.(sourceText);
       setMode('wysiwyg');
@@ -471,20 +496,23 @@ export function MarkdownEditor({
   const setMarkdown = useCallback(
     (markdown: string) => {
       if (!editor) return;
-      const doc = markdownToTipTap(markdown);
+      const { yaml, body } = parseFrontMatter(markdown);
+      setFrontMatterYaml(yaml);
+      const doc = markdownToTipTap(body || '');
       editor.commands.setContent(doc as unknown as Record<string, unknown>);
     },
     [editor],
   );
 
-  // 現在の Markdown を取得するメソッド
+  // 現在の Markdown を取得するメソッド（Front Matter 含む）
   const getMarkdown = useCallback((): string | null => {
     if (!editor) return null;
     // IME 変換中はシリアライズしない
     if (!ime.canProcess()) return null;
 
     const json = editor.getJSON() as unknown as TipTapDoc;
-    return tiptapToMarkdown(json);
+    const body = tiptapToMarkdown(json);
+    return serializeFrontMatter(frontMatterYamlRef.current, body);
   }, [editor, ime]);
 
   // テーブルセル右クリック → コンテキストメニュー表示
@@ -605,6 +633,22 @@ export function MarkdownEditor({
           onContextMenu={handleContextMenu}
           onMouseDown={handleWysiwygMouseDown}
         >
+          {/* YAML Front Matter パネル (Phase 7) */}
+          <div className="max-w-[800px] mx-auto px-12 pt-6">
+            <FrontMatterPanel
+              yaml={frontMatterYaml}
+              onChange={(newYaml) => {
+                setFrontMatterYaml(newYaml);
+                frontMatterYamlRef.current = newYaml;
+                // Front Matter 変更を本文と合わせて親に通知
+                const json = editor?.getJSON() as unknown as TipTapDoc | undefined;
+                if (json) {
+                  const body = tiptapToMarkdown(json);
+                  onContentChangeRef.current?.(serializeFrontMatter(newYaml, body));
+                }
+              }}
+            />
+          </div>
           {/* 検索バー（フローティング） */}
           {searchVisible && editor && (
             <SearchBar

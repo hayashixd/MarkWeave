@@ -126,6 +126,18 @@ export function AppShell() {
     return () => window.removeEventListener('open-ai-templates', handler);
   }, []);
 
+  // Wikilink クリックでファイルを開く (Phase 7.5)
+  const openFileAsTab = useOpenFileAsTab();
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { target } = (e as CustomEvent<{ target: string }>).detail;
+      // フルパスでなければワークスペース相対として解決を試みる（ベストエフォート）
+      openFileAsTab(target);
+    };
+    window.addEventListener('open-wikilink', handler);
+    return () => window.removeEventListener('open-wikilink', handler);
+  }, [openFileAsTab]);
+
   // フォルダを開くダイアログ（Ctrl+Shift+O）
   const openFolderDialog = useCallback(async () => {
     try {
