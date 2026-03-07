@@ -37,6 +37,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     writingGoal: 0,
     ambientSound: 'off',
     ambientVolume: 0.4,
+    typewriterSound: false,
+    typewriterStyle: 'mechanical',
+    typewriterVolume: 0.3,
   },
   markdown: {
     enableMath: true,

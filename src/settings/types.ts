@@ -42,6 +42,12 @@ export interface EditorSettings {
   ambientSound: 'off' | 'white' | 'brown' | 'rain' | 'cafe';
   /** アンビエントサウンド音量 (0.0–1.0) */
   ambientVolume: number;
+  /** タイプライター打鍵音フィードバックの有効/無効 */
+  typewriterSound: boolean;
+  /** タイプライター打鍵音のスタイル */
+  typewriterStyle: 'mechanical' | 'soft' | 'typewriter';
+  /** タイプライター打鍵音の音量 (0.0–1.0) */
+  typewriterVolume: number;
 }
 
 export interface MarkdownSettings {

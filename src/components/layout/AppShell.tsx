@@ -47,6 +47,7 @@ import { ConversionDialog } from '../Conversion/ConversionDialog';
 import { useConvertFile } from '../../hooks/useConvertFile';
 import { useRecentFilesStore } from '../../store/recentFilesStore';
 import { useOpenFileAsTab } from '../../hooks/useOpenFileAsTab';
+import { parseFrontMatter, parseYamlFields } from '../../lib/frontmatter';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -719,6 +720,18 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
   const goalProgress = writingGoal > 0 ? Math.min(charCount / writingGoal, 1) : 0;
   const goalReached = writingGoal > 0 && charCount >= writingGoal;
 
+  // YAML Front Matter のドラフト状態（下書きバッジ表示）
+  const isDraft = (() => {
+    if (!tab || tab.fileType !== 'markdown') return false;
+    try {
+      const { yaml } = parseFrontMatter(tab.content);
+      if (!yaml) return false;
+      return parseYamlFields(yaml).draft === true;
+    } catch {
+      return false;
+    }
+  })();
+
   return (
     <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-600" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
@@ -727,6 +740,12 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
             <span>{tab.filePath ?? '未保存'}</span>
             {tab.isDirty && (
               <span className="text-orange-500">● 変更あり</span>
+            )}
+            {/* 下書きバッジ (YAML Front Matter: draft: true) */}
+            {isDraft && (
+              <span className="status-bar__draft-badge" title="YAML Front Matter に draft: true が設定されています">
+                下書き
+              </span>
             )}
             {/* 執筆目標進捗 */}
             {writingGoal > 0 && (

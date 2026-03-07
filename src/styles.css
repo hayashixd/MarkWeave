@@ -2862,3 +2862,18 @@
   border-top: 1px solid #f1f5f9;
   text-align: center;
 }
+
+/* ===== YAML ドラフトバッジ (Phase 7.5) ===== */
+
+.status-bar__draft-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #fef9c3;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}

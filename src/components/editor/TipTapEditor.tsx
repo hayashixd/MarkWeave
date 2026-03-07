@@ -77,6 +77,7 @@ import { WikilinkPopup } from './WikilinkPopup';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useRecentFilesStore } from '../../store/recentFilesStore';
 import { AmbientSoundControl } from './AmbientSoundControl';
+import { typewriterPlayer } from '../../lib/typewriter-sound';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -519,6 +520,22 @@ export function MarkdownEditor({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [toggleMode]);
+
+  // タイプライター打鍵音フィードバック (Phase 7)
+  useEffect(() => {
+    if (!settings.editor.typewriterSound) return;
+    const handler = (e: KeyboardEvent) => {
+      // IME 入力中・修飾キー単体・機能キーでは発音しない
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // 文字入力・スペース・バックスペース・エンターのみ
+      const isPrintable = e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Delete';
+      if (!isPrintable) return;
+      typewriterPlayer.playKey(settings.editor.typewriterStyle, settings.editor.typewriterVolume);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [settings.editor.typewriterSound, settings.editor.typewriterStyle, settings.editor.typewriterVolume]);
 
   // ソースモードでのテキスト変更（CodeMirror から直接文字列を受け取る）
   const handleSourceTextChange = useCallback(

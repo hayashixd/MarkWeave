@@ -161,7 +161,61 @@ export function WritingTab() {
         )}
       </div>
 
-      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">ヒント</h2>
+      {/* タイプライター打鍵音 */}
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 mt-6">タイプライター打鍵音</h2>
+      <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 space-y-3">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.editor.typewriterSound}
+            onChange={(e) => updateSettings({ editor: { typewriterSound: e.target.checked } })}
+            className="w-4 h-4"
+          />
+          <span className="text-sm text-gray-700">打鍵音を有効にする</span>
+        </label>
+        {settings.editor.typewriterSound && (
+          <div className="space-y-3 pt-2 border-t border-gray-100">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-gray-600">サウンドスタイル</span>
+              {([
+                { value: 'mechanical', label: 'メカニカル', desc: 'コクッとした明確なクリック音' },
+                { value: 'soft', label: 'ソフト', desc: '柔らかな押し下げ音' },
+                { value: 'typewriter', label: 'タイプライター', desc: 'ヴィンテージ打鍵音' },
+              ] as const).map((opt) => (
+                <label key={opt.value} className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="typewriterStyle"
+                    value={opt.value}
+                    checked={settings.editor.typewriterStyle === opt.value}
+                    onChange={() => updateSettings({ editor: { typewriterStyle: opt.value } })}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <span className="text-sm text-gray-700">{opt.label}</span>
+                    <p className="text-xs text-gray-400">{opt.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">音量</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.editor.typewriterVolume}
+                onChange={(e) => updateSettings({ editor: { typewriterVolume: parseFloat(e.target.value) } })}
+                className="flex-1"
+              />
+              <span className="text-xs text-gray-500 w-8">{Math.round(settings.editor.typewriterVolume * 100)}%</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 mt-6">ヒント</h2>
       <div className="text-xs text-gray-500 space-y-1.5 bg-blue-50 rounded-lg px-4 py-3">
         <p>・フォーカスモード + タイプライターモードを同時に使うと最大限集中できます</p>
         <p>・Zen モード中は Escape キーで通常表示に戻れます</p>
