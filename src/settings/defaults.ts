@@ -68,4 +68,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     normalizeCodeFences: true,
     analyzePromptStructure: false,
   },
+  slashCommands: {
+    enabled: true,
+    showAiTemplates: true,
+  },
 };

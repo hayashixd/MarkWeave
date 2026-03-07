@@ -81,6 +81,13 @@ export interface AiCopySettings {
   analyzePromptStructure: boolean;
 }
 
+export interface SlashCommandSettings {
+  /** スラッシュコマンド機能の有効/無効 */
+  enabled: boolean;
+  /** AIテンプレートコマンドをスラッシュコマンドメニューに含めるか */
+  showAiTemplates: boolean;
+}
+
 /** アプリ設定の全体型 */
 export interface AppSettings {
   /** 設定ファイルのバージョン。マイグレーションに使用 */
@@ -90,6 +97,7 @@ export interface AppSettings {
   markdown: MarkdownSettings;
   file: FileSettings;
   aiCopy: AiCopySettings;
+  slashCommands: SlashCommandSettings;
 }
 
 /** ネストされたオブジェクトの部分更新用ユーティリティ型 */

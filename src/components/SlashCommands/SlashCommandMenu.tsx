@@ -19,6 +19,7 @@ import {
   type SlashCommandCategory,
 } from './slash-command-definitions';
 import type { SlashCommandState } from '../../extensions/SlashCommandsExtension';
+import { useSettingsStore } from '../../store/settingsStore';
 
 interface SlashCommandMenuProps {
   editor: Editor;
@@ -34,7 +35,11 @@ export function SlashCommandMenu({ editor, slashState, onClose }: SlashCommandMe
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef<HTMLButtonElement>(null);
 
-  const filtered = filterCommands(slashState.query);
+  const { settings } = useSettingsStore();
+  const showAi = settings.slashCommands?.showAiTemplates !== false;
+  const filtered = filterCommands(slashState.query).filter(
+    (cmd) => showAi || cmd.category !== 'ai',
+  );
 
   // クエリが変わったら選択インデックスをリセット
   useEffect(() => {

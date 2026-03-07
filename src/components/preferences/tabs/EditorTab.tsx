@@ -80,6 +80,35 @@ export function EditorTab() {
           className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
       </div>
+
+      {/* スラッシュコマンド設定 */}
+      <h2 className="text-lg font-semibold pt-3">スラッシュコマンド</h2>
+      <div className="space-y-3">
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.slashCommands?.enabled !== false}
+            onChange={(e) => updateSettings({ slashCommands: { enabled: e.target.checked } })}
+            className="mt-0.5 accent-blue-600"
+          />
+          <div>
+            <span className="text-sm">スラッシュコマンドを有効にする</span>
+            <p className="text-xs text-gray-500">行頭で / を入力するとコマンドメニューを表示</p>
+          </div>
+        </label>
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.slashCommands?.showAiTemplates !== false}
+            onChange={(e) => updateSettings({ slashCommands: { showAiTemplates: e.target.checked } })}
+            className="mt-0.5 accent-blue-600"
+          />
+          <div>
+            <span className="text-sm">AIテンプレートをメニューに含める</span>
+            <p className="text-xs text-gray-500">スラッシュコマンドメニューにAIテンプレート項目を表示</p>
+          </div>
+        </label>
+      </div>
     </div>
   );
 }

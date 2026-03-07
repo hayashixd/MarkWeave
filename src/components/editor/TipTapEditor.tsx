@@ -245,7 +245,7 @@ export function MarkdownEditor({
       WordCompleteExtension,
       TyporaFocusExtension,
       FocusModeExtension.configure({ enabled: focusMode }),
-      SlashCommandsExtension.configure({ onStateChange: setSlashState }),
+      ...(settings.slashCommands?.enabled !== false ? [SlashCommandsExtension.configure({ onStateChange: setSlashState })] : []),
       WikilinkExtension.configure({
         onLinkClick: (target) => {
           window.dispatchEvent(new CustomEvent('open-wikilink', { detail: { target } }));
@@ -536,6 +536,45 @@ export function MarkdownEditor({
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [settings.editor.typewriterSound, settings.editor.typewriterStyle, settings.editor.typewriterVolume]);
+
+  // コードブロックにコピーボタンを自動付与 (テクニカルライター/開発者ペルソナ向け)
+  useEffect(() => {
+    if (!editor || mode !== 'wysiwyg') return;
+    const editorDom = editor.view.dom;
+
+    const addCopyButtons = () => {
+      const preElements = editorDom.querySelectorAll('pre');
+      preElements.forEach((pre) => {
+        if (pre.querySelector('.code-copy-btn')) return;
+        const btn = document.createElement('button');
+        btn.className = 'code-copy-btn';
+        btn.textContent = 'Copy';
+        btn.title = 'コードをコピー';
+        btn.contentEditable = 'false';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const code = pre.querySelector('code');
+          if (code) {
+            void navigator.clipboard.writeText(code.textContent ?? '');
+            btn.textContent = '✓ Copied';
+            btn.classList.add('code-copy-btn--copied');
+            setTimeout(() => {
+              btn.textContent = 'Copy';
+              btn.classList.remove('code-copy-btn--copied');
+            }, 1500);
+          }
+        });
+        pre.style.position = 'relative';
+        pre.appendChild(btn);
+      });
+    };
+
+    addCopyButtons();
+    const observer = new MutationObserver(addCopyButtons);
+    observer.observe(editorDom, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [editor, mode]);
 
   // ソースモードでのテキスト変更（CodeMirror から直接文字列を受け取る）
   const handleSourceTextChange = useCallback(

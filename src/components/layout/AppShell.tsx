@@ -367,6 +367,13 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Alt+D: デイリーノート作成 (知識管理者ペルソナ向け)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'd') {
+        e.preventDefault();
+        createDailyNote();
+        return;
+      }
+
       // F11: Zen モードのトグル (zen-mode-design.md に準拠)
       if (e.key === 'F11') {
         e.preventDefault();
@@ -385,6 +392,54 @@ export function AppShell() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow, settings.editor.zenMode, updateSettings]);
+
+  // デイリーノート作成関数 (知識管理者ペルソナ向け)
+  const createDailyNote = useCallback(() => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const dateStr = `${yyyy}-${mm}-${dd}`;
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    const dayName = dayNames[now.getDay()];
+
+    const content = [
+      '---',
+      `title: ${dateStr} (${dayName})`,
+      `date: ${dateStr}`,
+      'tags: [daily]',
+      'draft: true',
+      '---',
+      '',
+      `# ${dateStr} (${dayName})`,
+      '',
+      '## 今日のタスク',
+      '',
+      '- [ ] ',
+      '',
+      '## メモ',
+      '',
+      '',
+      '',
+      '## 振り返り',
+      '',
+      '',
+    ].join('\n');
+
+    addTab({
+      filePath: null,
+      fileName: `${dateStr}.md`,
+      content,
+      savedContent: '',
+    });
+  }, [addTab]);
+
+  // カスタムイベント: create-daily-note (スラッシュコマンドから)
+  useEffect(() => {
+    const handler = () => createDailyNote();
+    window.addEventListener('create-daily-note', handler);
+    return () => window.removeEventListener('create-daily-note', handler);
+  }, [createDailyNote]);
 
   return (
     <div
@@ -732,6 +787,9 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
     }
   })();
 
+  // 読了時間の推定（日本語: 約500文字/分）
+  const readingTimeMin = charCount > 0 ? Math.max(1, Math.ceil(charCount / 500)) : 0;
+
   return (
     <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-600" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
@@ -768,6 +826,12 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
         )}
       </div>
       <div className="flex items-center gap-3">
+        {/* 読了時間 (ブロガー向け) */}
+        {tab && readingTimeMin > 0 && (
+          <span className="text-gray-400" title={`推定読了時間（約500文字/分で計算）: ${charCount.toLocaleString()}文字`}>
+            {readingTimeMin}分で読了
+          </span>
+        )}
         {/* インデント設定 */}
         <div ref={indentRef} className="relative">
           <button

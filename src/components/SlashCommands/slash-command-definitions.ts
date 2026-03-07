@@ -14,7 +14,8 @@ export type SlashCommandCategory =
   | 'code'       // コード・数式
   | 'table'      // テーブル
   | 'media'      // メディア
-  | 'ai';        // AI テンプレート
+  | 'ai'         // AI テンプレート
+  | 'pkm';       // ナレッジ管理
 
 export interface SlashCommandDef {
   id: string;
@@ -39,6 +40,7 @@ export const CATEGORY_LABELS: Record<SlashCommandCategory, string> = {
   table: 'テーブル',
   media: 'メディア',
   ai: 'AI テンプレート',
+  pkm: 'ナレッジ管理',
 };
 
 export const SLASH_COMMANDS: SlashCommandDef[] = [
@@ -250,6 +252,40 @@ export const SLASH_COMMANDS: SlashCommandDef[] = [
     icon: '📋',
     action: (_editor) => {
       window.dispatchEvent(new CustomEvent('open-ai-template', { detail: { templateId: 'meeting-notes' } }));
+    },
+  },
+  // ===== ナレッジ管理 =====
+  {
+    id: 'daily-note',
+    category: 'pkm',
+    name: 'デイリーノート',
+    keywords: 'daily デイリー 日記 journal today 今日 ノート note',
+    description: '今日の日付でデイリーノートを新規作成',
+    icon: '📅',
+    action: (_editor) => {
+      window.dispatchEvent(new CustomEvent('create-daily-note'));
+    },
+  },
+  {
+    id: 'wikilink',
+    category: 'pkm',
+    name: 'Wikiリンク挿入',
+    keywords: 'wikilink ウィキ リンク link 参照 [[',
+    description: '[[ファイル名]] 形式のWikiリンクを挿入開始',
+    icon: '🔗',
+    action: (editor) => {
+      editor.chain().focus().insertContent('[[').run();
+    },
+  },
+  {
+    id: 'front-matter',
+    category: 'pkm',
+    name: 'Front Matter 追加',
+    keywords: 'yaml frontmatter フロントマター メタデータ metadata',
+    description: 'YAML Front Matter を追加（タイトル・日付・タグ）',
+    icon: '📄',
+    action: (_editor) => {
+      window.dispatchEvent(new CustomEvent('add-front-matter'));
     },
   },
 ];
