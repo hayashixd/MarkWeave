@@ -8,6 +8,15 @@
  */
 
 import { useSettingsStore } from '../../../store/settingsStore';
+import type { AmbientSoundType } from '../../../lib/ambient-sound';
+
+const AMBIENT_OPTIONS: { type: AmbientSoundType; label: string; description: string }[] = [
+  { type: 'off',   label: '停止',          description: '環境音なし' },
+  { type: 'white', label: 'ホワイトノイズ',  description: '全周波数均一のノイズ。集中作業向き' },
+  { type: 'brown', label: 'ブラウンノイズ',  description: '低域が強い穏やかなノイズ。読書・思考向き' },
+  { type: 'rain',  label: '雨音',          description: '雨が降る環境音。リラックス向き' },
+  { type: 'cafe',  label: 'カフェ',         description: 'カフェのざわめき。創作向き' },
+];
 
 function ToggleRow({
   label,
@@ -86,6 +95,70 @@ export function WritingTab() {
           onChange={(v) => updateSettings({ editor: { zenMode: v } })}
           shortcut="F11"
         />
+      </div>
+
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">執筆目標</h2>
+      <div className="bg-gray-50 rounded-lg px-4 py-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <div className="text-sm font-medium text-gray-800">目標文字数</div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              設定するとステータスバーに進捗バーが表示されます。0 = 無効
+            </div>
+          </div>
+          <input
+            type="number"
+            min={0}
+            max={100000}
+            step={100}
+            value={settings.editor.writingGoal}
+            onChange={(e) => updateSettings({ editor: { writingGoal: Math.max(0, parseInt(e.target.value) || 0) } })}
+            className="w-24 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-right"
+          />
+        </div>
+        {settings.editor.writingGoal > 0 && (
+          <p className="text-xs text-blue-600 mt-2">
+            ステータスバーに「現在の文字数 / {settings.editor.writingGoal.toLocaleString()}文字」が表示されます
+          </p>
+        )}
+      </div>
+
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">環境音</h2>
+      <div className="bg-gray-50 rounded-lg px-4 py-3 mb-6">
+        <p className="text-xs text-gray-500 mb-3">集中執筆のための背景音。ツールバーからも切り替え可能です。</p>
+        <div className="space-y-1">
+          {AMBIENT_OPTIONS.map((opt) => (
+            <label key={opt.type} className="flex items-start gap-3 cursor-pointer py-1.5">
+              <input
+                type="radio"
+                name="ambientSound"
+                value={opt.type}
+                checked={settings.editor.ambientSound === opt.type}
+                onChange={() => updateSettings({ editor: { ambientSound: opt.type } })}
+                className="mt-0.5"
+              />
+              <div>
+                <span className="text-sm font-medium text-gray-700">{opt.label}</span>
+                <p className="text-xs text-gray-400">{opt.description}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+        {settings.editor.ambientSound !== 'off' && (
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-200">
+            <span className="text-xs text-gray-500">音量</span>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={settings.editor.ambientVolume}
+              onChange={(e) => updateSettings({ editor: { ambientVolume: parseFloat(e.target.value) } })}
+              className="flex-1"
+            />
+            <span className="text-xs text-gray-500 w-8">{Math.round(settings.editor.ambientVolume * 100)}%</span>
+          </div>
+        )}
       </div>
 
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">ヒント</h2>

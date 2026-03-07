@@ -36,6 +36,12 @@ export interface EditorSettings {
   typewriterMode: boolean;
   /** Zen モード: UI を完全に隠してフルスクリーン執筆 */
   zenMode: boolean;
+  /** 執筆目標文字数 (0 = 無効). ステータスバーにカウンターと進捗バーを表示 */
+  writingGoal: number;
+  /** アンビエントサウンド種別 ('off' | 'white' | 'brown' | 'rain' | 'cafe') */
+  ambientSound: 'off' | 'white' | 'brown' | 'rain' | 'cafe';
+  /** アンビエントサウンド音量 (0.0–1.0) */
+  ambientVolume: number;
 }
 
 export interface MarkdownSettings {

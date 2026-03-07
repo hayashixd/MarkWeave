@@ -648,6 +648,18 @@ function EmptyState({
   );
 }
 
+/** YAML Front Matter と Markdown 記号を除いた純テキスト文字数を返す */
+function countWritingChars(content: string): number {
+  const body = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '');
+  const text = body
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[*_`~]/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^>\s+/gm, '')
+    .replace(/\s+/g, '');
+  return text.length;
+}
+
 function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
   tab: ReturnType<typeof useTabStore.getState>['tabs'][number] | null;
   onSaveAsMarkdown?: () => void;
@@ -691,6 +703,12 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
     ? `タブ: ${settings.editor.sourceTabSize}`
     : `スペース: ${settings.editor.sourceTabSize}`;
 
+  // 執筆目標文字数
+  const writingGoal = settings.editor.writingGoal;
+  const charCount = tab ? countWritingChars(tab.content) : 0;
+  const goalProgress = writingGoal > 0 ? Math.min(charCount / writingGoal, 1) : 0;
+  const goalReached = writingGoal > 0 && charCount >= writingGoal;
+
   return (
     <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-600" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
@@ -699,6 +717,21 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
             <span>{tab.filePath ?? '未保存'}</span>
             {tab.isDirty && (
               <span className="text-orange-500">● 変更あり</span>
+            )}
+            {/* 執筆目標進捗 */}
+            {writingGoal > 0 && (
+              <div className="flex items-center gap-1.5" title={`執筆目標: ${charCount.toLocaleString()} / ${writingGoal.toLocaleString()}文字`}>
+                <span className={goalReached ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                  {charCount.toLocaleString()} / {writingGoal.toLocaleString()}文字
+                </span>
+                <div className="w-20 h-1.5 bg-gray-300 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${goalReached ? 'bg-green-500' : 'bg-blue-400'}`}
+                    style={{ width: `${goalProgress * 100}%` }}
+                  />
+                </div>
+                {goalReached && <span className="text-green-600">✓</span>}
+              </div>
             )}
           </>
         ) : (

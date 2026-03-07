@@ -72,7 +72,10 @@ import { SlashCommandsExtension, type SlashCommandState } from '../../extensions
 import { SlashCommandMenu } from '../SlashCommands/SlashCommandMenu';
 import { FrontMatterPanel } from './FrontMatterPanel';
 import { parseFrontMatter, serializeFrontMatter } from '../../lib/frontmatter';
-import { WikilinkExtension } from '../../extensions/WikilinkExtension';
+import { WikilinkExtension, type WikilinkAutoState } from '../../extensions/WikilinkExtension';
+import { WikilinkPopup } from './WikilinkPopup';
+import { useWorkspaceStore } from '../../store/workspaceStore';
+import { AmbientSoundControl } from './AmbientSoundControl';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -139,6 +142,31 @@ export function MarkdownEditor({
     coords: null,
   });
 
+  // Wikilink オートコンプリートの状態
+  const [wikilinkAutoState, setWikilinkAutoState] = useState<WikilinkAutoState>({
+    active: false,
+    query: '',
+    from: -1,
+    coords: null,
+  });
+
+  // ワークスペースのファイル一覧をオートコンプリート候補として使う
+  const { tree } = useWorkspaceStore();
+  const wikilinkCandidates = (() => {
+    const files: { name: string; path: string }[] = [];
+    const walk = (nodes: typeof tree) => {
+      for (const node of nodes) {
+        if (node.type === 'file') {
+          files.push({ name: node.name, path: node.path });
+        } else if (node.children) {
+          walk(node.children);
+        }
+      }
+    };
+    walk(tree);
+    return files;
+  })();
+
   // テーブルコンテキストメニューの状態
   const [tableMenu, setTableMenu] = useState<TableContextMenuState>({
     visible: false,
@@ -202,9 +230,9 @@ export function MarkdownEditor({
       SlashCommandsExtension.configure({ onStateChange: setSlashState }),
       WikilinkExtension.configure({
         onLinkClick: (target) => {
-          // AppShell 経由でファイルを開く（カスタムイベント）
           window.dispatchEvent(new CustomEvent('open-wikilink', { detail: { target } }));
         },
+        onAutoStateChange: setWikilinkAutoState,
       }),
     ],
     editable: !readOnly,
@@ -666,6 +694,15 @@ export function MarkdownEditor({
               onClose={() => setSlashState({ active: false, query: '', from: -1, coords: null })}
             />
           )}
+          {/* Wikilink オートコンプリートポップアップ (Phase 7.5) */}
+          {wikilinkAutoState.active && editor && (
+            <WikilinkPopup
+              editor={editor}
+              autoState={wikilinkAutoState}
+              candidates={wikilinkCandidates}
+              onClose={() => setWikilinkAutoState({ active: false, query: '', from: -1, coords: null })}
+            />
+          )}
           <div className="max-w-[800px] mx-auto px-12 py-8">
             <EditorContent
               editor={editor}
@@ -917,6 +954,11 @@ function EditorToolbar({
         active={zenMode}
         onClick={() => updateSettings({ editor: { zenMode: !zenMode } })}
       />
+
+      {/* アンビエントサウンド (Phase 7) */}
+      {/* ペルソナ: 一般ライター・知識管理者 — 執筆集中のための環境音 */}
+      <ToolbarDivider />
+      <AmbientSoundControl />
 
       {/* AIコピーボタン (Phase 8) */}
       {/* ペルソナ: AIパワーユーザー — Markdownを最適化してClaudeやChatGPTに渡す */}

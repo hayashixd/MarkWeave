@@ -18,9 +18,20 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 
+/** オートコンプリートポップアップの状態 */
+export interface WikilinkAutoState {
+  active: boolean;
+  query: string;
+  /** `[[` の直後の位置 (ノード削除に使用) */
+  from: number;
+  coords: { top: number; left: number; bottom: number } | null;
+}
+
 export interface WikilinkOptions {
   /** リンクをクリックした時のコールバック（ファイルパスを開く） */
   onLinkClick?: (target: string) => void;
+  /** オートコンプリート状態変化コールバック */
+  onAutoStateChange?: (state: WikilinkAutoState) => void;
   HTMLAttributes: Record<string, unknown>;
 }
 
@@ -38,6 +49,7 @@ export const WikilinkExtension = Node.create<WikilinkOptions>({
   addOptions() {
     return {
       onLinkClick: undefined,
+      onAutoStateChange: undefined,
       HTMLAttributes: {},
     };
   },
@@ -104,49 +116,116 @@ export const WikilinkExtension = Node.create<WikilinkOptions>({
     };
   },
 
-  /**
-   * InputRule: `[[ファイル名]]` または `[[ファイル名|表示テキスト]]` を入力すると
-   * 自動的に wikilink ノードに変換する。
-   *
-   * IME 変換中はトリガーしない（isComposing ガード）。
-   */
   addProseMirrorPlugins() {
     const pluginKey = new PluginKey('wikilinkInput');
     const extension = this;
+    /** `[[` が検出された位置（オートコンプリート開始） */
+    let autoFrom = -1;
+
+    const closeAuto = () => {
+      autoFrom = -1;
+      extension.options.onAutoStateChange?.({ active: false, query: '', from: -1, coords: null });
+    };
 
     return [
       new Plugin({
         key: pluginKey,
         props: {
           handleTextInput(view, from, to, text) {
-            // `]]` が入力された時点でトリガー
-            if (text !== ']') return false;
+            if (view.composing) return false;
 
             const { state } = view;
             const before = state.doc.textBetween(Math.max(0, from - 100), from, '\n');
 
-            // `[[...]]` のパターンを探す（`]]` の前に `[[` がある）
-            // `[[label|target]]` または `[[target]]` の形式に対応
-            const match = before.match(/\[\[([^\]]+?)(?:\|([^\]]+?))?\]$/);
-            if (!match) return false;
+            // ─── ]] 入力: wikilink ノードに変換（オートコンプリートより優先） ───
+            if (text === ']' && autoFrom >= 0) {
+              const queryText = before.slice(before.lastIndexOf('[[') + 2);
+              const match = queryText.match(/^([^\]]+?)(?:\|([^\]]+?))?$/);
+              if (match) {
+                const rawTarget = match[1].trim();
+                const rawLabel = match[2]?.trim() ?? null;
+                const matchStart = autoFrom;
+                closeAuto();
+                const tr = state.tr.replaceWith(
+                  matchStart,
+                  to + 1,
+                  state.schema.nodes[extension.name].create({ target: rawTarget, label: rawLabel }),
+                );
+                view.dispatch(tr);
+                return true;
+              }
+            }
 
-            const rawTarget = match[1].trim();
-            const rawLabel = match[2]?.trim() ?? null;
+            // ─── [[ 入力: オートコンプリートを開始 ───
+            const fullAfter = before + text;
+            if (fullAfter.endsWith('[[')) {
+              autoFrom = to + 1; // `[[` の直後の位置
+              const coords = view.coordsAtPos(to + 1);
+              extension.options.onAutoStateChange?.({
+                active: true,
+                query: '',
+                from: autoFrom,
+                coords: { top: coords.top, left: coords.left, bottom: coords.bottom },
+              });
+              return false; // `[[` 自体は通常どおり挿入
+            }
 
-            // `[[` の開始位置を計算
-            const matchStart = from - match[0].length;
+            // ─── オートコンプリート中: クエリ更新 ───
+            if (autoFrom >= 0) {
+              const query = state.doc.textBetween(autoFrom, from, '') + text;
+              if (query.includes(']') || query.includes('\n')) {
+                closeAuto();
+                return false;
+              }
+              const coords = view.coordsAtPos(from);
+              extension.options.onAutoStateChange?.({
+                active: true,
+                query,
+                from: autoFrom,
+                coords: { top: coords.top, left: coords.left, bottom: coords.bottom },
+              });
+              return false;
+            }
 
-            // ノードを置換
-            const tr = state.tr.replaceWith(
-              matchStart,
-              to + 1, // `]]` の 2 文字目まで含む
-              state.schema.nodes[extension.name].create({
-                target: rawTarget,
-                label: rawLabel,
-              }),
-            );
-            view.dispatch(tr);
-            return true;
+            return false;
+          },
+
+          handleKeyDown(view, event) {
+            if (autoFrom < 0) return false;
+            if (event.isComposing || event.keyCode === 229) return false;
+
+            if (event.key === 'Escape') {
+              closeAuto();
+              return true;
+            }
+
+            // ↑↓ Enter Tab をポップアップに委譲
+            if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab'].includes(event.key)) {
+              event.preventDefault();
+              window.dispatchEvent(new CustomEvent('wikilink-autocomplete-key', { detail: { key: event.key } }));
+              return true;
+            }
+
+            // Backspace でクエリを縮小
+            if (event.key === 'Backspace') {
+              const { state } = view;
+              const curFrom = state.selection.from;
+              if (curFrom <= autoFrom) {
+                closeAuto();
+              } else {
+                const query = state.doc.textBetween(autoFrom, curFrom - 1, '');
+                const coords = view.coordsAtPos(curFrom - 1);
+                extension.options.onAutoStateChange?.({
+                  active: true,
+                  query,
+                  from: autoFrom,
+                  coords: { top: coords.top, left: coords.left, bottom: coords.bottom },
+                });
+              }
+              return false;
+            }
+
+            return false;
           },
         },
       }),

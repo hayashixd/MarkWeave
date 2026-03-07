@@ -2532,3 +2532,210 @@
   color: #dc2626;
   background: #fef2f2;
 }
+
+/* ===== Wikilink Autocomplete Popup (Phase 7.5) ===== */
+
+.wikilink-popup {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.wikilink-popup__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.wikilink-popup__icon {
+  font-family: monospace;
+  font-weight: 700;
+  color: #3b82f6;
+  font-size: 0.8rem;
+}
+
+.wikilink-popup__query {
+  flex: 1;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.wikilink-popup__count {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.wikilink-popup__list {
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.wikilink-popup__empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.wikilink-popup__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.wikilink-popup__item:hover,
+.wikilink-popup__item--selected {
+  background: #eff6ff;
+}
+
+.wikilink-popup__item-badge {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.wikilink-popup__item-badge--html {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.wikilink-popup__item-name {
+  flex: 1;
+  font-size: 0.82rem;
+  color: #1e293b;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wikilink-popup__item-path {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.wikilink-popup__footer {
+  display: flex;
+  gap: 12px;
+  padding: 5px 12px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+/* ===== Ambient Sound Control (Phase 7) ===== */
+
+.ambient-sound-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  padding: 10px;
+  min-width: 180px;
+}
+
+.ambient-sound-menu__title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+  padding: 0 4px;
+}
+
+.ambient-sound-menu__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ambient-sound-menu__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #475569;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.ambient-sound-menu__option:hover {
+  background: #f1f5f9;
+}
+
+.ambient-sound-menu__option--active {
+  background: #ede9fe;
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.ambient-sound-menu__option-emoji {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+}
+
+.ambient-sound-menu__volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.ambient-sound-menu__volume-label {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.ambient-sound-menu__slider {
+  flex: 1;
+  height: 3px;
+  accent-color: #7c3aed;
+}
+
+.ambient-sound-menu__volume-value {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+}
