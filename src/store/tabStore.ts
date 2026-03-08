@@ -26,6 +26,7 @@ export interface TabState {
   encoding: FileEncoding; // ファイルの文字コード
   lineEnding: LineEnding; // 改行コード
   fileType: FileType; // ファイル種別（Phase 5: HTML WYSIWYG 編集）
+  isReadOnly: boolean; // 別ウィンドウが編集中のため読み取り専用（Phase 7: マルチウィンドウ）
 }
 
 interface TabStore {
@@ -33,7 +34,7 @@ interface TabStore {
   activeTabId: string | null;
 
   // タブ操作
-  addTab: (tab: Omit<TabState, 'id' | 'isDirty' | 'encoding' | 'lineEnding' | 'fileType'> & { encoding?: FileEncoding; lineEnding?: LineEnding; fileType?: FileType }) => string;
+  addTab: (tab: Omit<TabState, 'id' | 'isDirty' | 'encoding' | 'lineEnding' | 'fileType' | 'isReadOnly'> & { encoding?: FileEncoding; lineEnding?: LineEnding; fileType?: FileType; isReadOnly?: boolean }) => string;
   removeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
 
@@ -49,6 +50,9 @@ interface TabStore {
 
   // ファイルパス更新（名前を付けて保存後）
   updateFilePath: (oldPath: string, newPath: string) => void;
+
+  // Read-Only 状態の切り替え（マルチウィンドウ対応）
+  setReadOnly: (filePath: string, isReadOnly: boolean) => void;
 
   // ヘルパー
   getTab: (tabId: string) => TabState | undefined;
@@ -105,6 +109,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
       encoding: tabData.encoding ?? 'UTF-8',
       lineEnding: tabData.lineEnding ?? 'LF',
       fileType: detectedFileType,
+      isReadOnly: tabData.isReadOnly ?? false,
     };
 
     set({
@@ -198,6 +203,14 @@ export const useTabStore = create<TabStore>((set, get) => ({
               fileName: newPath.split(/[/\\]/).pop() ?? tab.fileName,
             }
           : tab,
+      ),
+    }));
+  },
+
+  setReadOnly: (filePath, isReadOnly) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.filePath === filePath ? { ...tab, isReadOnly } : tab,
       ),
     }));
   },

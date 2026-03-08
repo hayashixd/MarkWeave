@@ -4,3 +4,4 @@ pub mod fs_commands;
 pub mod plugin_commands;
 pub mod recent_files;
 pub mod window_commands;
+pub mod window_sync;

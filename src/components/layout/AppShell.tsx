@@ -50,6 +50,11 @@ import { useConvertFile } from '../../hooks/useConvertFile';
 import { useRecentFilesStore } from '../../store/recentFilesStore';
 import { useOpenFileAsTab } from '../../hooks/useOpenFileAsTab';
 import { parseFrontMatter, parseYamlFields } from '../../lib/frontmatter';
+import { useWindowSync } from '../../hooks/useWindowSync';
+import { useWriteAccessTransferHandler } from '../../hooks/useWriteAccessTransfer';
+import { useDetachedTabInit } from '../../hooks/useDetachedTabInit';
+import { detachTabToWindow } from '../../lib/tauri-commands';
+import { requestWriteAccess } from '../../hooks/useWriteAccessTransfer';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -98,6 +103,11 @@ export function AppShell() {
 
   // 外部ファイルオープンイベント受信（シングルインスタンス制御・CLI引数対応）
   useFileOpenListener();
+
+  // ウィンドウ間同期（Phase 7: マルチウィンドウ対応）
+  useWindowSync();
+  useWriteAccessTransferHandler();
+  useDetachedTabInit();
 
   // ドラッグ&ドロップでファイルを開く
   const { isDragOver } = useDropListener();
@@ -229,6 +239,35 @@ export function AppShell() {
       removeTab(tabId);
     },
     [removeTab],
+  );
+
+  // タブを新しいウィンドウに切り出す（Phase 7: マルチウィンドウ）
+  const handleDetachTab = useCallback(
+    async (tabId: string) => {
+      const tab = getTab(tabId);
+      if (!tab) return;
+
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        const sourceLabel = getCurrentWebviewWindow().label;
+
+        await detachTabToWindow({
+          sourceWindowLabel: sourceLabel,
+          filePath: tab.filePath,
+          fileName: tab.fileName,
+          content: tab.content,
+          encoding: tab.encoding,
+          lineEnding: tab.lineEnding,
+          fileType: tab.fileType,
+        });
+
+        // 元のウィンドウからタブを削除
+        removeTab(tabId);
+      } catch {
+        // Tauri 外ではスキップ
+      }
+    },
+    [getTab, removeTab],
   );
 
   // エディタからのコンテンツ変更 → ストア更新 + 自動保存スケジュール
@@ -465,7 +504,7 @@ export function AppShell() {
       aria-label="Markdown エディタ"
     >
       {/* タブバー */}
-      <TabBar onCloseTab={handleCloseTab} onNewTab={handleNewTab} />
+      <TabBar onCloseTab={handleCloseTab} onNewTab={handleNewTab} onDetachTab={handleDetachTab} />
 
       {/* メインエリア */}
       <main id="editor-panel" className="flex flex-1 min-h-0" role="main" aria-label="エディタ領域">
@@ -483,6 +522,23 @@ export function AppShell() {
 
         {/* エディタエリア - Phase 5: ファイル種別に応じてエディタを切替 */}
         <div className="flex-1 min-w-0 flex flex-col">
+          {/* Read-Only バナー（Phase 7: マルチウィンドウ対応） */}
+          {activeTab?.isReadOnly && (
+            <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-sm text-amber-800" role="status">
+              <span>🔒 読み取り専用（別のウィンドウで編集中）</span>
+              <button
+                type="button"
+                className="ml-2 px-3 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-amber-900 text-xs font-medium transition-colors"
+                onClick={() => {
+                  if (activeTab.filePath) {
+                    requestWriteAccess(activeTab.filePath);
+                  }
+                }}
+              >
+                編集権限を取得する
+              </button>
+            </div>
+          )}
           {activeTab ? (
             <EditorErrorBoundary key={activeTab.id}>
               {activeTab.fileType === 'html' ? (

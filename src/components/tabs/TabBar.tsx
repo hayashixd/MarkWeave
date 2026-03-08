@@ -5,6 +5,7 @@
  * - タブの開く・閉じる・切り替え
  * - 未保存マーカー表示 (● filename.md)
  * - タブ閉じる時の未保存確認
+ * - タブをウィンドウに切り出す機能（Phase 7: コンテキストメニュー）
  *
  * UI 改善:
  * - 閉じるボタンを常時表示（ホバー時のみだと見つけにくい）
@@ -13,16 +14,32 @@
  * - タブバー空き領域をドラッグ領域として使用（data-tauri-drag-region）
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { useTabStore } from '../../store/tabStore';
+import type { TabState } from '../../store/tabStore';
 
 interface TabBarProps {
   onCloseTab?: (tabId: string, isDirty: boolean) => void;
   onNewTab?: () => void;
+  onDetachTab?: (tabId: string) => void;
 }
 
-export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
+export function TabBar({ onCloseTab, onNewTab, onDetachTab }: TabBarProps) {
   const { tabs, activeTabId, setActiveTab } = useTabStore();
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tab: TabState } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // コンテキストメニュー外クリックで閉じる
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = (e: PointerEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [contextMenu]);
 
   // タブバー空き領域のダブルクリックでウィンドウ最大化/元のサイズに切り替え
   const handleDragAreaDoubleClick = useCallback(() => {
@@ -76,6 +93,11 @@ export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
     }
   };
 
+  const handleContextMenu = (e: React.MouseEvent, tab: TabState) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, tab });
+  };
+
   return (
     <div className="tab-bar flex items-center bg-gray-100 border-b border-gray-200 overflow-x-auto flex-shrink-0">
       <div
@@ -100,8 +122,14 @@ export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
               }`}
               onClick={() => setActiveTab(tab.id)}
               onKeyDown={(e) => handleTabKeyDown(e, index)}
+              onContextMenu={(e) => handleContextMenu(e, tab)}
             >
               <span className="truncate max-w-40">
+                {tab.isReadOnly && (
+                  <span className="text-gray-400 mr-1" title="読み取り専用">
+                    🔒
+                  </span>
+                )}
                 {tab.isDirty && (
                   <span className="text-orange-500 mr-1" title="未保存の変更があります">
                     ●
@@ -144,6 +172,37 @@ export function TabBar({ onCloseTab, onNewTab }: TabBarProps) {
       >
         +
       </button>
+
+      {/* タブコンテキストメニュー */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-48"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            onClick={() => {
+              onCloseTab?.(contextMenu.tab.id, contextMenu.tab.isDirty);
+              setContextMenu(null);
+            }}
+          >
+            タブを閉じる
+          </button>
+          <div className="border-t border-gray-100 my-1" />
+          <button
+            type="button"
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+            onClick={() => {
+              onDetachTab?.(contextMenu.tab.id);
+              setContextMenu(null);
+            }}
+          >
+            新しいウィンドウに切り出す
+          </button>
+        </div>
+      )}
     </div>
   );
 }
