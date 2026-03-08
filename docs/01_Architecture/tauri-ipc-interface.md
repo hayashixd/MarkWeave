@@ -447,6 +447,68 @@ const sizeBytes = await invoke<number>('print_to_pdf', {
 // 戻り値: PDF ファイルのバイト数
 ```
 
+### `try_acquire_file_lock`
+
+```typescript
+// window-tab-session-design.md §11 に準拠
+// Rust シグネチャ: pub fn try_acquire_file_lock(app: AppHandle, registry: State<FileLockRegistry>, file_path: String, window_label: String) -> serde_json::Value
+interface FileLockResult {
+  acquired: boolean;
+  ownerLabel: string | null;
+}
+const result = await invoke<FileLockResult>('try_acquire_file_lock', {
+  filePath: '/path/to/file.md',
+  windowLabel: 'main',
+});
+```
+
+### `release_file_lock`
+
+```typescript
+// Rust シグネチャ: pub fn release_file_lock(app: AppHandle, registry: State<FileLockRegistry>, file_path: String, window_label: String)
+await invoke<void>('release_file_lock', {
+  filePath: '/path/to/file.md',
+  windowLabel: 'main',
+});
+```
+
+### `transfer_file_lock`
+
+```typescript
+// Rust シグネチャ: pub fn transfer_file_lock(app: AppHandle, registry: State<FileLockRegistry>, file_path: String, from_label: String, to_label: String) -> bool
+const transferred = await invoke<boolean>('transfer_file_lock', {
+  filePath: '/path/to/file.md',
+  fromLabel: 'main',
+  toLabel: 'detached-1',
+});
+```
+
+### `notify_write_access_denied`
+
+```typescript
+// Rust シグネチャ: pub fn notify_write_access_denied(app: AppHandle, file_path: String, requester_label: String)
+await invoke<void>('notify_write_access_denied', {
+  filePath: '/path/to/file.md',
+  requesterLabel: 'detached-1',
+});
+```
+
+### `detach_tab_to_window`
+
+```typescript
+// Rust シグネチャ: pub async fn detach_tab_to_window(app: AppHandle, ...) -> Result<String, String>
+const newWindowLabel = await invoke<string>('detach_tab_to_window', {
+  sourceWindowLabel: 'main',
+  filePath: '/path/to/file.md',
+  fileName: 'file.md',
+  content: '# Hello',
+  encoding: 'UTF-8',
+  lineEnding: 'LF',
+  fileType: 'markdown',
+});
+// 戻り値: 新しいウィンドウの label（例: "detached-1"）
+```
+
 ---
 
 ## 10. エラー型定義

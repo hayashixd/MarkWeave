@@ -92,6 +92,79 @@ export async function setTitleBarDirty(dirty: boolean, fileName?: string): Promi
   }
 }
 
+// --- ウィンドウ同期コマンド (window-tab-session-design.md §11) ---
+
+/** ファイルロック取得結果 */
+export interface FileLockResult {
+  acquired: boolean;
+  ownerLabel: string | null;
+}
+
+/**
+ * ファイルロックの取得を試みる。
+ * @returns acquired=true でロック成功、false の場合 ownerLabel に保有者
+ */
+export async function tryAcquireFileLock(filePath: string, windowLabel: string): Promise<FileLockResult> {
+  try {
+    return await invoke<FileLockResult>('try_acquire_file_lock', { filePath, windowLabel });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
+/**
+ * ファイルロックを解放する。
+ */
+export async function releaseFileLock(filePath: string, windowLabel: string): Promise<void> {
+  try {
+    await invoke<void>('release_file_lock', { filePath, windowLabel });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
+/**
+ * ファイルロックを譲渡する。
+ */
+export async function transferFileLock(filePath: string, fromLabel: string, toLabel: string): Promise<boolean> {
+  try {
+    return await invoke<boolean>('transfer_file_lock', { filePath, fromLabel, toLabel });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
+/**
+ * 書き込み権限の拒否を通知する。
+ */
+export async function notifyWriteAccessDenied(filePath: string, requesterLabel: string): Promise<void> {
+  try {
+    await invoke<void>('notify_write_access_denied', { filePath, requesterLabel });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
+/**
+ * タブを新しいウィンドウに切り出す。
+ * @returns 新しいウィンドウの label
+ */
+export async function detachTabToWindow(params: {
+  sourceWindowLabel: string;
+  filePath: string | null;
+  fileName: string;
+  content: string;
+  encoding: string;
+  lineEnding: string;
+  fileType: string;
+}): Promise<string> {
+  try {
+    return await invoke<string>('detach_tab_to_window', params);
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
 /**
  * Rust 側の AppError を日本語のユーザー向けメッセージに変換する。
  *

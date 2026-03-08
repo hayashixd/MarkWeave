@@ -9,6 +9,7 @@ use commands::fs_commands;
 use commands::plugin_commands;
 use commands::recent_files;
 use commands::window_commands;
+use commands::window_sync;
 use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,6 +31,8 @@ pub fn run() {
                 let _ = window.unminimize();
             }
         }))
+        .manage(window_sync::FileLockRegistry::new())
+        .manage(window_sync::WindowCounter::new())
         .invoke_handler(tauri::generate_handler![
             export_commands::print_to_pdf,
             export_commands::check_pandoc,
@@ -43,6 +46,11 @@ pub fn run() {
             fs_commands::rename_file,
             fs_commands::move_to_trash,
             window_commands::set_title_dirty,
+            window_sync::try_acquire_file_lock,
+            window_sync::release_file_lock,
+            window_sync::transfer_file_lock,
+            window_sync::notify_write_access_denied,
+            window_sync::detach_tab_to_window,
             plugin_commands::plugin_read_file,
             plugin_commands::plugin_write_file,
             plugin_commands::plugin_list_directory,
@@ -68,6 +76,21 @@ pub fn run() {
                 .level_for("app_lib", log::LevelFilter::Debug)
                 .build(),
         )
+        .on_window_event(|window, event| {
+            // ウィンドウが閉じられるとき、そのウィンドウが保持するファイルロックを全解放
+            if let tauri::WindowEvent::Destroyed = event {
+                let label = window.label().to_string();
+                if let Some(registry) = window.try_state::<window_sync::FileLockRegistry>() {
+                    let released = registry.release_all_for_window(&label);
+                    for path in released {
+                        let _ = window.emit("file-lock-released", serde_json::json!({
+                            "filePath": path,
+                            "windowLabel": label,
+                        }));
+                    }
+                }
+            }
+        })
         .setup(|app| {
             // 初回起動時のコマンドライン引数からファイルパスを処理
             let args: Vec<String> = std::env::args().collect();
