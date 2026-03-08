@@ -20,6 +20,8 @@ interface PaneTabBarProps {
   paneId: string;
   isFocused: boolean;
   showCloseButton: boolean;
+  /** 同一ファイルが両ペインで開かれている場合 true */
+  isSameFileSplit?: boolean;
   onCloseTab?: (tabId: string, isDirty: boolean) => void;
   onNewTab?: () => void;
   onClosePane?: () => void;
@@ -29,6 +31,7 @@ export function PaneTabBar({
   paneId,
   isFocused,
   showCloseButton,
+  isSameFileSplit = false,
   onCloseTab,
   onNewTab,
   onClosePane,
@@ -38,6 +41,8 @@ export function PaneTabBar({
   const setPaneActiveTab = usePaneStore((s) => s.setPaneActiveTab);
   const setActivePaneId = usePaneStore((s) => s.setActivePaneId);
   const moveTabToPane = usePaneStore((s) => s.moveTabToPane);
+  const scrollSyncEnabled = usePaneStore((s) => s.scrollSyncEnabled);
+  const setScrollSyncEnabled = usePaneStore((s) => s.setScrollSyncEnabled);
   const [dragOverActive, setDragOverActive] = useState(false);
 
   const paneTabs: TabState[] = pane
@@ -193,6 +198,23 @@ export function PaneTabBar({
       >
         +
       </button>
+
+      {/* スクロール同期トグル（同一ファイル分割時のみ） */}
+      {isSameFileSplit && (
+        <button
+          type="button"
+          className={`px-2 py-1 text-xs flex-shrink-0 border-l border-gray-200 transition-colors ${
+            scrollSyncEnabled
+              ? 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+              : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
+          }`}
+          onClick={() => setScrollSyncEnabled(!scrollSyncEnabled)}
+          aria-label={scrollSyncEnabled ? 'スクロール同期を無効にする' : 'スクロール同期を有効にする'}
+          title={scrollSyncEnabled ? 'スクロール同期: 有効' : 'スクロール同期: 無効'}
+        >
+          {scrollSyncEnabled ? '⇄ 同期' : '⇄'}
+        </button>
+      )}
 
       {/* ペインを閉じるボタン（分割時のみ） */}
       {showCloseButton && (

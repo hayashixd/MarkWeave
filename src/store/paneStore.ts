@@ -31,6 +31,8 @@ interface SplitEditorStore {
   layout: PaneLayout;
   panes: PaneState[];
   activePaneId: string;
+  /** 同一ファイル分割時のスクロール同期（split-editor-design.md §6） */
+  scrollSyncEnabled: boolean;
 
   // アクション
   /** ペインを分割する。tabId を指定すると、そのタブを新ペインへ移動 */
@@ -49,6 +51,8 @@ interface SplitEditorStore {
   removeTabFromPane: (tabId: string) => void;
   /** ペイン内のアクティブタブを設定する */
   setPaneActiveTab: (paneId: string, tabId: string | null) => void;
+  /** スクロール同期の有効/無効を切り替える */
+  setScrollSyncEnabled: (enabled: boolean) => void;
 
   // ヘルパー
   /** タブが属するペインを返す */
@@ -64,6 +68,7 @@ export const usePaneStore = create<SplitEditorStore>((set, get) => ({
   layout: { type: 'single', splitRatio: 0.5 },
   panes: [{ id: PANE_1, tabs: [], activeTabId: null }],
   activePaneId: PANE_1,
+  scrollSyncEnabled: true,
 
   splitPane: (direction, tabId) => {
     const state = get();
@@ -229,6 +234,10 @@ export const usePaneStore = create<SplitEditorStore>((set, get) => ({
         p.id === paneId ? { ...p, activeTabId: tabId } : p,
       ),
     }));
+  },
+
+  setScrollSyncEnabled: (enabled) => {
+    set({ scrollSyncEnabled: enabled });
   },
 
   getPaneForTab: (tabId) => {

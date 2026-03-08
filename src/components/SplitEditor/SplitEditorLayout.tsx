@@ -15,6 +15,7 @@ import { useTabStore } from '../../store/tabStore';
 import type { TabState } from '../../store/tabStore';
 import { PaneTabBar, PANE_TAB_DRAG_TYPE } from './PaneTabBar';
 import { Splitter } from './Splitter';
+import { useScrollSync } from './useScrollSync';
 
 interface SplitEditorLayoutProps {
   /** エディタ本体のレンダリング関数（タブに応じてエディタを表示） */
@@ -45,6 +46,9 @@ export function SplitEditorLayout({
   const moveTabToPane = usePaneStore((s) => s.moveTabToPane);
   const allTabs = useTabStore((s) => s.tabs);
   const [dropTargetPaneId, setDropTargetPaneId] = useState<string | null>(null);
+
+  // 同一ファイル分割時のスクロール同期
+  const { isSameFile } = useScrollSync();
 
   const handleClosePane = useCallback(
     (paneId: string) => {
@@ -119,10 +123,12 @@ export function SplitEditorLayout({
           <div key={pane.id} className="contents">
             {/* ペイン間のスプリッタ（2番目のペインの前に配置） */}
             {index === 1 && isSplit && (
-              <Splitter
-                direction={layout.type as 'horizontal' | 'vertical'}
-                onRatioChange={setSplitRatio}
-              />
+              <>
+                <Splitter
+                  direction={layout.type as 'horizontal' | 'vertical'}
+                  onRatioChange={setSplitRatio}
+                />
+              </>
             )}
             <div
               className={`split-pane flex flex-col min-h-0 min-w-0 ${
@@ -150,6 +156,7 @@ export function SplitEditorLayout({
                   paneId={pane.id}
                   isFocused={isFocused}
                   showCloseButton={true}
+                  isSameFileSplit={isSameFile}
                   onCloseTab={onCloseTab}
                   onNewTab={onNewTab}
                   onClosePane={() => handleClosePane(pane.id)}
