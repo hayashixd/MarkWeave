@@ -43,6 +43,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     pomodoroEnabled: false,
     pomodoroWorkMinutes: 25,
     pomodoroBreakMinutes: 5,
+    wordSprintEnabled: false,
+    wordSprintDurationMinutes: 15,
+    wordSprintTargetWords: 500,
   },
   markdown: {
     enableMath: true,
