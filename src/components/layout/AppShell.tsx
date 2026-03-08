@@ -88,6 +88,7 @@ export function AppShell() {
   const addTabToPane = usePaneStore((s) => s.addTabToPane);
   const removeTabFromPane = usePaneStore((s) => s.removeTabFromPane);
   const splitPane = usePaneStore((s) => s.splitPane);
+  const setActivePaneId = usePaneStore((s) => s.setActivePaneId);
   const setPaneActiveTab = usePaneStore((s) => s.setPaneActiveTab);
 
   // タブストアとペインストアの同期:
@@ -498,6 +499,26 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Alt+←/→/↑/↓: ペイン間フォーカス移動
+      if ((e.ctrlKey || e.metaKey) && e.altKey && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        const currentPanes = usePaneStore.getState().panes;
+        const currentActivePaneId = usePaneStore.getState().activePaneId;
+        if (currentPanes.length < 2) return;
+
+        const currentIndex = currentPanes.findIndex((p) => p.id === currentActivePaneId);
+        const otherIndex = currentIndex === 0 ? 1 : 0;
+        const otherPane = currentPanes[otherIndex];
+        if (otherPane) {
+          setActivePaneId(otherPane.id);
+          // アクティブペインのアクティブタブを tabStore に同期
+          if (otherPane.activeTabId) {
+            useTabStore.getState().setActiveTab(otherPane.activeTabId);
+          }
+        }
+        return;
+      }
+
       // Escape: Zen モードを解除
       if (e.key === 'Escape' && settings.editor.zenMode) {
         e.preventDefault();
@@ -508,7 +529,7 @@ export function AppShell() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow, settings.editor.zenMode, updateSettings, splitPane]);
+  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow, settings.editor.zenMode, updateSettings, splitPane, setActivePaneId]);
 
   // デイリーノート作成関数 (知識管理者ペルソナ向け)
   const createDailyNote = useCallback(() => {
