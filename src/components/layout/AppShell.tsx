@@ -43,6 +43,8 @@ import { writeFile } from '../../lib/tauri-commands';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ExportDialog } from '../Export/ExportDialog';
 import { PdfExportDialog } from '../Export/PdfExportDialog';
+import { PandocExportDialog } from '../Export/PandocExportDialog';
+import type { PandocFormat } from '../../file/export/pandoc-exporter';
 import { ConversionDialog } from '../Conversion/ConversionDialog';
 import { useConvertFile } from '../../hooks/useConvertFile';
 import { useRecentFilesStore } from '../../store/recentFilesStore';
@@ -55,6 +57,8 @@ export function AppShell() {
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [pdfExportDialogOpen, setPdfExportDialogOpen] = useState(false);
+  const [pandocExportDialogOpen, setPandocExportDialogOpen] = useState(false);
+  const [pandocExportFormat, setPandocExportFormat] = useState<PandocFormat>('docx');
   // エディタインスタンスへの参照（アウトラインパネル等で使用）
   const [currentEditor, setCurrentEditor] = useState<Editor | null>(null);
 
@@ -101,7 +105,12 @@ export function AppShell() {
   // ファイルダイアログ
   const openFileDialog = useOpenFileDialog();
   const saveAsDialog = useSaveAsDialog();
-  const { openWorkspace } = useWorkspaceStore();
+  const { openWorkspace, loadRecentWorkspaces } = useWorkspaceStore();
+
+  // 起動時に最近使ったワークスペース履歴を読み込む（Phase 7）
+  useEffect(() => {
+    loadRecentWorkspaces();
+  }, [loadRecentWorkspaces]);
 
   // HTML ↔ MD 変換フック（Phase 6）
   const {
@@ -367,6 +376,14 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Alt+W: Word (.docx) エクスポートダイアログ (export-interop-design.md §7)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'w') {
+        e.preventDefault();
+        setPandocExportFormat('docx');
+        setPandocExportDialogOpen(true);
+        return;
+      }
+
       // Ctrl+Alt+D: デイリーノート作成 (知識管理者ペルソナ向け)
       if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'd') {
         e.preventDefault();
@@ -520,6 +537,18 @@ export function AppShell() {
           markdown={activeTab.content}
           currentFilePath={activeTab.filePath ?? undefined}
           onClose={() => setPdfExportDialogOpen(false)}
+        />
+      )}
+
+      {/* Pandoc エクスポートダイアログ（Phase 7: Word / LaTeX / ePub） */}
+      {pandocExportDialogOpen && activeTab && (
+        <PandocExportDialog
+          markdown={activeTab.content}
+          currentFilePath={activeTab.filePath ?? undefined}
+          onClose={() => setPandocExportDialogOpen(false)}
+          onOpenSettings={() => setPreferencesOpen(true)}
+          pandocPath={settings.export.pandocPath}
+          initialFormat={pandocExportFormat}
         />
       )}
 

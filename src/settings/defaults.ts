@@ -72,4 +72,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabled: true,
     showAiTemplates: true,
   },
+  export: {
+    pandocPath: '',
+  },
 };

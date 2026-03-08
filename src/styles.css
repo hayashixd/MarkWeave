@@ -1391,6 +1391,13 @@
   font-weight: 500;
 }
 
+/* Phase 7: ドラッグ&ドロップ ターゲットのハイライト */
+.file-tree-node--drag-over {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  outline: 1.5px dashed var(--color-accent);
+  border-radius: 3px;
+}
+
 .file-tree-node__icon {
   flex-shrink: 0;
   font-size: 0.6875rem;

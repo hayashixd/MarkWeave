@@ -30,10 +30,16 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![
             export_commands::print_to_pdf,
+            export_commands::check_pandoc,
+            export_commands::export_with_pandoc,
             fs_commands::read_file,
             fs_commands::write_file,
             fs_commands::file_exists,
             fs_commands::get_path_info,
+            fs_commands::list_workspace_files,
+            fs_commands::list_markdown_files,
+            fs_commands::rename_file,
+            fs_commands::move_to_trash,
             window_commands::set_title_dirty,
         ])
         .plugin(

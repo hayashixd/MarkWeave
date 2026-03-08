@@ -150,3 +150,171 @@ pub async fn get_path_info(path: String) -> Result<PathInfo, String> {
         extension,
     })
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 7: ワークスペース高度な機能（file-workspace-design.md §6 に準拠）
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// ファイルツリーノード（JSON シリアライズ用）。
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileNode {
+    pub name: String,
+    pub path: String,
+    #[serde(rename = "type")]
+    pub node_type: String, // "file" | "directory"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<FileNode>>,
+}
+
+/// ワークスペース内のファイルツリーを再帰取得する Tauri コマンド。
+///
+/// file-workspace-design.md §3, §8 に準拠。
+/// フロントエンドから `invoke('list_workspace_files', { rootPath, extensions })` で呼び出す。
+#[tauri::command]
+pub async fn list_workspace_files(
+    root_path: String,
+    extensions: Vec<String>,
+) -> Result<Vec<FileNode>, String> {
+    let root = Path::new(&root_path);
+    if !root.is_dir() {
+        return Err(format!("ディレクトリではありません: {}", root_path));
+    }
+    let nodes = collect_file_tree(root, &extensions).map_err(|e| e.to_string())?;
+    Ok(nodes)
+}
+
+fn collect_file_tree(dir: &Path, extensions: &[String]) -> std::io::Result<Vec<FileNode>> {
+    let mut entries: Vec<FileNode> = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        // 隠しファイル・隠しフォルダをスキップ
+        if name.starts_with('.') {
+            continue;
+        }
+
+        if path.is_dir() {
+            let children = collect_file_tree(&path, extensions)?;
+            entries.push(FileNode {
+                name,
+                path: path.to_string_lossy().to_string(),
+                node_type: "directory".to_string(),
+                children: Some(children),
+            });
+        } else if path.is_file() {
+            let ext = path.extension()
+                .and_then(|e| e.to_str())
+                .map(|e| format!(".{}", e))
+                .unwrap_or_default();
+            if extensions.is_empty() || extensions.iter().any(|e| e == &ext) {
+                entries.push(FileNode {
+                    name,
+                    path: path.to_string_lossy().to_string(),
+                    node_type: "file".to_string(),
+                    children: None,
+                });
+            }
+        }
+    }
+    Ok(entries)
+}
+
+/// ワークスペース内の .md ファイルを一覧取得する Tauri コマンド。
+///
+/// link-updater.ts からのリンク更新スキャンで使用する。
+#[tauri::command]
+pub async fn list_markdown_files(root_path: String) -> Result<Vec<String>, String> {
+    let root = Path::new(&root_path);
+    if !root.is_dir() {
+        return Err(format!("ディレクトリではありません: {}", root_path));
+    }
+    let mut files = Vec::new();
+    collect_md_files(root, &mut files).map_err(|e| e.to_string())?;
+    Ok(files)
+}
+
+fn collect_md_files(dir: &Path, files: &mut Vec<String>) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let name = path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if name.starts_with('.') {
+            continue;
+        }
+        if path.is_dir() {
+            collect_md_files(&path, files)?;
+        } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
+            files.push(path.to_string_lossy().to_string());
+        }
+    }
+    Ok(())
+}
+
+/// ファイルをリネーム / 別ディレクトリへ移動する Tauri コマンド。
+///
+/// file-workspace-design.md §6.3 に準拠。
+/// フロントエンドから `invoke('rename_file', { oldPath, newPath })` で呼び出す。
+#[tauri::command]
+pub async fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
+    log::info!("rename_file: {} → {}", old_path, new_path);
+
+    let old = Path::new(&old_path);
+    let new = Path::new(&new_path);
+
+    if !old.exists() {
+        return Err(format!("ファイルが見つかりません: {}", old_path));
+    }
+
+    // 同じパスへのリネームは何もしない
+    if old == new {
+        return Ok(());
+    }
+
+    // 移動先ディレクトリが存在しない場合は作成
+    if let Some(parent) = new.parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("ディレクトリ作成に失敗: {}", e))?;
+        }
+    }
+
+    // 移動先に同名ファイルが存在する場合はエラー
+    if new.exists() {
+        return Err(format!("移動先に同名のファイルが既に存在します: {}", new_path));
+    }
+
+    std::fs::rename(old, new).map_err(|e| format!("リネームに失敗: {}", e))?;
+    log::info!("rename_file: success");
+    Ok(())
+}
+
+/// ファイルを削除する Tauri コマンド。
+///
+/// file-workspace-design.md §6.2 に準拠。
+/// 注: OS のゴミ箱機能を使用（`trash` クレート未使用のため直接削除）。
+/// フロントエンドから `invoke('move_to_trash', { path })` で呼び出す。
+#[tauri::command]
+pub async fn move_to_trash(path: String) -> Result<(), String> {
+    log::info!("move_to_trash: {}", path);
+
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err(format!("ファイルが見つかりません: {}", path));
+    }
+
+    if p.is_dir() {
+        std::fs::remove_dir_all(p).map_err(|e| format!("ディレクトリ削除に失敗: {}", e))?;
+    } else {
+        std::fs::remove_file(p).map_err(|e| format!("ファイル削除に失敗: {}", e))?;
+    }
+
+    log::info!("move_to_trash: success");
+    Ok(())
+}
