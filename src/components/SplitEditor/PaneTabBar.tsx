@@ -1,16 +1,20 @@
 /**
  * ペイン専用タブバーコンポーネント
  *
- * split-editor-design.md §3 に準拠:
+ * split-editor-design.md §3, §4.1 に準拠:
  * - 各ペインが独立したタブバーを持つ
  * - フォーカスのあるペインのタブバーは強調色
  * - 「ペインを閉じる」ボタン（分割時のみ表示）
+ * - タブをドラッグでペイン間移動
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useTabStore } from '../../store/tabStore';
 import type { TabState } from '../../store/tabStore';
 import { usePaneStore } from '../../store/paneStore';
+
+/** ドラッグ中のタブ情報を転送するための MIME タイプ */
+export const PANE_TAB_DRAG_TYPE = 'application/x-pane-tab';
 
 interface PaneTabBarProps {
   paneId: string;
@@ -33,6 +37,8 @@ export function PaneTabBar({
   const pane = usePaneStore((s) => s.panes.find((p) => p.id === paneId));
   const setPaneActiveTab = usePaneStore((s) => s.setPaneActiveTab);
   const setActivePaneId = usePaneStore((s) => s.setActivePaneId);
+  const moveTabToPane = usePaneStore((s) => s.moveTabToPane);
+  const [dragOverActive, setDragOverActive] = useState(false);
 
   const paneTabs: TabState[] = pane
     ? pane.tabs
@@ -54,14 +60,67 @@ export function PaneTabBar({
     setActivePaneId(paneId);
   }, [paneId, setActivePaneId]);
 
+  // ドラッグ開始: タブ ID とソースペイン ID をセット
+  const handleDragStart = useCallback(
+    (e: React.DragEvent, tabId: string) => {
+      e.dataTransfer.setData(
+        PANE_TAB_DRAG_TYPE,
+        JSON.stringify({ tabId, fromPaneId: paneId }),
+      );
+      e.dataTransfer.effectAllowed = 'move';
+    },
+    [paneId],
+  );
+
+  // ドラッグオーバー: ドロップ許可
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(PANE_TAB_DRAG_TYPE)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDragOverActive(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverActive(false);
+  }, []);
+
+  // ドロップ: タブをこのペインに移動
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOverActive(false);
+
+      const raw = e.dataTransfer.getData(PANE_TAB_DRAG_TYPE);
+      if (!raw) return;
+
+      try {
+        const { tabId, fromPaneId } = JSON.parse(raw) as {
+          tabId: string;
+          fromPaneId: string;
+        };
+        if (fromPaneId !== paneId) {
+          moveTabToPane(tabId, fromPaneId, paneId);
+          setActivePaneId(paneId);
+        }
+      } catch {
+        // 無効なデータ — 無視
+      }
+    },
+    [paneId, moveTabToPane, setActivePaneId],
+  );
+
   return (
     <div
       className={`pane-tab-bar flex items-center border-b flex-shrink-0 overflow-x-auto ${
         isFocused
           ? 'bg-gray-100 border-gray-300'
           : 'bg-gray-50 border-gray-200'
-      }`}
+      } ${dragOverActive ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
       onClick={handlePaneFocus}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div
         className="flex items-center min-w-0"
@@ -76,6 +135,8 @@ export function PaneTabBar({
               role="tab"
               aria-selected={isActive}
               tabIndex={isActive ? 0 : -1}
+              draggable
+              onDragStart={(e) => handleDragStart(e, tab.id)}
               className={`pane-tab-item flex items-center gap-1 px-2.5 py-1.5 cursor-pointer border-r border-gray-200 text-xs whitespace-nowrap select-none transition-colors ${
                 isActive
                   ? isFocused
@@ -119,7 +180,7 @@ export function PaneTabBar({
         })}
       </div>
 
-      {/* 空き領域 */}
+      {/* 空き領域（ドロップ可能） */}
       <div className="flex-1 self-stretch" />
 
       {/* 新規タブボタン */}

@@ -9,11 +9,11 @@
  */
 
 import type React from 'react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { usePaneStore } from '../../store/paneStore';
 import { useTabStore } from '../../store/tabStore';
 import type { TabState } from '../../store/tabStore';
-import { PaneTabBar } from './PaneTabBar';
+import { PaneTabBar, PANE_TAB_DRAG_TYPE } from './PaneTabBar';
 import { Splitter } from './Splitter';
 
 interface SplitEditorLayoutProps {
@@ -42,13 +42,54 @@ export function SplitEditorLayout({
   const setSplitRatio = usePaneStore((s) => s.setSplitRatio);
   const closePane = usePaneStore((s) => s.closePane);
   const setActivePaneId = usePaneStore((s) => s.setActivePaneId);
+  const moveTabToPane = usePaneStore((s) => s.moveTabToPane);
   const allTabs = useTabStore((s) => s.tabs);
+  const [dropTargetPaneId, setDropTargetPaneId] = useState<string | null>(null);
 
   const handleClosePane = useCallback(
     (paneId: string) => {
       closePane(paneId);
     },
     [closePane],
+  );
+
+  const handlePaneDragOver = useCallback(
+    (e: React.DragEvent, targetPaneId: string) => {
+      if (e.dataTransfer.types.includes(PANE_TAB_DRAG_TYPE)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        setDropTargetPaneId(targetPaneId);
+      }
+    },
+    [],
+  );
+
+  const handlePaneDragLeave = useCallback(() => {
+    setDropTargetPaneId(null);
+  }, []);
+
+  const handlePaneDrop = useCallback(
+    (e: React.DragEvent, targetPaneId: string) => {
+      e.preventDefault();
+      setDropTargetPaneId(null);
+
+      const raw = e.dataTransfer.getData(PANE_TAB_DRAG_TYPE);
+      if (!raw) return;
+
+      try {
+        const { tabId, fromPaneId } = JSON.parse(raw) as {
+          tabId: string;
+          fromPaneId: string;
+        };
+        if (fromPaneId !== targetPaneId) {
+          moveTabToPane(tabId, fromPaneId, targetPaneId);
+          setActivePaneId(targetPaneId);
+        }
+      } catch {
+        // 無効なデータ — 無視
+      }
+    },
+    [moveTabToPane, setActivePaneId],
   );
 
   const isSplit = layout.type !== 'single';
@@ -90,9 +131,16 @@ export function SplitEditorLayout({
                 isFocused && isSplit
                   ? 'ring-1 ring-blue-300 ring-inset'
                   : ''
+              } ${
+                dropTargetPaneId === pane.id
+                  ? 'bg-blue-50/50'
+                  : ''
               }`}
               style={sizeStyle}
               onClick={() => setActivePaneId(pane.id)}
+              onDragOver={(e) => handlePaneDragOver(e, pane.id)}
+              onDragLeave={handlePaneDragLeave}
+              onDrop={(e) => handlePaneDrop(e, pane.id)}
               data-pane-id={pane.id}
               data-focused={isFocused}
             >
