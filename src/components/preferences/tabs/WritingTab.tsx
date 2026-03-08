@@ -123,6 +123,46 @@ export function WritingTab() {
         )}
       </div>
 
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">ポモドーロタイマー</h2>
+      <div className="bg-gray-50 rounded-lg px-4 mb-6">
+        <ToggleRow
+          label="ポモドーロタイマー"
+          description="ステータスバーに25分集中→5分休憩のカウントダウンタイマーを表示します。"
+          checked={settings.editor.pomodoroEnabled}
+          onChange={(v) => updateSettings({ editor: { pomodoroEnabled: v } })}
+        />
+        {settings.editor.pomodoroEnabled && (
+          <div className="pb-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-800">集中時間（分）</div>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={120}
+                value={settings.editor.pomodoroWorkMinutes}
+                onChange={(e) => updateSettings({ editor: { pomodoroWorkMinutes: Math.max(1, parseInt(e.target.value) || 25) } })}
+                className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-right"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-800">休憩時間（分）</div>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={settings.editor.pomodoroBreakMinutes}
+                onChange={(e) => updateSettings({ editor: { pomodoroBreakMinutes: Math.max(1, parseInt(e.target.value) || 5) } })}
+                className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-right"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">環境音</h2>
       <div className="bg-gray-50 rounded-lg px-4 py-3 mb-6">
         <p className="text-xs text-gray-500 mb-3">集中執筆のための背景音。ツールバーからも切り替え可能です。</p>
