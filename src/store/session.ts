@@ -18,10 +18,23 @@ export interface FileSession {
   path: string; // 絶対パス
 }
 
+/** ペイン分割セッション情報（split-editor-design.md §5.2） */
+export interface PaneSessionState {
+  layoutType: 'single' | 'horizontal' | 'vertical';
+  splitRatio: number;
+  /** 各ペインに属するファイルパス一覧（タブ順） */
+  panes: {
+    filePaths: string[];
+    activeFilePath: string | null;
+  }[];
+  activePaneIndex: number;
+}
+
 export interface SessionState {
   openFiles: FileSession[]; // 開いているファイルの一覧（タブ順）
   activeFilePath: string | null; // アクティブタブのファイルパス
   sidebarVisible: boolean; // サイドバーの表示状態
+  paneLayout?: PaneSessionState; // ペイン分割状態（Phase 7）
 }
 
 export interface WindowState {
@@ -42,6 +55,11 @@ export async function saveSession(state: SessionState): Promise<void> {
   await store.set('openFiles', state.openFiles);
   await store.set('activeFilePath', state.activeFilePath);
   await store.set('sidebarVisible', state.sidebarVisible);
+  if (state.paneLayout) {
+    await store.set('paneLayout', state.paneLayout);
+  } else {
+    await store.delete('paneLayout');
+  }
   await store.save(); // 明示的に保存（autoSave: false でクラッシュ耐性向上）
 }
 
@@ -88,5 +106,7 @@ export async function loadSession(): Promise<SessionState | null> {
       (await store.get<string | null>('activeFilePath')) ?? null,
     sidebarVisible:
       (await store.get<boolean>('sidebarVisible')) ?? true,
+    paneLayout:
+      (await store.get<PaneSessionState>('paneLayout')) ?? undefined,
   };
 }

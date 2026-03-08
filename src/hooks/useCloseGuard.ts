@@ -16,12 +16,37 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { useTabStore } from '../store/tabStore';
 import { saveSession } from '../store/session';
+import type { PaneSessionState } from '../store/session';
+import { usePaneStore } from '../store/paneStore';
 import { captureAndSaveWindowState } from './useWindowState';
 
 /** 現在のタブ状態からセッション情報を生成する */
 function getCurrentSession() {
   const { tabs, activeTabId } = useTabStore.getState();
   const activeTab = activeTabId ? tabs.find((t) => t.id === activeTabId) : undefined;
+  const { layout, panes, activePaneId } = usePaneStore.getState();
+
+  // ペイン分割状態の保存
+  let paneLayout: PaneSessionState | undefined;
+  if (layout.type !== 'single' && panes.length > 1) {
+    paneLayout = {
+      layoutType: layout.type,
+      splitRatio: layout.splitRatio,
+      panes: panes.map((pane) => {
+        const paneTabs = pane.tabs
+          .map((tid) => tabs.find((t) => t.id === tid))
+          .filter((t) => t && t.filePath !== null);
+        const activePane = pane.activeTabId
+          ? tabs.find((t) => t.id === pane.activeTabId)
+          : undefined;
+        return {
+          filePaths: paneTabs.map((t) => t!.filePath!),
+          activeFilePath: activePane?.filePath ?? null,
+        };
+      }),
+      activePaneIndex: panes.findIndex((p) => p.id === activePaneId),
+    };
+  }
 
   return {
     openFiles: tabs
@@ -29,6 +54,7 @@ function getCurrentSession() {
       .map((t) => ({ path: t.filePath! })),
     activeFilePath: activeTab?.filePath ?? null,
     sidebarVisible: true, // Phase 1 ではサイドバー状態の追跡は省略
+    paneLayout,
   };
 }
 
