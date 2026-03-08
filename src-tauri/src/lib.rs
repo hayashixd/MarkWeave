@@ -7,6 +7,7 @@ mod models;
 use commands::export_commands;
 use commands::fs_commands;
 use commands::plugin_commands;
+use commands::recent_files;
 use commands::window_commands;
 use tauri::{Emitter, Manager};
 
@@ -51,6 +52,7 @@ pub fn run() {
             plugin_commands::plugin_set_enabled,
             plugin_commands::is_safe_mode_active,
             plugin_commands::set_safe_mode,
+            recent_files::add_to_recent_documents,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()

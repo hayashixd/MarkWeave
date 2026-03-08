@@ -7,6 +7,7 @@
  */
 
 import { useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useTabStore } from '../store/tabStore';
 import { useToastStore } from '../store/toastStore';
 import { readFile } from '../lib/tauri-commands';
@@ -30,6 +31,13 @@ export function useOpenFileAsTab() {
           content,
           savedContent: content,
         });
+
+        // Windows ジャンプリストと「最近使ったファイル」に登録する
+        // window-tab-session-design.md §4.2 参照。非 Windows では no-op。
+        invoke('add_to_recent_documents', { path }).catch(() => {
+          // ジャンプリスト登録の失敗はファイルオープン自体には影響させない
+        });
+
         return tabId;
       } catch (err) {
         const fileName = path.split(/[/\\]/).pop() ?? path;
