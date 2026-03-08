@@ -54,6 +54,12 @@ export interface EditorSettings {
   pomodoroWorkMinutes: number;
   /** ポモドーロ休憩時間（分） */
   pomodoroBreakMinutes: number;
+  /** ワードスプリントの有効/無効 */
+  wordSprintEnabled: boolean;
+  /** ワードスプリント制限時間（分） */
+  wordSprintDurationMinutes: number;
+  /** ワードスプリント目標文字数 */
+  wordSprintTargetWords: number;
 }
 
 export interface MarkdownSettings {

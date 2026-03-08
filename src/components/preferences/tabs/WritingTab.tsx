@@ -163,6 +163,47 @@ export function WritingTab() {
         )}
       </div>
 
+      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">ワードスプリント</h2>
+      <div className="bg-gray-50 rounded-lg px-4 mb-6">
+        <ToggleRow
+          label="ワードスプリント"
+          description="制限時間内に目標文字数の達成を目指すスプリントモード。ステータスバーから開始できます。"
+          checked={settings.editor.wordSprintEnabled}
+          onChange={(v) => updateSettings({ editor: { wordSprintEnabled: v } })}
+        />
+        {settings.editor.wordSprintEnabled && (
+          <div className="pb-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-800">制限時間（分）</div>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={120}
+                value={settings.editor.wordSprintDurationMinutes}
+                onChange={(e) => updateSettings({ editor: { wordSprintDurationMinutes: Math.max(1, parseInt(e.target.value) || 15) } })}
+                className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-right"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-gray-800">目標文字数</div>
+              </div>
+              <input
+                type="number"
+                min={10}
+                max={100000}
+                step={100}
+                value={settings.editor.wordSprintTargetWords}
+                onChange={(e) => updateSettings({ editor: { wordSprintTargetWords: Math.max(10, parseInt(e.target.value) || 500) } })}
+                className="w-24 px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 text-right"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">環境音</h2>
       <div className="bg-gray-50 rounded-lg px-4 py-3 mb-6">
         <p className="text-xs text-gray-500 mb-3">集中執筆のための背景音。ツールバーからも切り替え可能です。</p>

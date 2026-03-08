@@ -59,6 +59,7 @@ import { SplitEditorLayout } from '../SplitEditor';
 import { usePaneStore } from '../../store/paneStore';
 import type { TabState } from '../../store/tabStore';
 import { PomodoroTimer } from '../pomodoro/PomodoroTimer';
+import { WordSprintWidget } from '../wordSprint/WordSprintWidget';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -998,6 +999,8 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
       <div className="flex items-center gap-3">
         {/* ポモドーロタイマー */}
         <PomodoroTimer />
+        {/* ワードスプリント */}
+        <WordSprintWidget charCount={charCount} />
         {/* 読了時間 (ブロガー向け) */}
         {tab && readingTimeMin > 0 && (
           <span className="text-gray-400" title={`推定読了時間（約500文字/分で計算）: ${charCount.toLocaleString()}文字`}>
