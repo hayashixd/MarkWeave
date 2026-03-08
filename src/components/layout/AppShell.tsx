@@ -55,6 +55,9 @@ import { useWriteAccessTransferHandler } from '../../hooks/useWriteAccessTransfe
 import { useDetachedTabInit } from '../../hooks/useDetachedTabInit';
 import { detachTabToWindow } from '../../lib/tauri-commands';
 import { requestWriteAccess } from '../../hooks/useWriteAccessTransfer';
+import { SplitEditorLayout } from '../SplitEditor';
+import { usePaneStore } from '../../store/paneStore';
+import type { TabState } from '../../store/tabStore';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -78,6 +81,54 @@ export function AppShell() {
   }, [loadRecentFiles]);
   const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab } =
     useTabStore();
+
+  // ペイン分割ストア
+  const panes = usePaneStore((s) => s.panes);
+  const activePaneId = usePaneStore((s) => s.activePaneId);
+  const addTabToPane = usePaneStore((s) => s.addTabToPane);
+  const removeTabFromPane = usePaneStore((s) => s.removeTabFromPane);
+  const splitPane = usePaneStore((s) => s.splitPane);
+  const setPaneActiveTab = usePaneStore((s) => s.setPaneActiveTab);
+
+  // タブストアとペインストアの同期:
+  // 新しいタブが追加されたらアクティブペインに登録する
+  const prevTabIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    const currentIds = tabs.map((t) => t.id);
+    const prevIds = prevTabIdsRef.current;
+
+    // 追加されたタブをペインに登録
+    const addedIds = currentIds.filter((id) => !prevIds.includes(id));
+    for (const id of addedIds) {
+      addTabToPane(id);
+    }
+
+    // 削除されたタブをペインから除去
+    const removedIds = prevIds.filter((id) => !currentIds.includes(id));
+    for (const id of removedIds) {
+      removeTabFromPane(id);
+    }
+
+    prevTabIdsRef.current = currentIds;
+  }, [tabs, addTabToPane, removeTabFromPane]);
+
+  // アクティブペインのアクティブタブを tabStore の activeTabId に同期
+  const activePane = panes.find((p) => p.id === activePaneId) ?? panes[0];
+  const effectiveActiveTabId = activePane?.activeTabId ?? activeTabId;
+  useEffect(() => {
+    if (effectiveActiveTabId && effectiveActiveTabId !== activeTabId) {
+      useTabStore.getState().setActiveTab(effectiveActiveTabId);
+    }
+  }, [effectiveActiveTabId, activeTabId]);
+
+  // tabStore の activeTabId が変更された場合、ペインのアクティブタブも同期
+  useEffect(() => {
+    if (!activeTabId) return;
+    const paneForTab = panes.find((p) => p.tabs.includes(activeTabId));
+    if (paneForTab && paneForTab.activeTabId !== activeTabId) {
+      setPaneActiveTab(paneForTab.id, activeTabId);
+    }
+  }, [activeTabId, panes, setPaneActiveTab]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
@@ -437,6 +488,16 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+\: ペイン分割（右に分割）
+      if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+        e.preventDefault();
+        const tab = getActiveTab();
+        if (tab) {
+          splitPane('vertical', tab.id);
+        }
+        return;
+      }
+
       // Escape: Zen モードを解除
       if (e.key === 'Escape' && settings.editor.zenMode) {
         e.preventDefault();
@@ -447,7 +508,7 @@ export function AppShell() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow, settings.editor.zenMode, updateSettings]);
+  }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow, settings.editor.zenMode, updateSettings, splitPane]);
 
   // デイリーノート作成関数 (知識管理者ペルソナ向け)
   const createDailyNote = useCallback(() => {
@@ -520,18 +581,41 @@ export function AppShell() {
           currentFileName={activeTab?.fileName ?? ''}
         />
 
-        {/* エディタエリア - Phase 5: ファイル種別に応じてエディタを切替 */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          {/* Read-Only バナー（Phase 7: マルチウィンドウ対応） */}
-          {activeTab?.isReadOnly && (
+        {/* エディタエリア - Phase 7: ペイン分割対応 */}
+        <SplitEditorLayout
+          renderEditor={(tab: TabState, _paneId: string) => (
+            <EditorErrorBoundary key={tab.id}>
+              {tab.fileType === 'html' ? (
+                <HtmlEditor
+                  initialContent={tab.content}
+                  onContentChange={handleContentChange}
+                  onEditorReady={setCurrentEditor}
+                />
+              ) : (
+                <MarkdownEditor
+                  initialContent={tab.content}
+                  onContentChange={handleContentChange}
+                  onEditorReady={setCurrentEditor}
+                />
+              )}
+            </EditorErrorBoundary>
+          )}
+          renderEmpty={(_paneId: string) => (
+            <EmptyState
+              onNewTab={handleNewTab}
+              onOpenFile={() => openFileDialogRef.current()}
+              recentFiles={recentFiles}
+            />
+          )}
+          renderReadOnlyBanner={(tab: TabState) => (
             <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-sm text-amber-800" role="status">
               <span>🔒 読み取り専用（別のウィンドウで編集中）</span>
               <button
                 type="button"
                 className="ml-2 px-3 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-amber-900 text-xs font-medium transition-colors"
                 onClick={() => {
-                  if (activeTab.filePath) {
-                    requestWriteAccess(activeTab.filePath);
+                  if (tab.filePath) {
+                    requestWriteAccess(tab.filePath);
                   }
                 }}
               >
@@ -539,30 +623,9 @@ export function AppShell() {
               </button>
             </div>
           )}
-          {activeTab ? (
-            <EditorErrorBoundary key={activeTab.id}>
-              {activeTab.fileType === 'html' ? (
-                <HtmlEditor
-                  initialContent={activeTab.content}
-                  onContentChange={handleContentChange}
-                  onEditorReady={setCurrentEditor}
-                />
-              ) : (
-                <MarkdownEditor
-                  initialContent={activeTab.content}
-                  onContentChange={handleContentChange}
-                  onEditorReady={setCurrentEditor}
-                />
-              )}
-            </EditorErrorBoundary>
-          ) : (
-            <EmptyState
-              onNewTab={handleNewTab}
-              onOpenFile={() => openFileDialogRef.current()}
-              recentFiles={recentFiles}
-            />
-          )}
-        </div>
+          onCloseTab={handleCloseTab}
+          onNewTab={handleNewTab}
+        />
       </main>
 
       {/* ステータスバー */}
