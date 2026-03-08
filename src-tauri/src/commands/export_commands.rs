@@ -83,8 +83,8 @@ pub async fn print_to_pdf(
         temp_html_path.to_string_lossy().replace('\\', "/")
     );
 
-    // 非表示の WebviewWindow を作成して PDF を生成
-    let pdf_bytes = {
+    // 非表示の WebviewWindow を作成して印刷ダイアログを表示
+    {
         let window_label = format!("pdf_export_{}", std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -102,67 +102,24 @@ pub async fn print_to_pdf(
         // ページのロード完了を少し待つ
         tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
 
-        // 用紙サイズをインチに変換（WebView2 の print_to_pdf はインチを使用）
-        let (width_inch, height_inch) = paper_size_to_inches(&options.paper_size);
-        let (width_inch, height_inch) = if options.orientation == "landscape" {
-            (height_inch, width_inch)
-        } else {
-            (width_inch, height_inch)
-        };
-
-        // 余白を mm → インチに変換
-        let margin_top = options.margin_top / 25.4;
-        let margin_bottom = options.margin_bottom / 25.4;
-        let margin_left = options.margin_left / 25.4;
-        let margin_right = options.margin_right / 25.4;
-
-        // print API を呼び出して PDF バイト列を取得
-        let pdf_result = webview_window.print_to_pdf(
-            tauri::webview::PageSize {
-                width: width_inch,
-                height: height_inch,
-            },
-            tauri::webview::PrintMargin {
-                top: margin_top,
-                right: margin_right,
-                bottom: margin_bottom,
-                left: margin_left,
-            },
-        ).await;
+        // Tauri 2.x の WebviewWindow::print() でOS印刷ダイアログを表示する。
+        // （Tauri 2.x にはヘッドレス PDF 生成 API が存在しないため、
+        //   ユーザーが印刷ダイアログで「PDFとして保存」を選択する方式）
+        webview_window
+            .print()
+            .map_err(|e| format!("印刷ダイアログの表示に失敗: {}", e))?;
 
         // 非表示ウィンドウを閉じる
         let _ = webview_window.close();
-
-        pdf_result.map_err(|e| format!("PDF の生成に失敗: {}", e))?
     };
-
-    // PDF ファイルを出力先に書き出し
-    let pdf_size = pdf_bytes.len() as u64;
-    tokio::fs::write(&output_path, &pdf_bytes)
-        .await
-        .map_err(|e| format!("PDF ファイルの書き込みに失敗: {}", e))?;
 
     // 一時ファイルを削除
     let _ = tokio::fs::remove_file(&temp_html_path).await;
 
-    log::info!(
-        "print_to_pdf: success ({} bytes) → {}",
-        pdf_size,
-        output_path
-    );
+    log::info!("print_to_pdf: print dialog opened for {}", output_path);
 
-    Ok(pdf_size)
-}
-
-/// 用紙サイズ文字列をインチ単位の (幅, 高さ) に変換する。
-fn paper_size_to_inches(paper_size: &str) -> (f64, f64) {
-    match paper_size {
-        "A3" => (11.69, 16.54),
-        "A4" => (8.27, 11.69),
-        "Letter" => (8.5, 11.0),
-        "Legal" => (8.5, 14.0),
-        _ => (8.27, 11.69), // デフォルト: A4
-    }
+    // 印刷ダイアログ経由のため、実際のファイルサイズは不明
+    Ok(0)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
