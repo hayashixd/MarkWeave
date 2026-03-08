@@ -48,6 +48,12 @@ export interface EditorSettings {
   typewriterStyle: 'mechanical' | 'soft' | 'typewriter';
   /** タイプライター打鍵音の音量 (0.0–1.0) */
   typewriterVolume: number;
+  /** ポモドーロタイマーの有効/無効 */
+  pomodoroEnabled: boolean;
+  /** ポモドーロ集中時間（分） */
+  pomodoroWorkMinutes: number;
+  /** ポモドーロ休憩時間（分） */
+  pomodoroBreakMinutes: number;
 }
 
 export interface MarkdownSettings {

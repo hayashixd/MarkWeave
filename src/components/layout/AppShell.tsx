@@ -58,6 +58,7 @@ import { requestWriteAccess } from '../../hooks/useWriteAccessTransfer';
 import { SplitEditorLayout } from '../SplitEditor';
 import { usePaneStore } from '../../store/paneStore';
 import type { TabState } from '../../store/tabStore';
+import { PomodoroTimer } from '../pomodoro/PomodoroTimer';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -995,6 +996,8 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
         )}
       </div>
       <div className="flex items-center gap-3">
+        {/* ポモドーロタイマー */}
+        <PomodoroTimer />
         {/* 読了時間 (ブロガー向け) */}
         {tab && readingTimeMin > 0 && (
           <span className="text-gray-400" title={`推定読了時間（約500文字/分で計算）: ${charCount.toLocaleString()}文字`}>

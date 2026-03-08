@@ -40,6 +40,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     typewriterSound: false,
     typewriterStyle: 'mechanical',
     typewriterVolume: 0.3,
+    pomodoroEnabled: false,
+    pomodoroWorkMinutes: 25,
+    pomodoroBreakMinutes: 5,
   },
   markdown: {
     enableMath: true,
