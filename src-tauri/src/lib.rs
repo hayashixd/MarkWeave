@@ -6,6 +6,8 @@ mod models;
 
 use commands::export_commands;
 use commands::fs_commands;
+use commands::plugin_commands;
+use commands::recent_files;
 use commands::window_commands;
 use tauri::{Emitter, Manager};
 
@@ -41,6 +43,16 @@ pub fn run() {
             fs_commands::rename_file,
             fs_commands::move_to_trash,
             window_commands::set_title_dirty,
+            plugin_commands::plugin_read_file,
+            plugin_commands::plugin_write_file,
+            plugin_commands::plugin_list_directory,
+            plugin_commands::plugin_load_manifest,
+            plugin_commands::plugin_install,
+            plugin_commands::plugin_uninstall,
+            plugin_commands::plugin_set_enabled,
+            plugin_commands::is_safe_mode_active,
+            plugin_commands::set_safe_mode,
+            recent_files::add_to_recent_documents,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()

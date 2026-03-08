@@ -12,13 +12,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppearanceTab } from './tabs/AppearanceTab';
 import { EditorTab } from './tabs/EditorTab';
 import { WritingTab } from './tabs/WritingTab';
+import { PluginsTab } from './tabs/PluginsTab';
 
-type TabId = 'appearance' | 'editor' | 'writing';
+type TabId = 'appearance' | 'editor' | 'writing' | 'plugins';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'appearance', label: '外観' },
   { id: 'editor', label: 'エディタ' },
   { id: 'writing', label: '執筆スタイル' },
+  { id: 'plugins', label: 'プラグイン' },
 ];
 
 interface PreferencesDialogProps {
@@ -95,6 +97,7 @@ export function PreferencesDialog({ isOpen, onClose }: PreferencesDialogProps) {
             {activeTab === 'appearance' && <AppearanceTab />}
             {activeTab === 'editor' && <EditorTab />}
             {activeTab === 'writing' && <WritingTab />}
+            {activeTab === 'plugins' && <PluginsTab />}
           </div>
         </div>
       </div>
