@@ -92,7 +92,7 @@ pub fn try_acquire_file_lock(
                 "windowLabel": window_label,
             }),
         );
-        serde_json::json!({ "acquired": true, "ownerLabel": null::<String> })
+        serde_json::json!({ "acquired": true, "ownerLabel": null })
     } else {
         let owner = registry.get_owner(&file_path);
         serde_json::json!({ "acquired": false, "ownerLabel": owner })
