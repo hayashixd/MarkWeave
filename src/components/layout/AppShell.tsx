@@ -105,7 +105,12 @@ export function AppShell() {
   // ファイルダイアログ
   const openFileDialog = useOpenFileDialog();
   const saveAsDialog = useSaveAsDialog();
-  const { openWorkspace } = useWorkspaceStore();
+  const { openWorkspace, loadRecentWorkspaces } = useWorkspaceStore();
+
+  // 起動時に最近使ったワークスペース履歴を読み込む（Phase 7）
+  useEffect(() => {
+    loadRecentWorkspaces();
+  }, [loadRecentWorkspaces]);
 
   // HTML ↔ MD 変換フック（Phase 6）
   const {
