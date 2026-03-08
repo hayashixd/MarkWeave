@@ -14,7 +14,9 @@
  */
 
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use tauri::{AppHandle, Manager};
 
 // ---------------------------------------------------------------------------
@@ -319,31 +321,37 @@ pub async fn set_safe_mode(app: AppHandle, active: bool) -> Result<(), String> {
 // ヘルパー
 // ---------------------------------------------------------------------------
 
-/// ディレクトリを再帰的にコピーする
-async fn copy_dir_all(src: &str, dst: &PathBuf) -> Result<(), String> {
-    let src_path = PathBuf::from(src);
-    let mut entries = tokio::fs::read_dir(&src_path)
-        .await
-        .map_err(|e| format!("ディレクトリ読み取りエラー: {e}"))?;
-
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        let dst_path = dst.join(entry.file_name());
-        let file_type = entry
-            .file_type()
+/// ディレクトリを再帰的にコピーする。
+/// 再帰 async 関数は Future サイズが無限大になるため、Box::pin でラップする。
+fn copy_dir_all<'a>(
+    src: &'a str,
+    dst: &'a PathBuf,
+) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send + 'a>> {
+    Box::pin(async move {
+        let src_path = PathBuf::from(src);
+        let mut entries = tokio::fs::read_dir(&src_path)
             .await
-            .map_err(|e| format!("ファイルタイプ取得エラー: {e}"))?;
+            .map_err(|e| format!("ディレクトリ読み取りエラー: {e}"))?;
 
-        if file_type.is_dir() {
-            tokio::fs::create_dir_all(&dst_path)
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let dst_path = dst.join(entry.file_name());
+            let file_type = entry
+                .file_type()
                 .await
-                .map_err(|e| format!("ディレクトリ作成エラー: {e}"))?;
-            copy_dir_all(&entry.path().to_string_lossy(), &dst_path).await?;
-        } else {
-            tokio::fs::copy(entry.path(), &dst_path)
-                .await
-                .map_err(|e| format!("ファイルコピーエラー: {e}"))?;
+                .map_err(|e| format!("ファイルタイプ取得エラー: {e}"))?;
+
+            if file_type.is_dir() {
+                tokio::fs::create_dir_all(&dst_path)
+                    .await
+                    .map_err(|e| format!("ディレクトリ作成エラー: {e}"))?;
+                copy_dir_all(&entry.path().to_string_lossy(), &dst_path).await?;
+            } else {
+                tokio::fs::copy(entry.path(), &dst_path)
+                    .await
+                    .map_err(|e| format!("ファイルコピーエラー: {e}"))?;
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    })
 }
