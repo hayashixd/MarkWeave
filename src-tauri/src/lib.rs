@@ -30,6 +30,8 @@ pub fn run() {
         }))
         .invoke_handler(tauri::generate_handler![
             export_commands::print_to_pdf,
+            export_commands::check_pandoc,
+            export_commands::export_with_pandoc,
             fs_commands::read_file,
             fs_commands::write_file,
             fs_commands::file_exists,

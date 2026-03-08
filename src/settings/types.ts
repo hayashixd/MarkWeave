@@ -88,6 +88,12 @@ export interface SlashCommandSettings {
   showAiTemplates: boolean;
 }
 
+/** 外部ツール・エクスポート設定（export-interop-design.md §9.2） */
+export interface ExportSettings {
+  /** Pandoc の実行パス（空文字列 = 自動検出） */
+  pandocPath: string;
+}
+
 /** アプリ設定の全体型 */
 export interface AppSettings {
   /** 設定ファイルのバージョン。マイグレーションに使用 */
@@ -98,6 +104,7 @@ export interface AppSettings {
   file: FileSettings;
   aiCopy: AiCopySettings;
   slashCommands: SlashCommandSettings;
+  export: ExportSettings;
 }
 
 /** ネストされたオブジェクトの部分更新用ユーティリティ型 */

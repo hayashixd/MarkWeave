@@ -32,6 +32,8 @@ export function migrateSettings(raw: unknown): AppSettings {
       markdown: { ...DEFAULT_SETTINGS.markdown, ...partial.markdown },
       file: { ...DEFAULT_SETTINGS.file, ...partial.file },
       aiCopy: DEFAULT_SETTINGS.aiCopy,
+      slashCommands: DEFAULT_SETTINGS.slashCommands,
+      export: DEFAULT_SETTINGS.export,
       version: 1,
     };
     version = 1;
