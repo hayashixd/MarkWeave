@@ -12,7 +12,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Editor } from '@tiptap/react';
 import {
-  SLASH_COMMANDS,
   CATEGORY_LABELS,
   filterCommands,
   type SlashCommandDef,
@@ -20,6 +19,8 @@ import {
 } from './slash-command-definitions';
 import type { SlashCommandState } from '../../extensions/SlashCommandsExtension';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useSnippetStore } from '../../store/snippetStore';
+import { snippetsToCommands } from '../../lib/snippet-commands';
 
 interface SlashCommandMenuProps {
   editor: Editor;
@@ -36,8 +37,10 @@ export function SlashCommandMenu({ editor, slashState, onClose }: SlashCommandMe
   const selectedItemRef = useRef<HTMLButtonElement>(null);
 
   const { settings } = useSettingsStore();
+  const { snippets } = useSnippetStore();
   const showAi = settings.slashCommands?.showAiTemplates !== false;
-  const filtered = filterCommands(slashState.query).filter(
+  const snippetCommands = snippetsToCommands(snippets);
+  const filtered = filterCommands(slashState.query, snippetCommands).filter(
     (cmd) => showAi || cmd.category !== 'ai',
   );
 
