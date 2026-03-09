@@ -18,6 +18,7 @@
  *
  * Phase 7 追加:
  * - タグビュータブ（知識管理者: YAML FM tags の横断収集・フィルタ）
+ * - グラフビュータブ（知識管理者: Wikiリンク関係の可視化）
  */
 
 import { useState, useCallback } from 'react';
@@ -27,8 +28,9 @@ import { FileTreePanel } from './FileTreePanel';
 import { TemplatePanel } from '../AiPanel/TemplatePanel';
 import { BacklinksPanel } from './BacklinksPanel';
 import { TagViewPanel } from './TagViewPanel';
+import { GraphViewPanel } from './GraphViewPanel';
 
-export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks' | 'tags';
+export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks' | 'tags' | 'graph';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -153,6 +155,17 @@ export function Sidebar({
           >
             🏷 Tags
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'graph'}
+            aria-controls="sidebar-panel-graph"
+            className={`sidebar-tab ${activeTab === 'graph' ? 'sidebar-tab--active' : ''} whitespace-nowrap`}
+            onClick={() => setActiveTab('graph')}
+            title="グラフビュー (Ctrl+Shift+6)"
+          >
+            🕸 Graph
+          </button>
         </div>
         <button
           type="button"
@@ -219,6 +232,16 @@ export function Sidebar({
             aria-labelledby="tab-tags"
           >
             <TagViewPanel />
+          </div>
+        )}
+        {activeTab === 'graph' && (
+          <div
+            id="sidebar-panel-graph"
+            role="tabpanel"
+            aria-labelledby="tab-graph"
+            className="h-full"
+          >
+            <GraphViewPanel />
           </div>
         )}
       </div>

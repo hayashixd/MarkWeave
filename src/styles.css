@@ -3113,6 +3113,201 @@
   text-align: center;
 }
 
+/* ===== グラフビューパネル (Phase 7) ===== */
+
+.graph-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.graph-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.graph-panel__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.graph-panel__count {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.graph-panel__canvas {
+  flex: 1;
+  min-height: 200px;
+  position: relative;
+  background: #fafbfc;
+}
+
+.graph-panel__empty {
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.graph-panel__empty p {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.graph-panel__footer {
+  padding: 5px 12px;
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+}
+
+/* ホバーカード */
+.graph-panel__hover-card {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-width: 200px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.graph-panel__hover-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.graph-panel__hover-unresolved {
+  color: #ef4444;
+  font-weight: 400;
+  font-size: 0.7rem;
+}
+
+.graph-panel__hover-title {
+  font-size: 0.72rem;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.graph-panel__hover-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 2px;
+}
+
+.graph-panel__hover-tag {
+  font-size: 0.65rem;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.graph-panel__hover-links {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+/* 全体表示ボタン */
+.graph-view__fit-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  color: #64748b;
+  z-index: 5;
+}
+
+.graph-view__fit-btn:hover {
+  background: #f1f5f9;
+  color: #3b82f6;
+}
+
+/* フィルタバー */
+.graph-filter-bar {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.graph-filter-bar__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.graph-filter-bar__chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 1px 6px;
+  border-radius: 10px;
+  gap: 2px;
+}
+
+.graph-filter-bar__chip-remove {
+  background: none;
+  border: none;
+  color: #93c5fd;
+  font-size: 0.6rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.graph-filter-bar__chip-remove:hover {
+  color: #ef4444;
+}
+
+.graph-filter-bar__select {
+  font-size: 0.68rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 4px;
+  background: white;
+  color: #64748b;
+}
+
+.graph-filter-bar__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.graph-filter-bar__checkbox input {
+  margin: 0;
+}
+
 /* ===== YAML ドラフトバッジ (Phase 7.5) ===== */
 
 .status-bar__draft-badge {
