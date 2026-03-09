@@ -1061,10 +1061,10 @@ const EditorModeExtension = Extension.create({
 
 ## 6. 開発フェーズ
 
-> **正式な実装計画は [`roadmap.md`](../00_Meta/roadmap.md) を参照（SoT）。**
-> 本セクションはフェーズ概要のみを示す。詳細タスク・優先度管理は roadmap.md で行うこと。
+> **正式な実装計画は [`feature-list.md`](../00_Meta/feature-list.md) を参照（SoT）。**
+> 本セクションはフェーズ概要のみを示す。詳細タスク・優先度管理は feature-list.md で行うこと。
 
-| roadmap.md フェーズ | 内容 |
+| フェーズ | 内容 |
 |--------------------|------|
 | **Phase 1** | MVP（環境構築・基本 WYSIWYG 編集・スマートペースト・エラーハンドリング） |
 | **Phase 2** | テーブル編集（Excel ライク操作） |

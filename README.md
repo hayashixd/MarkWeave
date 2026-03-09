@@ -348,8 +348,7 @@ docs/
 | ドキュメント | 内容 |
 |------------|------|
 | [design-index.md](./docs/00_Meta/design-index.md) | 設計ファイル索引（どのファイルに何を書くか） |
-| [design-coverage.md](./docs/00_Meta/design-coverage.md) | 設計検討済み項目一覧（✅/🔶/❌） |
-| [roadmap.md](./docs/00_Meta/roadmap.md) | 開発ロードマップ（Phase 1〜8） |
+| [feature-list.md](./docs/00_Meta/feature-list.md) | 総合機能一覧・ロードマップ・設計網羅度・実装ログ（SoT） |
 | [system-design.md](./docs/01_Architecture/system-design.md) | システム全体設計・コア原則・技術スタック・ディレクトリ構成 |
 | [security-design.md](./docs/01_Architecture/security-design.md) | セキュリティ設計（XSS・CSP・fsスコープ・AI API通信） |
 | [performance-design.md](./docs/01_Architecture/performance-design.md) | パフォーマンス設計（仮想スクロール・非同期パース） |

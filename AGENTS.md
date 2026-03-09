@@ -6,13 +6,13 @@
 
 ### ステップ1: 現在地の確認
 
-`docs/00_Meta/roadmap.md` を読み込む。
-最も番号の小さい Phase で、未完了（`- [ ]`）の項目を探す。
+`docs/00_Meta/feature-list.md` を読み込む。
+最も番号の小さい Phase で、未完了（❌）の項目を探す。
 その項目が「今回実装するタスク」。
 
 ### ステップ2: 設計書の確認
 
-roadmap.md のタスクに紐づく設計ドキュメントを読む。
+feature-list.md のタスクに紐づく設計ドキュメントを読む。
 （例: テーブル機能なら対応する design.md を参照）
 設計書の仕様通りに実装する。設計書にない仕様は勝手に追加しない。
 設計書の探し方は末尾の「[📐 設計書の読み方](#設計書の読み方)」を参照。
@@ -54,8 +54,8 @@ cd src-tauri && cargo test          # Rust 単体テスト
 
 ### ステップ5: チェックオフ
 
-実装完了後、`docs/00_Meta/roadmap.md` の該当行を更新する。
-`- [ ] タスク名` → `- [x] タスク名`
+実装完了後、`docs/00_Meta/feature-list.md` の該当行を更新する。
+実装列を ❌ → ✅ に変更する。
 その変更を同じコミットに含める。
 
 ### ステップ6: 次タスクへ
@@ -354,7 +354,7 @@ pub async fn read_file(path: String) -> Result<String, String> {
 ```markdown
 ## 概要
 
-<!-- roadmap.md の何番タスクを実装したか -->
+<!-- feature-list.md の何番タスクを実装したか -->
 Phase N の「タスク名」を実装しました。
 
 ## 変更内容
@@ -374,7 +374,7 @@ Phase N の「タスク名」を実装しました。
 - [ ] `npm run test` が全て PASS している
 - [ ] `npm run build` が成功している
 - [ ] Rust を変更した場合: `cargo clippy` / `cargo test` が PASS している
-- [ ] `docs/00_Meta/roadmap.md` の該当タスクを `- [x]` にチェックした
+- [ ] `docs/00_Meta/feature-list.md` の該当タスクの実装列を ✅ にした
 - [ ] 設計書にない機能を追加していない
 - [ ] タスクと無関係なファイルを変更していない
 ```
@@ -385,7 +385,7 @@ Phase N の「タスク名」を実装しました。
 
 | ファイル | 役割 |
 |---------|------|
-| `docs/00_Meta/roadmap.md` | **実装タスク一覧（SoT）** |
+| `docs/00_Meta/feature-list.md` | **総合機能一覧・ロードマップ・設計網羅度・実装ログ（SoT）** |
 | `docs/00_Meta/design-index.md` | 設計ドキュメント索引 |
 | `docs/01_Architecture/tauri-ipc-interface.md` | Tauri コマンド型定義（新規追加前に先に記入）|
 
