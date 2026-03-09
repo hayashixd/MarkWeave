@@ -15,7 +15,8 @@ export type SlashCommandCategory =
   | 'table'      // テーブル
   | 'media'      // メディア
   | 'ai'         // AI テンプレート
-  | 'pkm';       // ナレッジ管理
+  | 'pkm'        // ナレッジ管理
+  | 'snippet';   // ユーザースニペット
 
 export interface SlashCommandDef {
   id: string;
@@ -41,6 +42,7 @@ export const CATEGORY_LABELS: Record<SlashCommandCategory, string> = {
   media: 'メディア',
   ai: 'AI テンプレート',
   pkm: 'ナレッジ管理',
+  snippet: 'スニペット',
 };
 
 export const SLASH_COMMANDS: SlashCommandDef[] = [
@@ -293,12 +295,16 @@ export const SLASH_COMMANDS: SlashCommandDef[] = [
 /**
  * クエリで候補を絞り込む（簡易ファジーマッチ）。
  * fuse.js が使えない環境のため、includes ベースの実装。
+ *
+ * @param query フィルタ文字列
+ * @param extraCommands 動的に追加するコマンド（スニペット等）
  */
-export function filterCommands(query: string): SlashCommandDef[] {
-  if (!query.trim()) return SLASH_COMMANDS;
+export function filterCommands(query: string, extraCommands: SlashCommandDef[] = []): SlashCommandDef[] {
+  const all = [...SLASH_COMMANDS, ...extraCommands];
+  if (!query.trim()) return all;
 
   const q = query.toLowerCase().trim();
-  return SLASH_COMMANDS.filter((cmd) => {
+  return all.filter((cmd) => {
     const searchText = `${cmd.name} ${cmd.keywords} ${cmd.description}`.toLowerCase();
     // 各単語に対してパーシャルマッチ
     return q.split('').every((ch) => searchText.includes(ch)) || searchText.includes(q);
