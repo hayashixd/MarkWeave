@@ -2,10 +2,15 @@
  * 文書統計ダイアログ
  *
  * text-statistics-design.md §1, §2 に準拠。
- * 文字数・単語数・段落数・読了時間を表示する。
+ * 文字数・単語数・段落数・読了時間・可読性スコアを表示する。
  */
 
 import { useMemo, useCallback } from 'react';
+import {
+  calculateReadability,
+  getReadabilityLabel,
+  formatPercent,
+} from '../../lib/readability-score';
 
 interface TextStatsDialogProps {
   text: string;
@@ -65,6 +70,7 @@ export function estimateReadingTime(stats: TextStats): string {
 export function TextStatsDialog({ text, onClose }: TextStatsDialogProps) {
   const stats = useMemo(() => countTextStats(text), [text]);
   const readingTime = useMemo(() => estimateReadingTime(stats), [stats]);
+  const readability = useMemo(() => calculateReadability(text), [text]);
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -143,6 +149,42 @@ export function TextStatsDialog({ text, onClose }: TextStatsDialogProps) {
             </tr>
           </tbody>
         </table>
+
+        {readability.totalChars > 0 && (
+          <>
+            <div className="text-stats-dialog__section-header">可読性スコア</div>
+            <div className="readability-score-summary">
+              <div className="readability-score-badge" data-level={readability.level}>
+                <span className="readability-score-badge__value">{readability.score}</span>
+                <span className="readability-score-badge__label">{getReadabilityLabel(readability.level)}</span>
+              </div>
+            </div>
+            <table className="text-stats-dialog__table">
+              <tbody>
+                <tr>
+                  <td className="text-stats-dialog__label">漢字率</td>
+                  <td className="text-stats-dialog__value">{formatPercent(readability.kanjiRatio)}</td>
+                </tr>
+                <tr>
+                  <td className="text-stats-dialog__label">ひらがな率</td>
+                  <td className="text-stats-dialog__value">{formatPercent(readability.hiraganaRatio)}</td>
+                </tr>
+                <tr>
+                  <td className="text-stats-dialog__label">カタカナ率</td>
+                  <td className="text-stats-dialog__value">{formatPercent(readability.katakanaRatio)}</td>
+                </tr>
+                <tr>
+                  <td className="text-stats-dialog__label">平均文長</td>
+                  <td className="text-stats-dialog__value">{readability.averageSentenceLength}文字/文</td>
+                </tr>
+                <tr>
+                  <td className="text-stats-dialog__label">文数</td>
+                  <td className="text-stats-dialog__value">{readability.sentenceCount}</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
     </div>
   );

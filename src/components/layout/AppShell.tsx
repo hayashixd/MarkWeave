@@ -18,7 +18,7 @@
  * - ドラッグ中のオーバーレイ表示
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import type { Editor } from '@tiptap/react';
 import { TabBar } from '../tabs/TabBar';
 import { Sidebar } from '../sidebar/Sidebar';
@@ -60,6 +60,7 @@ import { usePaneStore } from '../../store/paneStore';
 import type { TabState } from '../../store/tabStore';
 import { PomodoroTimer } from '../pomodoro/PomodoroTimer';
 import { WordSprintWidget } from '../wordSprint/WordSprintWidget';
+import { calculateReadability, getReadabilityLabel } from '../../lib/readability-score';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -961,6 +962,12 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
   // 読了時間の推定（日本語: 約500文字/分）
   const readingTimeMin = charCount > 0 ? Math.max(1, Math.ceil(charCount / 500)) : 0;
 
+  // 可読性スコア
+  const readability = useMemo(
+    () => (tab ? calculateReadability(tab.content) : null),
+    [tab?.content],
+  );
+
   return (
     <div className="status-bar flex items-center justify-between px-4 py-1 bg-gray-100 border-t border-gray-200 text-xs text-gray-600" role="status" aria-live="polite">
       <div className="flex items-center gap-3">
@@ -1005,6 +1012,15 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
         {tab && readingTimeMin > 0 && (
           <span className="text-gray-400" title={`推定読了時間（約500文字/分で計算）: ${charCount.toLocaleString()}文字`}>
             {readingTimeMin}分で読了
+          </span>
+        )}
+        {/* 可読性スコア */}
+        {readability && readability.totalChars > 0 && (
+          <span
+            className={`readability-indicator readability-indicator--${readability.level}`}
+            title={`可読性スコア: ${readability.score}/100（${getReadabilityLabel(readability.level)}）\n漢字率: ${(readability.kanjiRatio * 100).toFixed(1)}%\n平均文長: ${readability.averageSentenceLength}文字/文`}
+          >
+            可読性: {readability.score}
           </span>
         )}
         {/* インデント設定 */}
