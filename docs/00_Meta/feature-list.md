@@ -577,103 +577,343 @@ Excelライクなテーブル操作。**全タスク実装完了。**
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
 | 全体アーキテクチャ（ContentEditable + AST） | ✅ | [system-design.md](../01_Architecture/system-design.md) §1 |
-| コアアーキテクチャ原則 | ✅ | [system-design.md](../01_Architecture/system-design.md) §1.1 |
-| データ処理基盤（SQLite・ファイルロック） | ✅ | [system-design.md](../01_Architecture/system-design.md) §1.1.1、[metadata-query-design.md](../05_Features/metadata-query-design.md) |
-| Rust バックエンド構成 | ✅ | [system-design.md](../01_Architecture/system-design.md) §3.2 |
-| Markdown ↔ TipTap 変換設計 | ✅ | [markdown-tiptap-conversion.md](../02_Core_Editor/markdown-tiptap-conversion.md) |
+| コアアーキテクチャ原則（ロスレス変換・ローカルファースト・責務分離・マルチエンジン） | ✅ | [system-design.md](../01_Architecture/system-design.md) §1.1 |
+| データ処理基盤（SQLite メタデータインデックス・ファイルロック） | ✅ | [system-design.md](../01_Architecture/system-design.md) §1.1.1、[metadata-query-design.md](../05_Features/metadata-query-design.md) |
+| Rust バックエンド構成（src-tauri/ ディレクトリ設計・責務分担） | ✅ | [system-design.md](../01_Architecture/system-design.md) §3.2 |
+| ファイルサイズ閾値・モード自動切替 | ✅ | [system-design.md](../01_Architecture/system-design.md) §2.2、[performance-design.md](../01_Architecture/performance-design.md) §2 |
+| Typora式カーソル位置計算 | ✅ | [system-design.md](../01_Architecture/system-design.md) §3 |
+| Markdown ↔ TipTap JSON 変換設計 | ✅ | [markdown-tiptap-conversion.md](../02_Core_Editor/markdown-tiptap-conversion.md) |
+| サポートする Markdown 要素マトリクス | ✅ | [markdown-tiptap-conversion.md](../02_Core_Editor/markdown-tiptap-conversion.md) §2 |
 | ラウンドトリップテスト戦略 | ✅ | [tiptap-roundtrip-test-strategy.md](../02_Core_Editor/tiptap-roundtrip-test-strategy.md) |
-| HTML ↔ Markdown 変換 | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §10 |
-| 技術選定・不採用理由 | ✅ | [decision-log.md](./decision-log.md) |
+| HTML ↔ Markdown 変換（turndown）・変換マトリクス | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §10、[smart-paste-design.md](../06_Export_Interop/smart-paste-design.md) §3 |
+| 技術選定・不採用理由の記録 | ✅ | [decision-log.md](./decision-log.md) |
 
 ### 2. エディタ UX
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| Typora 式インラインレンダリング | ✅ | [typora-analysis.md](./typora-analysis.md) §2 |
-| ソースモード切替 | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) |
-| オートフォーマット | 🔶 | [system-design.md](../01_Architecture/system-design.md) |
-| フォーカス/タイプライターモード | 🔶 | [typora-analysis.md](./typora-analysis.md) §2.3 |
-| スマートペースト | ✅ | [smart-paste-design.md](../06_Export_Interop/smart-paste-design.md) |
-| 矩形選択 | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §11 |
-| テキスト整形コマンド | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §12 |
-| YAML Front Matter 編集 UI | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §1 |
-| スマートクォーテーション | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §16 |
+| Typora 式インラインレンダリング（フォーカス時ソース） | ✅ | [typora-analysis.md](./typora-analysis.md) §2、[system-design.md](../01_Architecture/system-design.md) §5 |
+| ソースモード切替（Ctrl+/） | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md)、[system-design.md](../01_Architecture/system-design.md) |
+| オートフォーマット（`# ` → 見出し等） | 🔶 | [system-design.md](../01_Architecture/system-design.md) |
+| フォーカスモード・タイプライターモード | 🔶 | [typora-analysis.md](./typora-analysis.md) §2.3 |
+| スマートペースト（HTML → MD 自動変換） | ✅ | [smart-paste-design.md](../06_Export_Interop/smart-paste-design.md) |
+| 矩形選択（Alt+ドラッグ） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §11 |
+| テキスト整形コマンド（ソート・重複削除・空白除去・全角/半角） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §12 |
+| 行ブックマークと F2 ジャンプ | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §13 |
+| 単語の自動補完（Ctrl+Space） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §14 |
+| ブロック境界カーソル脱出設計（Ctrl+Enter で次段落移動） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §15 |
+| エンコーディング明示的 Reload / Convert UI | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §10.3 |
+| 改行コード明示的 Convert and Save UI | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §11.3 |
+| YAML Front Matter 編集 UI（専用パネル / インライン折りたたみ） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §1 |
+| フローティング数式プレビュー | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §2 |
+| アウトラインパネル設計 | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §3 |
+| クイックオープン（Ctrl+P） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §4 |
+| コードブロック補助 UI（コピーボタン・行番号・言語セレクター） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §5 |
+| 画像のインラインリサイズ UI | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §6 |
+| リンクのクリック動作設計（Ctrl+クリック） | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §7 |
+| ファイルツリーからの D&D リンク挿入 | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §8 |
+| スプリットビュースクロール同期アルゴリズム | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §9 |
+| 空ドキュメントのプレースホルダー表示 UX | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §10 |
+| スマートクォーテーション・オートコレクト | ✅ | [editor-ux-design.md](../03_UI_UX/editor-ux-design.md) §16 |
 
 ### 3. テーブル編集
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| テーブル WYSIWYG 操作 | ✅ | [system-design.md](../01_Architecture/system-design.md) §6 |
+| テーブル WYSIWYG 操作（Tab 移動・行/列 CRUD） | ✅ | [system-design.md](../01_Architecture/system-design.md) §6 |
+| テーブルの制限事項（セル結合不可等） | ✅ | [typora-analysis.md](./typora-analysis.md) §4.4 |
 
-### 4. キーボードショートカット
+### 4. Undo / Redo
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| ショートカット全一覧 | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) §1 |
-| OS 間競合の分析 | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) §2 |
-| IME 変換中の制御方針 | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) §2-4 |
+| TipTap 履歴プラグイン設計 | ✅ | [undo-redo-design.md](../02_Core_Editor/undo-redo-design.md) |
+| モード切替をまたいだ履歴管理 | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §9.3 |
+| Undo 粒度設計 | ✅ | [undo-redo-design.md](../02_Core_Editor/undo-redo-design.md) §2 |
 
-### 5. ファイル I/O・セッション管理
+### 5. キーボードショートカット
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| ショートカット全一覧（インライン・ブロック・テーブル・アプリ） | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) §1 |
+| OS 間競合の分析と対処 | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) §2 |
+| ショートカットカスタマイズ詳細 UX・永続化設計 | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) §6 |
+| IME 変換中のショートカット制御方針（`isComposing` ガード） | ✅ | [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md) §2-4 |
+
+### 6. ファイル I/O・セッション管理
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
 | タブ vs 複数ウィンドウ設計 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §1 |
 | セッション保存・復元 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §2 |
+| 未保存変更の管理 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §3 |
+| 最近使ったファイル履歴 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §4 |
+| ファイル関連付け・シングルインスタンス制御 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §5 |
+| 自動保存（Debounce 設計） | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §9、[performance-design.md](../01_Architecture/performance-design.md) §5 |
 | クラッシュリカバリ | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §10 |
-| フォルダ/ワークスペース管理 | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) |
-| ファイルエンコーディング対応 | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §10 |
+| フォルダ/ワークスペース管理 | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §1〜§8 |
+| 新規ファイル作成フロー | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §9 |
+| ファイルエンコーディング対応（UTF-8 / UTF-8 BOM / Shift-JIS） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §10 |
+| 改行コード対応（CRLF / LF） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §11 |
+| ファイル削除・ゴミ箱移動の UX | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §12 |
+| バックアップ設計（定期バックアップ・世代数） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §13 |
+| 印刷機能（ネイティブ印刷ダイアログ・印刷用 CSS） | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §14 |
+| ドラッグ&ドロップによるファイルオープン | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §15 |
+| 外部クラウドストレージ同期競合対応 | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §16 |
 | 外部変更時の競合解決 UX | ✅ | [file-workspace-design.md](../04_File_Workspace/file-workspace-design.md) §4.2.1 |
+| セッション復元と LRU タブ上限の整合性 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §2.5 |
+| 3MB 超ファイルのクラッシュリカバリ制約 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §10.7 |
+| 巨大ファイル差分チェックポイント設計 | ✅ | [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) §13 |
 
-### 6. 画像管理
-
-| 項目 | 状態 | 参照ドキュメント |
-|------|------|----------------|
-| 画像保存先モード | ✅ | [image-design.md](../05_Features/Image/image-design.md) §1 |
-| クリップボード画像貼り付け | ✅ | [image-design.md](../05_Features/Image/image-design.md) §6 |
-| 画像最適化・圧縮 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §7 |
-
-### 7. パフォーマンス
+### 7. 画像管理
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| パフォーマンスバジェット | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §1 |
+| 画像保存先モード（4 種） | ✅ | [image-design.md](../05_Features/Image/image-design.md) §1 |
+| ファイル命名戦略 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §1.2 |
+| ハッシュによる重複排除 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §2 |
+| 外部 URL 画像のキャッシュ | ✅ | [image-design.md](../05_Features/Image/image-design.md) §4 |
+| モバイル（Android/iOS）対応 | ✅ | [image-design.md](../05_Features/Image/image-design.md) §5 |
+| クリップボード画像貼り付けフロー | ✅ | [image-design.md](../05_Features/Image/image-design.md) §6 |
+| 画像最適化・圧縮（リサイズ・品質調整・WebP） | ✅ | [image-design.md](../05_Features/Image/image-design.md) §7 |
+| alt テキスト（画像キャプション）編集 UX | ✅ | [image-design.md](../05_Features/Image/image-design.md) §8 |
+
+### 8. パフォーマンス
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| パフォーマンスバジェット・計測指標 | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §1 |
 | 仮想スクロール設計 | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §3 |
-| バックグラウンド非同期処理 | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §9 |
+| インクリメンタルパース設計 | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §4 |
+| バックグラウンド保存・非同期 I/O | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §5 |
+| フォルダ内全文検索のパフォーマンス | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §6 |
+| メモリ管理設計 | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §7 |
+| バックグラウンド非同期処理アーキテクチャ（tokio::spawn + Tauri emit） | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §9 |
 
-### 8. セキュリティ
+### 9. セキュリティ
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| XSS 対策（DOMPurify） | ✅ | [security-design.md](../01_Architecture/security-design.md) §2 |
+| XSS 対策（DOMPurify 統合） | ✅ | [security-design.md](../01_Architecture/security-design.md) §2 |
 | Tauri CSP 設定 | ✅ | [security-design.md](../01_Architecture/security-design.md) §3 |
-| プラグインセキュリティ | ✅ | [security-design.md](../01_Architecture/security-design.md) §4.8 |
-| DOMPurify ホワイトリスト拡張 | ✅ | [security-design.md](../01_Architecture/security-design.md) §1.3 |
+| `plugin-fs` スコープ制限 | ✅ | [security-design.md](../01_Architecture/security-design.md) §4 |
+| スクリプトタグ分離 | ✅ | [security-design.md](../01_Architecture/security-design.md) §5 |
+| iframe / 埋め込みコンテンツのサンドボックス | ✅ | [security-design.md](../01_Architecture/security-design.md) §1.2、[html-editing-design.md](../05_Features/HTML/html-editing-design.md) §11 |
+| アップデートパッケージの整合性検証（署名確認） | ✅ | [security-design.md](../01_Architecture/security-design.md) §4.7 |
+| プラグインセキュリティ（コードレビュー・公開ポリシー） | ✅ | [security-design.md](../01_Architecture/security-design.md) §4.8 |
+| DOMPurify ホワイトリスト拡張（KaTeX/Mermaid/WikiLink） | ✅ | [security-design.md](../01_Architecture/security-design.md) §1.3 |
 
-### 9. エクスポート
+### 10. HTML 編集
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| MD → HTML エクスポート | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §2 |
+| HTML 3 モード UX（WYSIWYG / ソース / スプリット） | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §3 |
+| HTML 専用ツールバー | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §7.3 |
+| メタデータ編集パネル | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §4.3 |
+| `<style>` 内 CSS 編集の範囲設計 | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §8 |
+| HTML 編集時の相対パス解決設計 | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §9 |
+| HTML → MD 変換ロスの許容範囲定義 | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §10 |
+| JavaScript / iframe 埋め込みコンテンツの表示設計 | ✅ | [html-editing-design.md](../05_Features/HTML/html-editing-design.md) §11 |
+
+### 11. エクスポート
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| MD → HTML エクスポート（パイプライン） | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §2 |
+| HTML テーマ CSS | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §5、[theme-design.md](../03_UI_UX/theme-design.md) |
 | PDF エクスポート | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §3 |
+| エクスポートオプション UI（ダイアログ設計） | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §4 |
 | Pandoc 連携（Word/LaTeX/epub） | ✅ | [export-interop-design.md](../06_Export_Interop/export-interop-design.md) §7〜§9 |
 
-### 10. テーマ・プラグイン・アクセシビリティ
+### 12. AI 連携
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| テーマシステム（CSS 変数・カスタムテーマ） | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) |
-| プラグイン API・サンドボックス | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) |
-| アクセシビリティ | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) |
-| 国際化（i18n） | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) |
+| AI コピーボタン（最適化パイプライン） | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §2.1、§3 |
+| AI テンプレートシステム | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §2.2 |
+| RTICCO 構造解析 | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §3.3 |
+| AI コピー言語推定精度向上設計 | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §9 |
+| カスタムテンプレート永続化・管理 UI 設計 | ✅ | [ai-design.md](../05_Features/AI/ai-design.md) §10 |
 
-### 11. クロスプラットフォーム・配布
+### 13. テーマシステム
 
 | 項目 | 状態 | 参照ドキュメント |
 |------|------|----------------|
-| Windows / macOS / Linux 対応 | ✅ | [cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) |
-| Android / iOS 対応 | ✅ | [cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) §6〜7 |
+| CSS Custom Properties 変数体系 | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §2 |
+| テーマの 3 層構造（UI / プレビュー / エクスポート） | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §3 |
+| ライト/ダークモード・システムテーマ追従 | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §4 |
+| ユーザー定義テーマ（JSON カスタムテーマ） | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5 |
+| コードハイライトテーマの自動切り替え | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §4.3 |
+| プラットフォーム別フォントスタック | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §2.5 |
+| OS ローカルフォント列挙・適用設計 | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §9 |
+| リガチャ有効/無効切り替え設計 | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §9.5 |
+| PDF/印刷エクスポートへのカスタムフォント反映 | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §9.6 |
+| ビジュアルテーマカスタマイザー GUI | ✅ | [theme-design.md](../03_UI_UX/theme-design.md) §5.4〜§5.9 |
+
+### 14. 検索・置換
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| 単一ファイル内検索・置換 UX | ✅ | [search-design.md](../05_Features/search-design.md) §2 |
+| ワークスペース横断全文検索 UX | ✅ | [search-design.md](../05_Features/search-design.md) §3 |
+| 検索オプション（正規表現・大文字小文字・単語単位） | ✅ | [search-design.md](../05_Features/search-design.md) §5 |
+| 全文検索のパフォーマンス（Rust walkdir + regex） | ✅ | [performance-design.md](../01_Architecture/performance-design.md) §6.2、[search-design.md](../05_Features/search-design.md) §3.2 |
+
+### 15. プラグインシステム
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| プラグイン API 型定義（拡張ポイント・権限モデル） | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §2・§3 |
+| サンドボックス設計（iframe + postMessage） | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §4 |
+| ビルトインプラグイン（Mermaid・KaTeX・画像） | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §5 |
+| プラグインライフサイクル・クリーンアップ | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §6 |
+| プラグイン配布・インストール | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §7 |
+| プラグイン更新フロー（バージョン比較・ロールバック） | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §7.4 |
+| プラグイン設定 GUI・ストア UX | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9 |
+| セーフモード設計（クラッシュループ回復） | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §9.5 |
+| パフォーマンス監視・自動無効化 | ✅ | [plugin-api-design.md](../01_Architecture/plugin-api-design.md) §10 |
+
+### 16. アクセシビリティ（a11y）
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| エディタ本体の ARIA ロール設計 | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) §2 |
+| カスタム NodeView の ARIA | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) §3 |
+| キーボードのみの操作フロー・roving tabindex | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) §4 |
+| フォーカス管理（フォーカストラップ・スキップナビゲーション） | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) §5 |
+| ライブリージョン（状態変化のアナウンス） | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) §6 |
+| カラーコントラスト設計（WCAG 2.1 AA） | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) §7 |
+| a11y テスト戦略（axe-core・NVDA・VoiceOver） | ✅ | [accessibility-design.md](../03_UI_UX/accessibility-design.md) §8 |
+
+### 17. Markdown 拡張記法
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| 脚注（Footnotes）WYSIWYG 表示・編集 UX | ✅ | [markdown-extensions-design.md](../02_Core_Editor/markdown-extensions-design.md) §1 |
+| ハイライト（`==text==`）・上付き/下付き | ✅ | [markdown-extensions-design.md](../02_Core_Editor/markdown-extensions-design.md) §2 |
+| カスタムコンテナ / Callout ブロック（`:::warning` 等） | ✅ | [markdown-extensions-design.md](../02_Core_Editor/markdown-extensions-design.md) §3 |
+| TOC インライン自動生成（`[toc]` プレースホルダー） | ✅ | [markdown-extensions-design.md](../02_Core_Editor/markdown-extensions-design.md) §4 |
+| PlantUML / js-sequence-diagrams 対応方針 | ✅ | [markdown-extensions-design.md](../02_Core_Editor/markdown-extensions-design.md) §5 |
+| 定義リスト（Definition Lists） | ✅ | [markdown-extensions-design.md](../02_Core_Editor/markdown-extensions-design.md) §6 |
+
+### 18. アプリケーションシェル UI
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| ツールバー UI 設計（ボタン配置・ツールチップ・モード別変化） | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §1 |
+| メニューバー設計（Tauri ネイティブメニュー・各 OS 差異） | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §2 |
+| エディタ領域コンテキストメニュー | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §3 |
+| ステータスバー設計 | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §4 |
+| コマンドパレット（Ctrl+Shift+P 風） | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §5 |
+| フルスクリーンモード設計（F11） | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §6 |
+| サイドバーレイアウト・リサイズ | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §7 |
+| 初回起動・オンボーディング設計 | ✅ | [app-shell-design.md](../03_UI_UX/app-shell-design.md) §8 |
+
+### 19. テキスト処理・文書統計
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| 文字数・単語数・行数カウント | ✅ | [text-statistics-design.md](../02_Core_Editor/text-statistics-design.md) §1 |
+| 読了時間推定 | ✅ | [text-statistics-design.md](../02_Core_Editor/text-statistics-design.md) §2 |
+| スペルチェック統合設計（OS ネイティブ / hunspell） | ✅ | [text-statistics-design.md](../02_Core_Editor/text-statistics-design.md) §3 |
+| IME・CJK 入力最適化設計 | ✅ | [text-statistics-design.md](../02_Core_Editor/text-statistics-design.md) §4 |
+
+### 20. テスト戦略
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| UI コンポーネントテスト設計 | ✅ | [testing-strategy-design.md](../08_Testing_Quality/testing-strategy-design.md) §2 |
+| E2E テストシナリオ設計（Playwright + tauri-driver） | ✅ | [testing-strategy-design.md](../08_Testing_Quality/testing-strategy-design.md) §3 |
+| パフォーマンス計測・リグレッションテスト | ✅ | [testing-strategy-design.md](../08_Testing_Quality/testing-strategy-design.md) §4 |
+| セキュリティテスト計画 | ✅ | [testing-strategy-design.md](../08_Testing_Quality/testing-strategy-design.md) §5 |
+
+### 21. 国際化（i18n）
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| i18n 基盤導入方針・フェーズ分け | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §1 |
+| 技術選定（i18next + react-i18next） | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §2 |
+| 辞書ファイル名前空間構造 | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §3 |
+| Tauri ネイティブメニューの i18n | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §6 |
+| Phase 1 コーディングルール（ハードコード禁止等） | ✅ | [i18n-design.md](../07_Platform_Settings/i18n-design.md) §7 |
+
+### 22. クロスプラットフォーム・配布・コミュニティ
+
+| 項目 | 状態 | 参照ドキュメント |
+|------|------|----------------|
+| Windows / macOS / Linux 対応方針 | ✅ | [cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) §1〜5 |
+| Android / iOS 対応方針 | ✅ | [cross-platform-design.md](../07_Platform_Settings/cross-platform-design.md) §6〜7 |
+| ソフトキーボード・モバイル UX 設計 | ✅ | [mobile-advanced-design.md](../07_Platform_Settings/mobile-advanced-design.md) §1 |
+| Android SAF / iCloud Drive 連携 | ✅ | [mobile-advanced-design.md](../07_Platform_Settings/mobile-advanced-design.md) §2〜3 |
+| モバイル向けスラッシュコマンド代替 UI | ✅ | [mobile-advanced-design.md](../07_Platform_Settings/mobile-advanced-design.md) §5.6 |
 | 配布・自動アップデート | ✅ | [distribution-design.md](../07_Platform_Settings/distribution-design.md) |
-| コミュニティ・テレメトリー | ✅ | [community-design.md](../07_Platform_Settings/community-design.md) |
+| ライセンス方針・プライバシー・テレメトリー | ✅ | [community-design.md](../07_Platform_Settings/community-design.md) §1〜2 |
+| クラッシュレポート・フィードバック UI | ✅ | [community-design.md](../07_Platform_Settings/community-design.md) §3〜4 |
+
+### 23. 長期検討項目
+
+| 項目 | 優先度 | 備考 |
+|------|--------|------|
+| RTL（右から左）言語対応 | 低 | CSS `direction: rtl` + BiDi テキスト処理 |
+| マルチウィンドウ独立動作設計 | 低 | タブ→ウィンドウ切り出し後の状態同期 |
+
+---
+
+## 設計書 ↔ 実装ステータス対応表
+
+> 各設計書の主要機能と実装状態の対応。
+
+| 設計書 | 主要機能（要約） | ロードマップ紐づけ | 実装ステータス |
+|---|---|---|---|
+| `01_Architecture/system-design.md` | 全体アーキテクチャ、編集モード、責務分離 | Phase 1〜8（全体） | 🔶 |
+| `01_Architecture/tauri-ipc-interface.md` | Tauri IPC コマンド契約（SoT） | 全 Phase（横断） | 🔶 |
+| `01_Architecture/security-design.md` | XSS/CSP/fs-scope/更新署名の安全設計 | Phase 1（CSP）、技術的負債 | 🔶 |
+| `01_Architecture/performance-design.md` | 仮想スクロール、インクリメンタル処理、計測 | 技術的負債 | 🔶 |
+| `01_Architecture/plugin-api-design.md` | プラグイン API とサンドボックス | Phase 7 | ✅ |
+| `02_Core_Editor/markdown-tiptap-conversion.md` | Markdown ↔ TipTap 変換仕様 | Phase 1 | ✅ |
+| `02_Core_Editor/tiptap-roundtrip-test-strategy.md` | 変換ラウンドトリップ品質担保 | 品質管理（継続テスト） | 🔶 |
+| `02_Core_Editor/undo-redo-design.md` | Undo/Redo 粒度と履歴分離 | Phase 1 | ✅ |
+| `02_Core_Editor/markdown-extensions-design.md` | 脚注・カスタムコンテナ等の拡張記法 | 将来フェーズ | ❌ |
+| `02_Core_Editor/text-statistics-design.md` | 文字数/単語数/読了時間統計 | Phase 3 | ✅ |
+| `03_UI_UX/app-shell-design.md` | シェル UI、メニュー、ステータスバー | Phase 1/3/7 | ✅ |
+| `03_UI_UX/editor-ux-design.md` | エディタ操作 UX（ジャンプ・補完・整形等） | Phase 3 | ✅ |
+| `03_UI_UX/keyboard-shortcuts.md` | ショートカット体系 | Phase 1/3/7 | ✅ |
+| `03_UI_UX/theme-design.md` | テーマシステム・見た目カスタマイズ | Phase 7 | ✅ |
+| `03_UI_UX/zen-mode-design.md` | Zen/集中モード強化 | Phase 7 | ✅ |
+| `03_UI_UX/split-editor-design.md` | ペイン分割編集 | Phase 7 | ✅ |
+| `03_UI_UX/accessibility-design.md` | a11y 対応方針 | 技術的負債 | ❌ |
+| `04_File_Workspace/file-workspace-design.md` | ファイル/フォルダ/ワークスペース管理 | Phase 1/3/7 | ✅ |
+| `04_File_Workspace/window-tab-session-design.md` | タブ、セッション、クラッシュリカバリ | Phase 1、技術的負債 | 🔶 |
+| `05_Features/search-design.md` | 検索・置換機能 | Phase 3 | ✅ |
+| `05_Features/slash-commands-design.md` | スラッシュコマンド挿入 | Phase 7 | ✅ |
+| `05_Features/wikilinks-backlinks-design.md` | WikiLink/Backlink/グラフ表示 | Phase 7.5 | 🔶 |
+| `05_Features/git-integration-design.md` | Git 状態表示・履歴・競合支援 | Phase 7.5 | ❌ |
+| `05_Features/metadata-query-design.md` | メタデータ索引とクエリ | Phase 7.5 | ❌ |
+| `05_Features/HTML/html-editing-design.md` | HTML WYSIWYG/ソース/スプリット編集 | Phase 5/6 | ✅ |
+| `05_Features/Image/image-design.md` | 画像挿入・管理・最適化 | Phase 3/4 | ✅ |
+| `05_Features/AI/ai-design.md` | AIコピー・テンプレート | Phase 8 | ✅ |
+| `06_Export_Interop/export-interop-design.md` | HTML/PDF/Pandoc エクスポート | Phase 4/7 | ✅ |
+| `06_Export_Interop/smart-paste-design.md` | スマートペースト変換 | Phase 1/3 | ✅ |
+| `07_Platform_Settings/user-settings-design.md` | 設定管理・マイグレーション | Phase 1 | ✅ |
+| `07_Platform_Settings/i18n-design.md` | 多言語化 | 技術的負債 | 🔶 |
+| `07_Platform_Settings/cross-platform-design.md` | OS 差分対応方針 | Phase 7 | 🔶 |
+| `07_Platform_Settings/mobile-advanced-design.md` | モバイル高度機能（SAF/iCloud） | 将来フェーズ | ❌ |
+| `07_Platform_Settings/distribution-design.md` | 配布・自動更新 | 配布・アップデート章 | ❌ |
+| `07_Platform_Settings/community-design.md` | コミュニティ・テレメトリー | 将来フェーズ | ❌ |
+| `08_Testing_Quality/testing-strategy-design.md` | テスト戦略・品質ゲート | 全 Phase（品質管理） | 🔶 |
+| `08_Testing_Quality/error-handling-design.md` | ログ・通知・例外設計 | Phase 1 | ✅ |
+
+### 未紐づけ機能の管理
+
+以下は「設計書には存在するがロードマップに独立項目がない」ため、本セクションで明示管理する。
+
+| 設計書 | 機能 | 状態 |
+|--------|------|------|
+| `mobile-advanced-design.md` | モバイル高度機能（SAF/iCloud/ソフトキーボード） | 将来フェーズで実装予定 |
+| `community-design.md` | コミュニティ/テレメトリー/フィードバック | 将来フェーズで実装予定 |
+| `testing-strategy-design.md` | 品質戦略の運用項目（E2E カバレッジ拡充等） | 継続的に実施 |
+| `tiptap-roundtrip-test-strategy.md` | 変換品質の継続検証 | 継続的に実施 |
+| `markdown-extensions-design.md` | 脚注・ハイライト・カスタムコンテナ・定義リスト等 | 将来フェーズで実装予定 |
 
 ---
 
