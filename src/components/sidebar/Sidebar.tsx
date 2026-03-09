@@ -15,6 +15,9 @@
  *
  * Phase 7.5 追加:
  * - バックリンクタブ（知識管理者: 現在ファイルへの逆参照を表示）
+ *
+ * Phase 7 追加:
+ * - タグビュータブ（知識管理者: YAML FM tags の横断収集・フィルタ）
  */
 
 import { useState, useCallback } from 'react';
@@ -23,8 +26,9 @@ import { OutlinePanel } from '../Outline/OutlinePanel';
 import { FileTreePanel } from './FileTreePanel';
 import { TemplatePanel } from '../AiPanel/TemplatePanel';
 import { BacklinksPanel } from './BacklinksPanel';
+import { TagViewPanel } from './TagViewPanel';
 
-export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks';
+export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks' | 'tags';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -138,6 +142,17 @@ export function Sidebar({
           >
             🔗 Links
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'tags'}
+            aria-controls="sidebar-panel-tags"
+            className={`sidebar-tab ${activeTab === 'tags' ? 'sidebar-tab--active' : ''} whitespace-nowrap`}
+            onClick={() => setActiveTab('tags')}
+            title="タグビュー (Ctrl+Shift+5)"
+          >
+            🏷 Tags
+          </button>
         </div>
         <button
           type="button"
@@ -195,6 +210,15 @@ export function Sidebar({
               currentFilePath={currentFilePath}
               currentFileName={currentFileName}
             />
+          </div>
+        )}
+        {activeTab === 'tags' && (
+          <div
+            id="sidebar-panel-tags"
+            role="tabpanel"
+            aria-labelledby="tab-tags"
+          >
+            <TagViewPanel />
           </div>
         )}
       </div>

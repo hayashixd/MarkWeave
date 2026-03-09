@@ -2943,6 +2943,176 @@
   text-align: center;
 }
 
+/* ===== タグビューパネル (Phase 7) ===== */
+
+.tagview-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tagview-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.tagview-panel__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.tagview-panel__count {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.tagview-panel__filter {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tagview-panel__filter-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  outline: none;
+  background: #fff;
+  color: #334155;
+}
+
+.tagview-panel__filter-input:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.tagview-panel__empty {
+  padding: 16px 12px;
+  text-align: center;
+}
+
+.tagview-panel__empty p {
+  font-size: 0.78rem;
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.tagview-panel__empty-hint {
+  font-size: 0.72rem;
+  color: #cbd5e1;
+}
+
+.tagview-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.tagview-panel__item {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tagview-panel__item:last-child {
+  border-bottom: none;
+}
+
+.tagview-panel__tag-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  font-size: 0.8rem;
+  color: #334155;
+  background: none;
+  border: none;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.tagview-panel__tag-button:hover {
+  background: #f1f5f9;
+}
+
+.tagview-panel__tag-button--expanded {
+  background: #f1f5f9;
+}
+
+.tagview-panel__tag-icon {
+  font-size: 0.55rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  width: 10px;
+}
+
+.tagview-panel__tag-name {
+  flex: 1;
+  font-weight: 500;
+  color: #6366f1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagview-panel__tag-count {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  background: #f1f5f9;
+  border-radius: 9999px;
+  padding: 0 6px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.tagview-panel__file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px 0;
+}
+
+.tagview-panel__file-item {
+  padding: 0;
+}
+
+.tagview-panel__file-name {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 0.73rem;
+  color: #2563eb;
+  background: none;
+  border: none;
+  padding: 3px 12px 3px 28px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tagview-panel__file-name:hover {
+  text-decoration: underline;
+  background: #eff6ff;
+}
+
+.tagview-panel__footer {
+  padding: 5px 12px;
+  font-size: 0.68rem;
+  color: #cbd5e1;
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+}
+
 /* ===== YAML ドラフトバッジ (Phase 7.5) ===== */
 
 .status-bar__draft-badge {

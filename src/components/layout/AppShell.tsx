@@ -442,6 +442,14 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Shift+5: タグビューパネル表示 (Phase 7)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '%' || e.key === '5')) {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('tags');
+        return;
+      }
+
       // Ctrl+Shift+M: Markdownとして保存（HTML→MD変換）(html-editing-design.md §5.3)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         e.preventDefault();
