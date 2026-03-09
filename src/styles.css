@@ -1277,6 +1277,112 @@
   color: #d1d5db;
 }
 
+/* ===== フローティング TOC パネル（Phase 7: 右サイド固定目次） ===== */
+
+.floating-toc {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: 220px;
+  max-height: calc(100vh - 120px);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border-muted);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  overflow: hidden;
+}
+
+.floating-toc__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-muted);
+  flex-shrink: 0;
+}
+
+.floating-toc__title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.floating-toc__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-subtle);
+  border-radius: 3px;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+.floating-toc__close:hover {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.floating-toc__list {
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+  overflow-y: auto;
+}
+
+.floating-toc__item {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  transition: background-color 0.1s, color 0.1s;
+  border-left: 2px solid transparent;
+}
+
+.floating-toc__item:hover {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.floating-toc__item--current {
+  background-color: var(--color-bg-secondary);
+  border-left-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.floating-toc__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.floating-toc__empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+}
+
+/* Zen モードでは非表示 */
+.zen-mode .floating-toc {
+  display: none;
+}
+
 /* ===== ステータスバー ポップオーバー（Phase 3: 文字コード・改行コード・インデント） ===== */
 
 .status-bar__button {
