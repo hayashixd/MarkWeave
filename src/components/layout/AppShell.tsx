@@ -61,6 +61,7 @@ import type { TabState } from '../../store/tabStore';
 import { PomodoroTimer } from '../pomodoro/PomodoroTimer';
 import { WordSprintWidget } from '../wordSprint/WordSprintWidget';
 import { calculateReadability, getReadabilityLabel } from '../../lib/readability-score';
+import { FloatingTocPanel } from '../Outline/FloatingTocPanel';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -72,6 +73,8 @@ export function AppShell() {
   const [pandocExportFormat, setPandocExportFormat] = useState<PandocFormat>('docx');
   // エディタインスタンスへの参照（アウトラインパネル等で使用）
   const [currentEditor, setCurrentEditor] = useState<Editor | null>(null);
+  // フローティング TOC パネルの表示状態
+  const [floatingTocOpen, setFloatingTocOpen] = useState(false);
 
   // Zen Mode / 設定
   const { settings, updateSettings } = useSettingsStore();
@@ -450,6 +453,13 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Shift+T: フローティング TOC パネル表示/非表示トグル
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
+        e.preventDefault();
+        setFloatingTocOpen((v) => !v);
+        return;
+      }
+
       // Ctrl+Shift+M: Markdownとして保存（HTML→MD変換）(html-editing-design.md §5.3)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
         e.preventDefault();
@@ -715,6 +725,13 @@ export function AppShell() {
           isConverting={conversionState.isConverting}
         />
       )}
+
+      {/* フローティング TOC パネル */}
+      <FloatingTocPanel
+        editor={currentEditor}
+        isOpen={floatingTocOpen}
+        onClose={() => setFloatingTocOpen(false)}
+      />
 
       {/* トースト通知 */}
       <ToastContainer />
