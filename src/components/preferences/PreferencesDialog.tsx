@@ -14,14 +14,16 @@ import { EditorTab } from './tabs/EditorTab';
 import { WritingTab } from './tabs/WritingTab';
 import { PluginsTab } from './tabs/PluginsTab';
 import { SnippetsTab } from './tabs/SnippetsTab';
+import { TemplatesTab } from './tabs/TemplatesTab';
 
-type TabId = 'appearance' | 'editor' | 'writing' | 'snippets' | 'plugins';
+type TabId = 'appearance' | 'editor' | 'writing' | 'snippets' | 'templates' | 'plugins';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'appearance', label: '外観' },
   { id: 'editor', label: 'エディタ' },
   { id: 'writing', label: '執筆スタイル' },
   { id: 'snippets', label: 'スニペット' },
+  { id: 'templates', label: 'テンプレート' },
   { id: 'plugins', label: 'プラグイン' },
 ];
 
@@ -100,6 +102,7 @@ export function PreferencesDialog({ isOpen, onClose }: PreferencesDialogProps) {
             {activeTab === 'editor' && <EditorTab />}
             {activeTab === 'writing' && <WritingTab />}
             {activeTab === 'snippets' && <SnippetsTab />}
+            {activeTab === 'templates' && <TemplatesTab />}
             {activeTab === 'plugins' && <PluginsTab />}
           </div>
         </div>
