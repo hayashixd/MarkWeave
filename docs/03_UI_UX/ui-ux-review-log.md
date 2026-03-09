@@ -7,8 +7,7 @@
 ## 2. レビュー対象
 
 ### 2.1 ドキュメント
-- `docs/00_Meta/roadmap.md`
-- `docs/00_Meta/design-coverage.md`
+- `docs/00_Meta/feature-list.md`（旧 roadmap.md / design-coverage.md を統合）
 - `docs/00_Meta/typora-analysis.md`
 - `docs/01_Architecture/*.md`
 - `docs/02_Core_Editor/*.md`
@@ -150,7 +149,7 @@
 
 ## 8. ドキュメント運用ルール（今回レビューを踏まえた補足）
 
-- 実装前に `roadmap.md` の対象タスクと、対応する design を **1:1 で紐づけ確認**する。
-- 機能の「設計済み/未実装」が増えた場合、`design-coverage.md` に状態追記して差分を可視化する。
+- 実装前に `feature-list.md` の対象タスクと、対応する design を **1:1 で紐づけ確認**する。
+- 機能の「設計済み/未実装」が増えた場合、`feature-list.md` の設計網羅度セクションに状態追記して差分を可視化する。
 - UI/UX 改善タスクは本ログに追記し、次回レビューで「提案 → 実装」の進捗を管理する。
 
