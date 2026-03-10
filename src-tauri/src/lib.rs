@@ -66,6 +66,7 @@ pub fn run() {
             db_commands::index_workspace_metadata,
             db_commands::update_metadata_for_file,
             db_commands::execute_metadata_query,
+            db_commands::get_graph_data,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
