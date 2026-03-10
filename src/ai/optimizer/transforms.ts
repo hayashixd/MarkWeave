@@ -108,22 +108,63 @@ export function annotateCodeBlocks(text: string): TransformResult {
 /**
  * コードブロックの内容から使用言語を推定する。
  *
+ * ai-design.md §9 に基づく改善版:
+ * - パターンの網羅性を向上（Ruby, PHP, Java, Kotlin, Swift, C#, YAML, TOML, CSS, SCSS 等）
+ * - 複数行でのコンテキスト判定を追加
+ *
  * @param code - コードブロックの本文
  * @returns 言語名（推定できない場合は null）
  */
 function detectLanguage(code: string): string | null {
   const trimmed = code.trim();
+  if (!trimmed) return null;
 
-  if (/^\s*(def |import |from |print\(|if __name__)/.test(trimmed)) return 'python';
-  if (/^\s*(const |let |var |function |=>|require\()/.test(trimmed)) return 'javascript';
-  if (/^\s*(interface |type |enum |namespace )/.test(trimmed)) return 'typescript';
-  if (/^\s*(<html|<!DOCTYPE|<div|<p |<span)/.test(trimmed)) return 'html';
-  if (/^\s*(SELECT |INSERT |UPDATE |DELETE |CREATE TABLE)/i.test(trimmed)) return 'sql';
-  if (/^\s*(\$\s|#!\/bin|echo |cd |ls |mkdir )/.test(trimmed)) return 'bash';
+  // Python: def, import, from, print, class, if __name__
+  if (/^\s*(def |import |from \S+ import|print\(|if __name__|class \w+[:(])/.test(trimmed)) return 'python';
+  // TypeScript (check before JavaScript since TS is a superset)
+  if (/^\s*(interface |type \w+ =|enum \w+ \{|namespace |export (interface|type|enum))/.test(trimmed)) return 'typescript';
+  // JavaScript / TypeScript: const, let, var, function, arrow
+  if (/^\s*(const |let |var |function |=>|require\(|export (default |const |function ))/.test(trimmed)) return 'javascript';
+  // HTML / XML
+  if (/^\s*(<html|<!DOCTYPE|<div|<p[ >]|<span|<\?xml)/.test(trimmed)) return 'html';
+  // CSS / SCSS
+  if (/^\s*(\.|#|@media|@import|@keyframes|:root)\s*\{?/.test(trimmed) && /\{[\s\S]*\}/.test(trimmed)) return 'css';
+  // SQL
+  if (/^\s*(SELECT |INSERT |UPDATE |DELETE |CREATE TABLE|ALTER TABLE|DROP TABLE)/i.test(trimmed)) return 'sql';
+  // Shell / Bash
+  if (/^\s*(\$\s|#!\/bin|echo |cd |ls |mkdir |export |source |alias )/.test(trimmed)) return 'bash';
+  // JSON
   if (/^\s*(\{|\[)/.test(trimmed) && /["']:\s/.test(trimmed)) return 'json';
-  if (/^\s*#\s*(pragma|include|define|ifdef)/.test(trimmed)) return 'c';
-  if (/^\s*(package |import "fmt"|func )/.test(trimmed)) return 'go';
-  if (/^\s*(fn |let mut|use std|impl )/.test(trimmed)) return 'rust';
+  // YAML
+  if (/^---\s*$/.test(trimmed.split('\n')[0] ?? '') || /^\w+:\s+\S/.test(trimmed)) {
+    if (/^\w+:\s/.test(trimmed) && !trimmed.includes('{') && trimmed.includes('\n')) return 'yaml';
+  }
+  // TOML
+  if (/^\s*\[\w+(\.\w+)*\]/.test(trimmed) && /^\w+\s*=\s*/m.test(trimmed)) return 'toml';
+  // C / C++
+  if (/^\s*#\s*(pragma|include|define|ifdef|ifndef)/.test(trimmed)) return 'c';
+  // C++ specific
+  if (/^\s*(#include\s*<\w+>|std::|cout |cin |using namespace|template\s*<)/.test(trimmed)) return 'cpp';
+  // Java
+  if (/^\s*(public\s+class |import\s+java\.|package\s+\w+|@Override|System\.out\.)/.test(trimmed)) return 'java';
+  // Kotlin
+  if (/^\s*(fun |val |var |data class |sealed class |object \w+ |import kotlin\.)/.test(trimmed)) return 'kotlin';
+  // Swift
+  if (/^\s*(func |var \w+:\s|let \w+:\s|import (Foundation|UIKit|SwiftUI)|struct \w+:\s|guard let)/.test(trimmed)) return 'swift';
+  // C#
+  if (/^\s*(using System|namespace \w+|public (class|static|void|async)|Console\.(Write|Read))/.test(trimmed)) return 'csharp';
+  // Go
+  if (/^\s*(package |import "fmt"|func |import \(|fmt\.)/.test(trimmed)) return 'go';
+  // Rust
+  if (/^\s*(fn |let mut |use std|impl |pub fn |mod |#\[derive)/.test(trimmed)) return 'rust';
+  // Ruby
+  if (/^\s*(require |def \w+|class \w+ < |puts |end$|module \w+)/.test(trimmed)) return 'ruby';
+  // PHP
+  if (/^\s*(<\?php|\$\w+\s*=|function \w+\s*\(.*\)\s*\{|echo |namespace \w+\\)/.test(trimmed)) return 'php';
+  // Dockerfile
+  if (/^\s*(FROM |RUN |CMD |EXPOSE |COPY |WORKDIR |ENTRYPOINT )/m.test(trimmed)) return 'dockerfile';
+  // Markdown (fenced code block in code block is rare but possible)
+  if (/^#{1,6}\s+\S/.test(trimmed) && /\n\n/.test(trimmed)) return 'markdown';
 
   return null;
 }
