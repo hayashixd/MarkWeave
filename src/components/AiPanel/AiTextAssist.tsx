@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { ProgressBar } from '../common/ProgressBar';
 
 export type AiAssistAction = 'improve' | 'translate' | 'summarize' | 'proofread';
 
@@ -49,7 +50,7 @@ function processText(text: string, action: AiAssistAction): string {
     case 'improve': {
       // 基本的な文章改善: 連続空白削除、句読点統一
       let result = text;
-      result = result.replace(/　/g, ' '); // 全角スペース→半角
+      result = result.replace(/\u3000/g, ' '); // 全角スペース→半角
       result = result.replace(/ {2,}/g, ' '); // 連続スペース→1つ
       result = result.replace(/。{2,}/g, '。'); // 連続句点→1つ
       result = result.replace(/、{2,}/g, '、'); // 連続読点→1つ
@@ -156,11 +157,7 @@ export const AiTextAssist: React.FC<AiTextAssistProps> = ({
     >
       <div className="ai-text-assist__header">
         <span className="ai-text-assist__title">AI アシスト</span>
-        <button
-          className="ai-text-assist__close"
-          onClick={onClose}
-          aria-label="閉じる"
-        >
+        <button className="ai-text-assist__close" onClick={onClose} aria-label="閉じる">
           &times;
         </button>
       </div>
@@ -181,7 +178,9 @@ export const AiTextAssist: React.FC<AiTextAssistProps> = ({
       </div>
 
       {processing && (
-        <div className="ai-text-assist__loading">処理中...</div>
+        <div className="ai-text-assist__loading">
+          <ProgressBar indeterminate label="AI処理を実行中" />
+        </div>
       )}
 
       {result && !processing && (
