@@ -546,6 +546,48 @@ export function MarkdownEditor({
     return () => window.removeEventListener('keydown', handler);
   }, [toggleMode]);
 
+  // ネイティブメニューからのカスタムイベント受信
+  useEffect(() => {
+    const onFind = () => { setSearchVisible(true); setShowReplace(false); };
+    const onFindReplace = () => { setSearchVisible(true); setShowReplace(true); };
+    const onTextStats = () => { setTextStatsVisible(true); };
+    const onEditorMode = (e: Event) => {
+      const detail = (e as CustomEvent<{ mode: string }>).detail;
+      if (detail.mode === 'wysiwyg' && mode === 'source') toggleMode();
+      if (detail.mode === 'source' && mode === 'wysiwyg') toggleMode();
+    };
+    const onPastePlain = async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        editor?.commands.insertContent(text);
+      } catch { /* clipboard access denied */ }
+    };
+    const onZoom = (e: Event) => {
+      const { action } = (e as CustomEvent<{ action: string }>).detail;
+      const root = document.documentElement;
+      const current = parseFloat(root.style.getPropertyValue('--app-zoom') || '1');
+      if (action === 'reset') root.style.setProperty('--app-zoom', '1');
+      else if (action === 'in') root.style.setProperty('--app-zoom', String(Math.min(current + 0.1, 2)));
+      else if (action === 'out') root.style.setProperty('--app-zoom', String(Math.max(current - 0.1, 0.5)));
+      root.style.zoom = root.style.getPropertyValue('--app-zoom');
+    };
+
+    window.addEventListener('menu-find', onFind);
+    window.addEventListener('menu-find-replace', onFindReplace);
+    window.addEventListener('menu-text-stats', onTextStats);
+    window.addEventListener('menu-editor-mode', onEditorMode);
+    window.addEventListener('menu-paste-plain', onPastePlain);
+    window.addEventListener('menu-zoom', onZoom);
+    return () => {
+      window.removeEventListener('menu-find', onFind);
+      window.removeEventListener('menu-find-replace', onFindReplace);
+      window.removeEventListener('menu-text-stats', onTextStats);
+      window.removeEventListener('menu-editor-mode', onEditorMode);
+      window.removeEventListener('menu-paste-plain', onPastePlain);
+      window.removeEventListener('menu-zoom', onZoom);
+    };
+  }, [editor, mode, toggleMode]);
+
   // タイプライター打鍵音フィードバック (Phase 7)
   useEffect(() => {
     if (!settings.editor.typewriterSound) return;

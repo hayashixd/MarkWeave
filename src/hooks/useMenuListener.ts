@@ -14,6 +14,8 @@ export interface MenuActions {
   file_new: () => void;
   file_open: () => void;
   file_open_folder: () => void;
+  file_recent_files: () => void;
+  file_recent_workspaces: () => void;
   file_save: () => void;
   file_save_as: () => void;
   file_export_html: () => void;
@@ -23,10 +25,18 @@ export interface MenuActions {
   file_export_epub: () => void;
   file_save_as_md: () => void;
   file_save_as_html: () => void;
+  file_template_new: () => void;
   file_daily_note: () => void;
+  file_print: () => void;
   // 編集メニュー
+  edit_paste_plain: () => void;
+  edit_find: () => void;
+  edit_find_replace: () => void;
+  edit_text_stats: () => void;
   edit_preferences: () => void;
   // 表示メニュー
+  view_mode_wysiwyg: () => void;
+  view_mode_source: () => void;
   view_sidebar_toggle: () => void;
   view_outline: () => void;
   view_files: () => void;
@@ -34,11 +44,17 @@ export interface MenuActions {
   view_backlinks: () => void;
   view_tags: () => void;
   view_floating_toc: () => void;
-  view_zen_mode: () => void;
   view_split_pane: () => void;
+  view_focus_mode: () => void;
+  view_typewriter_mode: () => void;
+  view_zen_mode: () => void;
+  view_zoom_reset: () => void;
+  view_zoom_in: () => void;
+  view_zoom_out: () => void;
   // ヘルプメニュー
   help_shortcuts: () => void;
   help_version: () => void;
+  help_feedback: () => void;
 }
 
 export function useMenuListener(actions: MenuActions) {
