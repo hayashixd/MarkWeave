@@ -98,12 +98,49 @@ export const SlashCommandsExtension = Extension.create<SlashCommandsOptions>({
               return true;
             }
 
+            // Backspace: クエリの最後の文字を削除、/ まで戻ったら閉じる
+            if (event.key === 'Backspace') {
+              const { from: slashFrom } = state;
+              const to = view.state.selection.from;
+
+              if (to <= slashFrom + 1) {
+                // / 自体を削除 → メニューを閉じる
+                setTimeout(() => {
+                  view.dispatch(view.state.tr.setMeta(pluginKey, INITIAL_STATE));
+                  self.options.onStateChange(INITIAL_STATE);
+                }, 0);
+              } else {
+                // クエリを1文字削除して更新
+                setTimeout(() => {
+                  const currentState = pluginKey.getState(view.state);
+                  if (!currentState?.active) return;
+                  const { from: sf } = currentState;
+                  const newTo = view.state.selection.from;
+                  const slice = view.state.doc.textBetween(sf, newTo, '');
+                  if (!slice.startsWith('/')) {
+                    view.dispatch(view.state.tr.setMeta(pluginKey, INITIAL_STATE));
+                    self.options.onStateChange(INITIAL_STATE);
+                    return;
+                  }
+                  const coords = view.coordsAtPos(newTo);
+                  const newState = {
+                    ...currentState,
+                    query: slice.slice(1),
+                    coords: { top: coords.top, left: coords.left, bottom: coords.bottom },
+                  };
+                  view.dispatch(view.state.tr.setMeta(pluginKey, newState));
+                  self.options.onStateChange(newState);
+                }, 0);
+              }
+              return false; // Backspace 自体は通常通り処理させる
+            }
+
             return false;
           },
 
           handleTextInput(view, _from, _to, text) {
             const { state } = view;
-            const { $cursor } = state.selection as { $cursor?: ReturnType<typeof state.selection.$from> };
+            const { $cursor } = state.selection as { $cursor?: { parent: { type: { name: string }; textContent: string }; parentOffset: number } };
             if (!$cursor) return false;
 
             const pluginState = pluginKey.getState(state);
@@ -168,49 +205,6 @@ export const SlashCommandsExtension = Extension.create<SlashCommandsOptions>({
             return false;
           },
 
-          handleKeyDown(view, event) {
-            const state = pluginKey.getState(view.state);
-            if (!state?.active) return false;
-
-            // Backspace: クエリの最後の文字を削除、/ まで戻ったら閉じる
-            if (event.key === 'Backspace') {
-              const { from: slashFrom } = state;
-              const to = view.state.selection.from;
-
-              if (to <= slashFrom + 1) {
-                // / 自体を削除 → メニューを閉じる
-                setTimeout(() => {
-                  view.dispatch(view.state.tr.setMeta(pluginKey, INITIAL_STATE));
-                  self.options.onStateChange(INITIAL_STATE);
-                }, 0);
-              } else {
-                // クエリを1文字削除して更新
-                setTimeout(() => {
-                  const currentState = pluginKey.getState(view.state);
-                  if (!currentState?.active) return;
-                  const { from: sf } = currentState;
-                  const newTo = view.state.selection.from;
-                  const slice = view.state.doc.textBetween(sf, newTo, '');
-                  if (!slice.startsWith('/')) {
-                    view.dispatch(view.state.tr.setMeta(pluginKey, INITIAL_STATE));
-                    self.options.onStateChange(INITIAL_STATE);
-                    return;
-                  }
-                  const coords = view.coordsAtPos(newTo);
-                  const newState = {
-                    ...currentState,
-                    query: slice.slice(1),
-                    coords: { top: coords.top, left: coords.left, bottom: coords.bottom },
-                  };
-                  view.dispatch(view.state.tr.setMeta(pluginKey, newState));
-                  self.options.onStateChange(newState);
-                }, 0);
-              }
-              return false; // Backspace 自体は通常通り処理させる
-            }
-
-            return false;
-          },
         },
       }),
     ];
@@ -222,7 +216,7 @@ export const SlashCommandsExtension = Extension.create<SlashCommandsOptions>({
  * SlashCommandMenu から呼ばれる。
  */
 export function executeSlashCommand(
-  editor: { view: { state: { tr: ReturnType<typeof editor.view.state.tr>; selection: { from: number }; doc: { textBetween: (...args: [number, number, string]) => string } }; dispatch: (tr: unknown) => void } },
+  editor: { view: { state: { tr: { delete: (from: number, to: number) => unknown }; selection: { from: number }; doc: { textBetween: (...args: [number, number, string]) => string } }; dispatch: (tr: unknown) => void } },
   from: number,
   action: () => void,
 ): void {

@@ -205,7 +205,7 @@ const fencedCodeLanguage: LintRule = (lines) => {
 };
 
 /** LINK001: 壊れた内部リンクの検出 */
-const brokenInternalLinks: LintRule = (lines, fullText) => {
+const brokenInternalLinks: LintRule = (lines, _fullText) => {
   const issues: LintIssue[] = [];
   // ドキュメント内の見出しアンカーを収集
   const anchors = new Set<string>();

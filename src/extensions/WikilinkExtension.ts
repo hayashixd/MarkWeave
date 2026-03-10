@@ -150,14 +150,14 @@ export const WikilinkExtension = Node.create<WikilinkOptions>({
               const queryText = before.slice(before.lastIndexOf('[[') + 2);
               const match = queryText.match(/^([^\]]+?)(?:\|([^\]]+?))?$/);
               if (match) {
-                const rawTarget = match[1].trim();
+                const rawTarget = match[1]!.trim();
                 const rawLabel = match[2]?.trim() ?? null;
                 const matchStart = autoFrom;
                 closeAuto();
                 const tr = state.tr.replaceWith(
                   matchStart,
                   to + 1,
-                  state.schema.nodes[extension.name].create({ target: rawTarget, label: rawLabel }),
+                  state.schema.nodes[extension.name]!.create({ target: rawTarget, label: rawLabel }),
                 );
                 view.dispatch(tr);
                 return true;

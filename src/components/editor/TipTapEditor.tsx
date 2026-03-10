@@ -104,7 +104,7 @@ export function MarkdownEditor({
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
 
   // YAML Front Matter を本文から分離して管理
-  const { yaml: initYaml, body: initBody } = parseFrontMatter(initialContent);
+  const { yaml: initYaml, body: _initBody } = parseFrontMatter(initialContent);
   const [frontMatterYaml, setFrontMatterYaml] = useState(initYaml);
   // Front Matter なしの本文を initialContent として使う
   const [sourceText, setSourceText] = useState(initialContent);

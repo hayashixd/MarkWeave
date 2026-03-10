@@ -792,7 +792,6 @@ function EmptyState({
   onOpenFile: () => void;
   recentFiles: import('../../store/recentFilesStore').RecentFileEntry[];
 }) {
-  const { addTab } = useTabStore();
   const { addRecentFile: _addRecent } = useRecentFilesStore();
   const openFileAsTab = useOpenFileAsTab();
 

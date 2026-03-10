@@ -53,7 +53,7 @@ export function WikilinkPopup({ editor, autoState, candidates, onClose }: Wikili
       editor.view.dispatch(
         editor.state.tr
           .delete(from, to)
-          .insert(from, editor.state.schema.nodes.wikilink.create({ target: targetName, label: null })),
+          .insert(from, editor.state.schema.nodes.wikilink!.create({ target: targetName, label: null })),
       );
       onClose();
     },

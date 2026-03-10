@@ -230,7 +230,7 @@ export const useDocumentTemplateStore = create<DocumentTemplateStore>((set, get)
 
   expandTemplate: (template, filename = 'untitled') => {
     const now = new Date();
-    const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const date = now.toISOString().split('T')[0]!; // YYYY-MM-DD
     const datetime = now.toISOString();
 
     let content = template.content;

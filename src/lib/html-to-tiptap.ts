@@ -662,7 +662,7 @@ function findElement(tree: Root | Element, tagName: string): Element | null {
  */
 function getChildElements(parent: Element, tagName: string): Element[] {
   return parent.children.filter(
-    (c): c is Element => isElement(c) && c.tagName === tagName,
+    (c: RootContent): c is Element => isElement(c) && c.tagName === tagName,
   );
 }
 

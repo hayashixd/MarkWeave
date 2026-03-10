@@ -67,7 +67,7 @@ export function AmbientSoundControl() {
     ambientPlayer.setVolume(v);
   }, [updateSettings]);
 
-  const currentOption = SOUND_OPTIONS.find((o) => o.type === currentType) ?? SOUND_OPTIONS[0];
+  const currentOption = SOUND_OPTIONS.find((o) => o.type === currentType) ?? SOUND_OPTIONS[0]!;
 
   return (
     <div ref={containerRef} style={{ position: 'relative', display: 'inline-block' }}>

@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Markdown Editor",
   "version": "0.1.0",
-  "identifier": "com.markdown-editor.app",
+  "identifier": "com.markdown-editor.dev",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
