@@ -92,6 +92,22 @@ describe('tabStore', () => {
     expect(useTabStore.getState().tabs[0]!.isDirty).toBe(false);
   });
 
+  it('does not recreate tab when content is unchanged', () => {
+    const id = useTabStore.getState().addTab({
+      filePath: '/path/to/file.md',
+      fileName: 'file.md',
+      content: 'same',
+      savedContent: 'same',
+    });
+
+    const beforeTab = useTabStore.getState().tabs[0];
+    useTabStore.getState().updateContent(id, 'same');
+    const afterTab = useTabStore.getState().tabs[0];
+
+    expect(afterTab).toBe(beforeTab);
+    expect(afterTab?.isDirty).toBe(false);
+  });
+
   it('markSaved clears isDirty and updates savedContent', () => {
     const id = useTabStore.getState().addTab({
       filePath: '/path/to/file.md',
