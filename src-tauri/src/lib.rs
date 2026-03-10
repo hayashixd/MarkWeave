@@ -63,6 +63,8 @@ pub fn run() {
             plugin_commands::set_safe_mode,
             recent_files::add_to_recent_documents,
             db_commands::init_metadata_db,
+            db_commands::index_workspace_metadata,
+            db_commands::update_metadata_for_file,
             db_commands::execute_metadata_query,
         ])
         .plugin(

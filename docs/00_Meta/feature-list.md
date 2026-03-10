@@ -441,7 +441,7 @@ Excelライクなテーブル操作。**全タスク実装完了。**
 | 機能名 | 概要 | 使い方 | 実装 |
 |--------|------|--------|------|
 | SQLite スキーマ | files / frontmatter / tags / tasks / links | — | ✅ |
-| MetadataIndexer | ワークスペース全スキャン + 差分更新 | — | ❌ |
+| MetadataIndexer | ワークスペース全スキャン + 差分更新 | — | ✅ |
 | TypeScript クエリパーサー | `parseQuery` / `astToSql` | — | ❌ |
 | execute_metadata_query | Tauri コマンド | — | ❌ |
 | QueryBlockView | ` ```query ``` ` ブロックのインライン表示 | — | ❌ |
