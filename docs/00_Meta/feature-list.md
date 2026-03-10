@@ -543,7 +543,7 @@ Excelライクなテーブル操作。**全タスク実装完了。**
 
 | 機能名 | 概要 | 設計書 | 実装 |
 |--------|------|--------|------|
-| 仮想スクロール | 大きなファイルのパフォーマンス対応 | [performance-design.md §3](../01_Architecture/performance-design.md) | ❌ |
+| 仮想スクロール | 大きなファイルのパフォーマンス対応 | [performance-design.md §3](../01_Architecture/performance-design.md) | ✅ |
 | インクリメンタルシリアライズ | 差分のみの変換処理 | [performance-design.md §4](../01_Architecture/performance-design.md) | ❌ |
 | アクセシビリティ（a11y） | ARIA ロール・キーボード操作・コントラスト | [accessibility-design.md](../03_UI_UX/accessibility-design.md) | ❌ |
 | 国際化（i18n） | 多言語対応（英語辞書の本格作成） | [i18n-design.md](../07_Platform_Settings/i18n-design.md) | 🔶 |

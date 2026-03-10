@@ -3466,3 +3466,15 @@ pre:hover .code-copy-btn {
   background: #f0fdf4 !important;
   opacity: 1 !important;
 }
+
+/* ===== 仮想スクロール (performance-design.md §3) ===== */
+
+/**
+ * ビューポート外ノードのプレースホルダースタイル。
+ * VirtualScrollExtension が data-virtually-hidden 属性を付与した要素に適用。
+ * height と contain: strict は inline style でデコレーションから設定される。
+ */
+.virtual-scroll-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
