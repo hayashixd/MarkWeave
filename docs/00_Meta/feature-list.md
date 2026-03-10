@@ -551,7 +551,7 @@ Excelライクなテーブル操作。**全タスク実装完了。**
 | パフォーマンスプロファイリング | 計測方法・ベンチマーク | [performance-design.md §8](../01_Architecture/performance-design.md) | ✅ |
 | HTML 編集セキュリティ審査 | XSS 対策の審査 | [security-design.md](../01_Architecture/security-design.md) | ✅ |
 | AI コピー言語推定精度向上 | linguist-languages 連携 | [ai-design.md §9](../05_Features/AI/ai-design.md) | ✅ |
-| クラッシュリカバリ | 異常終了からの復旧 | [window-tab-session-design.md §10](../04_File_Workspace/window-tab-session-design.md) | ❌ |
+| クラッシュリカバリ | 異常終了からの復旧 | [window-tab-session-design.md §10](../04_File_Workspace/window-tab-session-design.md) | ✅ |
 | オートフォーマット実装追従（InputRule/PasteRule） | `system-design.md §4.3` の確定仕様（IMEガード・失敗時フォールバック・Undo粒度）への実装追従 | [system-design.md §4.3](../01_Architecture/system-design.md) | ✅ |
 | フォーカス/タイプライター実装追従 | `typora-analysis.md §2.3.1` の確定仕様（active判定・中央寄せデッドゾーン・同時有効時優先順位・a11y）への実装追従 | [typora-analysis.md §2.3.1](./typora-analysis.md) | ✅ |
 
@@ -933,9 +933,9 @@ Excelライクなテーブル操作。**全タスク実装完了。**
 | Phase 7: 高度な機能 | 46 | 46 | 0 | 100% |
 | Phase 7.5: PKM | 30 | 7 | 23 | 23% |
 | Phase 8: AI 連携 | 14 | 13 | 1 | 93% |
-| 技術的負債 | 8 | 0 | 8 | 0% |
+| 技術的負債 | 10 | 9 | 1 | 90% |
 | 配布・アップデート | 7 | 0 | 7 | 0% |
-| **合計** | **217** | **167** | **50** | **77%** |
+| **合計** | **219** | **176** | **43** | **80%** |
 
 ---
 

@@ -10,12 +10,65 @@
  * - セッション復元自体の失敗はワーニングトーストを表示して空タブで開始する
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTabStore } from '../store/tabStore';
 import { useToastStore } from '../store/toastStore';
 import { usePaneStore } from '../store/paneStore';
-import { loadSession } from '../store/session';
+import { loadSession, checkNeedsRecovery } from '../store/session';
+import { clearRecoveryData } from '../store/crash-recovery';
+import type { RecoveryEntry } from '../store/crash-recovery';
 import { useOpenFileAsTab } from './useOpenFileAsTab';
+
+/**
+ * クラッシュリカバリが必要な場合のリカバリエントリを返すフック。
+ * RecoveryDialog の表示制御に使用する。
+ */
+export function useRecoveryCheck() {
+  const [recoveryEntries, setRecoveryEntries] = useState<RecoveryEntry[] | null>(null);
+  const checkedRef = useRef(false);
+
+  useEffect(() => {
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+
+    // Tauri 環境以外では何もしない
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+
+    checkNeedsRecovery()
+      .then((entries) => setRecoveryEntries(entries))
+      .catch(() => {}); // チェック失敗は無視
+  }, []);
+
+  const handleRestore = (entries: RecoveryEntry[]) => {
+    const addTab = useTabStore.getState().addTab;
+    const setActiveTab = useTabStore.getState().setActiveTab;
+
+    // リカバリエントリからタブを作成（未保存状態として開く）
+    let firstTabId: string | null = null;
+    for (const entry of entries) {
+      const fileName = entry.filePath.split(/[\\/]/).pop() ?? 'Untitled';
+      const tabId = addTab({
+        filePath: entry.filePath,
+        fileName,
+        content: entry.content,
+        savedContent: entry.savedContent,
+      });
+      if (!firstTabId) firstTabId = tabId;
+    }
+    if (firstTabId) setActiveTab(firstTabId);
+
+    // リカバリデータを削除
+    clearRecoveryData().catch(() => {});
+    setRecoveryEntries(null);
+  };
+
+  const handleDiscard = () => {
+    clearRecoveryData().catch(() => {});
+    setRecoveryEntries(null);
+  };
+
+  return { recoveryEntries, handleRestore, handleDiscard };
+}
 
 export function useSessionRestore() {
   const addTab = useTabStore((s) => s.addTab);
