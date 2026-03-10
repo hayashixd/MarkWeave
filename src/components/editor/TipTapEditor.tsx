@@ -43,6 +43,7 @@ import { useIMEComposition } from './useIMEComposition';
 import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
 import { markdownToTipTap } from '../../lib/markdown-to-tiptap';
 import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
+import { IncrementalSerializer } from '../../lib/incremental-serialize';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
 import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
@@ -118,6 +119,7 @@ export function MarkdownEditor({
   onContentChangeRef.current = onContentChange;
   const lastEmittedContentRef = useRef<string>(initialContent);
   const suppressNextUpdateRef = useRef(0);
+  const incrementalSerializerRef = useRef(new IncrementalSerializer());
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   // フロントマター変更時に参照するために ref に保持
   const frontMatterYamlRef = useRef(frontMatterYaml);
@@ -329,6 +331,9 @@ export function MarkdownEditor({
 
       const doc = markdownToTipTap(markdown || '');
 
+      // 外部からコンテンツが完全に置き換わるためキャッシュを無効化
+      incrementalSerializerRef.current.invalidate();
+
       // setContent 起点の update イベントを 1 回だけ抑止し、
       // 親 state との往復更新ループを防ぐ
       suppressNextUpdateRef.current += 1;
@@ -483,7 +488,8 @@ export function MarkdownEditor({
       }
 
       const json = editor.getJSON() as unknown as TipTapDoc;
-      const markdown = tiptapToMarkdown(json);
+      // インクリメンタルシリアライズ: 変更ブロックのみ再変換
+      const markdown = incrementalSerializerRef.current.serialize(json);
       const fullMarkdown = serializeFrontMatter(frontMatterYamlRef.current, markdown);
       lastEmittedContentRef.current = fullMarkdown;
       // Front Matter を先頭に付けて完全な Markdown として通知
