@@ -1838,6 +1838,13 @@
   scroll-behavior: smooth;
 }
 
+/* prefers-reduced-motion 時はスムーズスクロールを無効化 (typora-analysis.md §2.3.2) */
+@media (prefers-reduced-motion: reduce) {
+  .typewriter-mode-enabled {
+    scroll-behavior: auto;
+  }
+}
+
 /* ===== Zen Mode / 集中モード (Phase 7) ===== */
 /* ペルソナ: 一般ライター・知識管理者 — UI を完全に隠して執筆に没頭 */
 

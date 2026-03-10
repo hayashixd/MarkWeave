@@ -512,28 +512,47 @@ export function MarkdownEditor({
   }, [editor, ime]);
 
   // タイプライターモード: カーソル行を常に画面中央に保つ
+  // typora-analysis.md §2.3.1 に準拠:
+  // - デッドゾーン: ビューポート中央 ±10% 内ならスクロールしない
+  // - IME ガード: isComposing 中はセンタリングを抑制
+  // - prefers-reduced-motion: スムーズスクロールを無効化
+  // - rAF で DOM 計測を 1 フレーム内に集約
   useEffect(() => {
     if (!editor || !typewriterMode || mode !== 'wysiwyg') return;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const handleSelectionUpdate = () => {
-      const { state, view } = editor;
-      const { from } = state.selection;
-      const coords = view.coordsAtPos(from);
-      const wrapper = editorWrapperRef.current;
-      if (!wrapper) return;
+      // IME 変換中はセンタリングを抑制
+      if (ime.isComposing) return;
 
-      const wrapperRect = wrapper.getBoundingClientRect();
-      const targetY = wrapperRect.top + wrapperRect.height / 2;
-      const offset = coords.top - targetY;
+      requestAnimationFrame(() => {
+        const { state, view } = editor;
+        const { from } = state.selection;
+        const coords = view.coordsAtPos(from);
+        const wrapper = editorWrapperRef.current;
+        if (!wrapper) return;
 
-      wrapper.scrollBy({ top: offset, behavior: 'smooth' });
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const centerY = wrapperRect.top + wrapperRect.height / 2;
+        const deadZone = wrapperRect.height * 0.1; // ±10% デッドゾーン
+        const offset = coords.top - centerY;
+
+        // デッドゾーン内ならスクロールしない
+        if (Math.abs(offset) <= deadZone) return;
+
+        wrapper.scrollBy({
+          top: offset,
+          behavior: prefersReducedMotion ? 'instant' : 'smooth',
+        });
+      });
     };
 
     editor.on('selectionUpdate', handleSelectionUpdate);
     return () => {
       editor.off('selectionUpdate', handleSelectionUpdate);
     };
-  }, [editor, typewriterMode, mode]);
+  }, [editor, typewriterMode, mode, ime]);
 
   // フォーカスモード / タイプライターモードのキーボードショートカット
   useEffect(() => {

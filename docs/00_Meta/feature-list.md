@@ -553,7 +553,7 @@ Excelライクなテーブル操作。**全タスク実装完了。**
 | AI コピー言語推定精度向上 | linguist-languages 連携 | [ai-design.md §9](../05_Features/AI/ai-design.md) | ❌ |
 | クラッシュリカバリ | 異常終了からの復旧 | [window-tab-session-design.md §10](../04_File_Workspace/window-tab-session-design.md) | ❌ |
 | オートフォーマット実装追従（InputRule/PasteRule） | `system-design.md §4.3` の確定仕様（IMEガード・失敗時フォールバック・Undo粒度）への実装追従 | [system-design.md §4.3](../01_Architecture/system-design.md) | ✅ |
-| フォーカス/タイプライター実装追従 | `typora-analysis.md §2.3.1` の確定仕様（active判定・中央寄せデッドゾーン・同時有効時優先順位・a11y）への実装追従 | [typora-analysis.md §2.3.1](./typora-analysis.md) | ❌ |
+| フォーカス/タイプライター実装追従 | `typora-analysis.md §2.3.1` の確定仕様（active判定・中央寄せデッドゾーン・同時有効時優先順位・a11y）への実装追従 | [typora-analysis.md §2.3.1](./typora-analysis.md) | ✅ |
 
 ## 配布・アップデート
 
