@@ -41,8 +41,10 @@ import { common, createLowlight } from 'lowlight';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIMEComposition } from './useIMEComposition';
 import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
+import { SafeInputRulesExtension } from '../../extensions/SafeInputRulesExtension';
 import { markdownToTipTap } from '../../lib/markdown-to-tiptap';
 import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
+import { IncrementalSerializer } from '../../lib/incremental-serialize';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
 import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
@@ -118,6 +120,7 @@ export function MarkdownEditor({
   onContentChangeRef.current = onContentChange;
   const lastEmittedContentRef = useRef<string>(initialContent);
   const suppressNextUpdateRef = useRef(0);
+  const incrementalSerializerRef = useRef(new IncrementalSerializer());
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   // フロントマター変更時に参照するために ref に保持
   const frontMatterYamlRef = useRef(frontMatterYaml);
@@ -271,10 +274,18 @@ export function MarkdownEditor({
           return resolvedFileNames.has(target.toLowerCase());
         },
       }),
+      // IME ガード付きオートフォーマット (system-design.md §4.3)
+      SafeInputRulesExtension,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
     editorProps: {
+      // contenteditable 要素の ARIA 属性 (accessibility-design.md §2.2)
+      attributes: {
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': 'ドキュメント編集エリア',
+      },
       handleKeyDown(view, event) {
         // IME 変換中の Enter キーは ProseMirror に渡さない
         if (event.isComposing || event.keyCode === 229) {
@@ -328,6 +339,9 @@ export function MarkdownEditor({
       if (!editor) return;
 
       const doc = markdownToTipTap(markdown || '');
+
+      // 外部からコンテンツが完全に置き換わるためキャッシュを無効化
+      incrementalSerializerRef.current.invalidate();
 
       // setContent 起点の update イベントを 1 回だけ抑止し、
       // 親 state との往復更新ループを防ぐ
@@ -483,7 +497,8 @@ export function MarkdownEditor({
       }
 
       const json = editor.getJSON() as unknown as TipTapDoc;
-      const markdown = tiptapToMarkdown(json);
+      // インクリメンタルシリアライズ: 変更ブロックのみ再変換
+      const markdown = incrementalSerializerRef.current.serialize(json);
       const fullMarkdown = serializeFrontMatter(frontMatterYamlRef.current, markdown);
       lastEmittedContentRef.current = fullMarkdown;
       // Front Matter を先頭に付けて完全な Markdown として通知
@@ -497,28 +512,47 @@ export function MarkdownEditor({
   }, [editor, ime]);
 
   // タイプライターモード: カーソル行を常に画面中央に保つ
+  // typora-analysis.md §2.3.1 に準拠:
+  // - デッドゾーン: ビューポート中央 ±10% 内ならスクロールしない
+  // - IME ガード: isComposing 中はセンタリングを抑制
+  // - prefers-reduced-motion: スムーズスクロールを無効化
+  // - rAF で DOM 計測を 1 フレーム内に集約
   useEffect(() => {
     if (!editor || !typewriterMode || mode !== 'wysiwyg') return;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     const handleSelectionUpdate = () => {
-      const { state, view } = editor;
-      const { from } = state.selection;
-      const coords = view.coordsAtPos(from);
-      const wrapper = editorWrapperRef.current;
-      if (!wrapper) return;
+      // IME 変換中はセンタリングを抑制
+      if (ime.isComposing) return;
 
-      const wrapperRect = wrapper.getBoundingClientRect();
-      const targetY = wrapperRect.top + wrapperRect.height / 2;
-      const offset = coords.top - targetY;
+      requestAnimationFrame(() => {
+        const { state, view } = editor;
+        const { from } = state.selection;
+        const coords = view.coordsAtPos(from);
+        const wrapper = editorWrapperRef.current;
+        if (!wrapper) return;
 
-      wrapper.scrollBy({ top: offset, behavior: 'smooth' });
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const centerY = wrapperRect.top + wrapperRect.height / 2;
+        const deadZone = wrapperRect.height * 0.1; // ±10% デッドゾーン
+        const offset = coords.top - centerY;
+
+        // デッドゾーン内ならスクロールしない
+        if (Math.abs(offset) <= deadZone) return;
+
+        wrapper.scrollBy({
+          top: offset,
+          behavior: prefersReducedMotion ? 'instant' : 'smooth',
+        });
+      });
     };
 
     editor.on('selectionUpdate', handleSelectionUpdate);
     return () => {
       editor.off('selectionUpdate', handleSelectionUpdate);
     };
-  }, [editor, typewriterMode, mode]);
+  }, [editor, typewriterMode, mode, ime]);
 
   // フォーカスモード / タイプライターモードのキーボードショートカット
   useEffect(() => {

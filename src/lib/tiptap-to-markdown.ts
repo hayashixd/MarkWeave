@@ -30,7 +30,11 @@ export function tiptapToMarkdown(doc: TipTapDoc): string {
   return blocks.join('\n\n') + '\n';
 }
 
-function serializeBlockNode(
+/**
+ * 単一のブロックノードを Markdown 文字列にシリアライズする。
+ * IncrementalSerializer からも利用するためエクスポートする。
+ */
+export function serializeBlockNode(
   node: TipTapNode,
   _index: number,
   _siblings: TipTapNode[],
