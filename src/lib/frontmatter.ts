@@ -43,17 +43,17 @@ export function getYamlSummary(yaml: string): string {
 
   const titleMatch = yaml.match(/^title:\s*(.+)$/m);
   if (titleMatch) {
-    parts.push(titleMatch[1].trim().replace(/^['"]|['"]$/g, ''));
+    parts.push(titleMatch[1]!.trim().replace(/^['"]|['"]$/g, ''));
   }
 
   const dateMatch = yaml.match(/^date:\s*(.+)$/m);
   if (dateMatch) {
-    parts.push(dateMatch[1].trim());
+    parts.push(dateMatch[1]!.trim());
   }
 
   const tagsInlineMatch = yaml.match(/^tags:\s*\[(.+)\]$/m);
   if (tagsInlineMatch) {
-    const tags = tagsInlineMatch[1]
+    const tags = tagsInlineMatch[1]!
       .split(',')
       .map((t) => '#' + t.trim().replace(/^['"]|['"]$/g, ''))
       .join(' ');
@@ -64,7 +64,7 @@ export function getYamlSummary(yaml: string): string {
   if (!tagsInlineMatch) {
     const tagsBlockMatch = yaml.match(/^tags:\s*\n((?:[ \t]*-[ \t].+\n?)+)/m);
     if (tagsBlockMatch) {
-      const tags = tagsBlockMatch[1]
+      const tags = tagsBlockMatch[1]!
         .split('\n')
         .map((l) => l.trim())
         .filter((l) => l.startsWith('- '))
@@ -93,28 +93,28 @@ export function parseYamlFields(yaml: string): ParsedFrontMatterFields {
   const result: ParsedFrontMatterFields = {};
 
   const titleMatch = yaml.match(/^title:\s*(.+)$/m);
-  if (titleMatch) result.title = titleMatch[1].trim().replace(/^['"]|['"]$/g, '');
+  if (titleMatch) result.title = titleMatch[1]!.trim().replace(/^['"]|['"]$/g, '');
 
   const dateMatch = yaml.match(/^date:\s*(.+)$/m);
-  if (dateMatch) result.date = dateMatch[1].trim();
+  if (dateMatch) result.date = dateMatch[1]!.trim();
 
   const draftMatch = yaml.match(/^draft:\s*(true|false)$/m);
   if (draftMatch) result.draft = draftMatch[1] === 'true';
 
   const descMatch = yaml.match(/^description:\s*(.+)$/m);
-  if (descMatch) result.description = descMatch[1].trim().replace(/^['"]|['"]$/g, '');
+  if (descMatch) result.description = descMatch[1]!.trim().replace(/^['"]|['"]$/g, '');
 
   // インライン配列 tags: [a, b]
   const tagsInline = yaml.match(/^tags:\s*\[(.+)\]$/m);
   if (tagsInline) {
-    result.tags = tagsInline[1].split(',').map((t) => t.trim().replace(/^['"]|['"]$/g, ''));
+    result.tags = tagsInline[1]!.split(',').map((t) => t.trim().replace(/^['"]|['"]$/g, ''));
   }
 
   // ブロック配列 tags:\n  - a\n  - b
   if (!result.tags) {
     const tagsBlock = yaml.match(/^tags:\s*\n((?:[ \t]*-[ \t].+\n?)+)/m);
     if (tagsBlock) {
-      result.tags = tagsBlock[1]
+      result.tags = tagsBlock[1]!
         .split('\n')
         .map((l) => l.trim())
         .filter((l) => l.startsWith('- '))

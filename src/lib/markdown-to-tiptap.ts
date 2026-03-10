@@ -12,7 +12,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import type { Root, RootContent, PhrasingContent } from 'mdast';
+import type { Root, RootContent, PhrasingContent, ListItem } from 'mdast';
 
 export interface TipTapMark {
   type: string;
@@ -70,13 +70,13 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
 
     case 'list': {
       // タスクリスト判定: いずれかの item に checked が設定されていればタスクリスト
-      const isTaskList = node.children.some((item) => item.checked != null);
+      const isTaskList = node.children.some((item: ListItem) => item.checked != null);
 
       if (isTaskList) {
         return [
           {
             type: 'taskList',
-            content: node.children.map((item) => convertTaskItem(item)),
+            content: node.children.map((item: ListItem) => convertTaskItem(item)),
           },
         ];
       }
@@ -88,7 +88,7 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
       }
       const result: TipTapNode = {
         type: listType,
-        content: node.children.map((item) => convertListItem(item)),
+        content: node.children.map((item: ListItem) => convertListItem(item)),
       };
       if (Object.keys(attrs).length > 0) {
         result.attrs = attrs;
@@ -359,7 +359,7 @@ function parseWikilinks(text: string, marks: TipTapMark[]): TipTapNode[] {
       result.push(node);
     }
 
-    const target = match[1].trim();
+    const target = match[1]!.trim();
     const label = match[2]?.trim() ?? null;
     result.push({ type: 'wikilink', attrs: { target, label } });
 

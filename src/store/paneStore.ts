@@ -58,7 +58,7 @@ interface SplitEditorStore {
   /** タブが属するペインを返す */
   getPaneForTab: (tabId: string) => PaneState | undefined;
   /** アクティブペインの情報を返す */
-  getActivePane: () => PaneState;
+  getActivePane: () => PaneState | undefined;
 }
 
 const PANE_1 = 'pane-1';

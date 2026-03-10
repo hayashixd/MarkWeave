@@ -17,6 +17,7 @@ describe('TabBar accessibility', () => {
           encoding: 'UTF-8',
           lineEnding: 'LF',
           fileType: 'markdown',
+          isReadOnly: false,
         },
         {
           id: 'tab-2',
@@ -28,6 +29,7 @@ describe('TabBar accessibility', () => {
           encoding: 'UTF-8',
           lineEnding: 'LF',
           fileType: 'markdown',
+          isReadOnly: false,
         },
       ],
       activeTabId: 'tab-1',

@@ -23,8 +23,6 @@ const pluginKey = new PluginKey('focusMode');
  */
 function getFocusedTopLevelBlockPos(state: EditorState): number | null {
   const { $head } = state.selection;
-  const docDepth = 0;
-
   // depth=1 がドキュメント直下の子ノード
   if ($head.depth < 1) return null;
 
