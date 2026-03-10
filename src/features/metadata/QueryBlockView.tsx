@@ -6,6 +6,7 @@ import { useMetadataStore } from './metadataStore';
 import { TableView } from './views/TableView';
 import { ListView } from './views/ListView';
 import type { QueryResultRow } from './types';
+import { ProgressBar } from '../../components/common/ProgressBar';
 
 export function QueryBlockView({ node }: NodeViewProps) {
   const [rows, setRows] = useState<QueryResultRow[]>([]);
@@ -102,9 +103,6 @@ export function QueryBlockView({ node }: NodeViewProps) {
             </code>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {loading && (
-              <span style={{ fontSize: '0.75rem' }}>読み込み中...</span>
-            )}
             <span>{rows.length} 件</span>
             <button
               onClick={reload}
@@ -121,6 +119,12 @@ export function QueryBlockView({ node }: NodeViewProps) {
             </button>
           </div>
         </div>
+
+        {loading && (
+          <div style={{ padding: '10px 12px' }}>
+            <ProgressBar indeterminate label="クエリを実行中" />
+          </div>
+        )}
 
         {/* エラー表示 */}
         {error && (
@@ -140,18 +144,10 @@ export function QueryBlockView({ node }: NodeViewProps) {
         {!loading && !error && ast && (
           <div style={{ padding: '4px' }}>
             {ast.view === 'table' && (
-              <TableView
-                rows={rows}
-                fields={ast.select}
-                onRowClick={openFile}
-              />
+              <TableView rows={rows} fields={ast.select} onRowClick={openFile} />
             )}
             {ast.view === 'list' && (
-              <ListView
-                rows={rows}
-                fields={ast.select}
-                onRowClick={openFile}
-              />
+              <ListView rows={rows} fields={ast.select} onRowClick={openFile} />
             )}
             {ast.view === 'calendar' && (
               <div

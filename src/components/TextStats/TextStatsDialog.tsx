@@ -5,12 +5,13 @@
  * 文字数・単語数・段落数・読了時間・可読性スコアを表示する。
  */
 
-import { useMemo, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   calculateReadability,
   getReadabilityLabel,
   formatPercent,
 } from '../../lib/readability-score';
+import { ProgressBar } from '../common/ProgressBar';
 
 interface TextStatsDialogProps {
   text: string;
@@ -38,15 +39,11 @@ export function countTextStats(plainText: string): TextStats {
   // 単語数: 英語（スペース区切り）+ CJK（文字数の1/2を概算）
   const asciiWords = (plainText.match(/\b[a-zA-Z0-9]+\b/g) ?? []).length;
   const cjkChars = (
-    plainText.match(
-      /[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7A3\u3400-\u4DBF]/g,
-    ) ?? []
+    plainText.match(/[\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7A3\u3400-\u4DBF]/g) ?? []
   ).length;
   const words = asciiWords + Math.ceil(cjkChars / 2);
 
-  const paragraphs = plainText
-    .split(/\n{2,}/)
-    .filter((p) => p.trim()).length;
+  const paragraphs = plainText.split(/\n{2,}/).filter((p) => p.trim()).length;
   const sentences = (plainText.match(/[.!?。！？]/g) ?? []).length;
 
   return { chars, charsNoSpace, words, paragraphs, sentences };
@@ -68,9 +65,43 @@ export function estimateReadingTime(stats: TextStats): string {
 }
 
 export function TextStatsDialog({ text, onClose }: TextStatsDialogProps) {
-  const stats = useMemo(() => countTextStats(text), [text]);
-  const readingTime = useMemo(() => estimateReadingTime(stats), [stats]);
-  const readability = useMemo(() => calculateReadability(text), [text]);
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [stats, setStats] = useState<TextStats>(() => countTextStats(''));
+  const [readingTime, setReadingTime] = useState('1分未満');
+  const [readability, setReadability] = useState(() => calculateReadability(''));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      setProgress(10);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (cancelled) return;
+
+      const nextStats = countTextStats(text);
+      setStats(nextStats);
+      setProgress(45);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (cancelled) return;
+
+      setReadingTime(estimateReadingTime(nextStats));
+      setProgress(70);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (cancelled) return;
+
+      setReadability(calculateReadability(text));
+      setProgress(100);
+      setLoading(false);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [text]);
 
   const handleBackdropClick = useCallback(
     (e: React.MouseEvent) => {
@@ -111,78 +142,88 @@ export function TextStatsDialog({ text, onClose }: TextStatsDialogProps) {
             ×
           </button>
         </div>
-        <table className="text-stats-dialog__table">
-          <tbody>
-            <tr>
-              <td className="text-stats-dialog__label">文字数（スペース含む）</td>
-              <td className="text-stats-dialog__value">
-                {stats.chars.toLocaleString()}
-              </td>
-            </tr>
-            <tr>
-              <td className="text-stats-dialog__label">文字数（スペースなし）</td>
-              <td className="text-stats-dialog__value">
-                {stats.charsNoSpace.toLocaleString()}
-              </td>
-            </tr>
-            <tr>
-              <td className="text-stats-dialog__label">単語数</td>
-              <td className="text-stats-dialog__value">
-                {stats.words.toLocaleString()}
-              </td>
-            </tr>
-            <tr>
-              <td className="text-stats-dialog__label">段落数</td>
-              <td className="text-stats-dialog__value">
-                {stats.paragraphs.toLocaleString()}
-              </td>
-            </tr>
-            <tr>
-              <td className="text-stats-dialog__label">文数</td>
-              <td className="text-stats-dialog__value">
-                {stats.sentences.toLocaleString()}
-              </td>
-            </tr>
-            <tr>
-              <td className="text-stats-dialog__label">推定読了時間</td>
-              <td className="text-stats-dialog__value">{readingTime}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        {readability.totalChars > 0 && (
+        {loading ? (
+          <div className="text-stats-dialog__progress-wrap">
+            <ProgressBar value={progress} label="文書統計を計算中" />
+          </div>
+        ) : (
           <>
-            <div className="text-stats-dialog__section-header">可読性スコア</div>
-            <div className="readability-score-summary">
-              <div className="readability-score-badge" data-level={readability.level}>
-                <span className="readability-score-badge__value">{readability.score}</span>
-                <span className="readability-score-badge__label">{getReadabilityLabel(readability.level)}</span>
-              </div>
-            </div>
             <table className="text-stats-dialog__table">
               <tbody>
                 <tr>
-                  <td className="text-stats-dialog__label">漢字率</td>
-                  <td className="text-stats-dialog__value">{formatPercent(readability.kanjiRatio)}</td>
+                  <td className="text-stats-dialog__label">文字数（スペース含む）</td>
+                  <td className="text-stats-dialog__value">{stats.chars.toLocaleString()}</td>
                 </tr>
                 <tr>
-                  <td className="text-stats-dialog__label">ひらがな率</td>
-                  <td className="text-stats-dialog__value">{formatPercent(readability.hiraganaRatio)}</td>
+                  <td className="text-stats-dialog__label">文字数（スペースなし）</td>
+                  <td className="text-stats-dialog__value">
+                    {stats.charsNoSpace.toLocaleString()}
+                  </td>
                 </tr>
                 <tr>
-                  <td className="text-stats-dialog__label">カタカナ率</td>
-                  <td className="text-stats-dialog__value">{formatPercent(readability.katakanaRatio)}</td>
+                  <td className="text-stats-dialog__label">単語数</td>
+                  <td className="text-stats-dialog__value">{stats.words.toLocaleString()}</td>
                 </tr>
                 <tr>
-                  <td className="text-stats-dialog__label">平均文長</td>
-                  <td className="text-stats-dialog__value">{readability.averageSentenceLength}文字/文</td>
+                  <td className="text-stats-dialog__label">段落数</td>
+                  <td className="text-stats-dialog__value">{stats.paragraphs.toLocaleString()}</td>
                 </tr>
                 <tr>
                   <td className="text-stats-dialog__label">文数</td>
-                  <td className="text-stats-dialog__value">{readability.sentenceCount}</td>
+                  <td className="text-stats-dialog__value">{stats.sentences.toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td className="text-stats-dialog__label">推定読了時間</td>
+                  <td className="text-stats-dialog__value">{readingTime}</td>
                 </tr>
               </tbody>
             </table>
+
+            {readability.totalChars > 0 && (
+              <>
+                <div className="text-stats-dialog__section-header">可読性スコア</div>
+                <div className="readability-score-summary">
+                  <div className="readability-score-badge" data-level={readability.level}>
+                    <span className="readability-score-badge__value">{readability.score}</span>
+                    <span className="readability-score-badge__label">
+                      {getReadabilityLabel(readability.level)}
+                    </span>
+                  </div>
+                </div>
+                <table className="text-stats-dialog__table">
+                  <tbody>
+                    <tr>
+                      <td className="text-stats-dialog__label">漢字率</td>
+                      <td className="text-stats-dialog__value">
+                        {formatPercent(readability.kanjiRatio)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="text-stats-dialog__label">ひらがな率</td>
+                      <td className="text-stats-dialog__value">
+                        {formatPercent(readability.hiraganaRatio)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="text-stats-dialog__label">カタカナ率</td>
+                      <td className="text-stats-dialog__value">
+                        {formatPercent(readability.katakanaRatio)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="text-stats-dialog__label">平均文長</td>
+                      <td className="text-stats-dialog__value">
+                        {readability.averageSentenceLength}文字/文
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="text-stats-dialog__label">文数</td>
+                      <td className="text-stats-dialog__value">{readability.sentenceCount}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </>
+            )}
           </>
         )}
       </div>
