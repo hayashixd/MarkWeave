@@ -123,10 +123,16 @@ export function AppShell() {
   const activePane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const effectiveActiveTabId = activePane?.activeTabId ?? activeTabId;
   useEffect(() => {
+    // 新規タブ追加直後は paneStore への反映前に一時的な不整合が起きるため、
+    // activePane がそのタブをまだ保持していない場合は tabStore の巻き戻しを行わない。
+    if (activeTabId && activePane && !activePane.tabs.includes(activeTabId)) {
+      return;
+    }
+
     if (effectiveActiveTabId && effectiveActiveTabId !== activeTabId) {
       useTabStore.getState().setActiveTab(effectiveActiveTabId);
     }
-  }, [effectiveActiveTabId, activeTabId]);
+  }, [effectiveActiveTabId, activeTabId, activePane]);
 
   // tabStore の activeTabId が変更された場合、ペインのアクティブタブも同期
   useEffect(() => {
