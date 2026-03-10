@@ -82,6 +82,8 @@ import { VirtualScrollExtension } from '../../extensions/VirtualScrollExtension'
 
 export type EditorMode = 'wysiwyg' | 'source';
 
+const LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES = 3 * 1024 * 1024;
+
 export interface EditorProps {
   /** 初期 Markdown テキスト */
   initialContent?: string;
@@ -105,7 +107,7 @@ export function MarkdownEditor({
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
 
   // YAML Front Matter を本文から分離して管理
-  const { yaml: initYaml, body: _initBody } = parseFrontMatter(initialContent);
+  const { yaml: initYaml } = parseFrontMatter(initialContent);
   const [frontMatterYaml, setFrontMatterYaml] = useState(initYaml);
   // Front Matter なしの本文を initialContent として使う
   const [sourceText, setSourceText] = useState(initialContent);
@@ -133,6 +135,8 @@ export function MarkdownEditor({
 
   // 文書統計ダイアログの状態
   const [textStatsVisible, setTextStatsVisible] = useState(false);
+
+  const showToast = useToastStore((s) => s.show);
 
   // スマートペースト ask モードの状態
   const [smartPasteData, setSmartPasteData] = useState<SmartPasteAskEvent | null>(null);
@@ -413,13 +417,32 @@ export function MarkdownEditor({
   useEffect(() => {
     if (!editor) return;
 
+    const contentSizeBytes = new TextEncoder().encode(initialContent).length;
+    if (
+      contentSizeBytes >= LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES &&
+      mode === 'wysiwyg'
+    ) {
+      setSourceText(initialContent);
+      setMode('source');
+      showToast(
+        'warning',
+        'ファイルサイズが大きいため、フリーズを防止するためにソースモードで開きました。',
+      );
+      return;
+    }
+
+    if (mode === 'source') {
+      setSourceText(initialContent);
+      return;
+    }
+
     // Front Matter を抽出して本文のみ TipTap に渡す
     const { yaml, body } = parseFrontMatter(initialContent);
     setFrontMatterYaml(yaml);
 
     const doc = markdownToTipTap(body || '');
     editor.commands.setContent(doc as unknown as Record<string, unknown>);
-  }, [editor, initialContent]);
+  }, [editor, initialContent, mode, showToast]);
 
   // コンテンツ変更の監視
   useEffect(() => {
