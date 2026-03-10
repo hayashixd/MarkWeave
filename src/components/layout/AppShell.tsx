@@ -920,7 +920,7 @@ function EmptyState({
             <line x1="16" y1="13" x2="8" y2="13" />
             <line x1="16" y1="17" x2="8" y2="17" />
           </svg>
-          <h1 className="text-2xl font-bold text-gray-800 mb-1">Markdown Editor</h1>
+          <h1 className="text-2xl font-bold text-gray-800 mb-1">MarkWeave</h1>
           <p className="text-sm text-gray-400">書く・変換する・AIに渡す — 全部ここで</p>
         </div>
 

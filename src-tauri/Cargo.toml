@@ -1,7 +1,7 @@
 [package]
-name = "markdown-editor"
+name = "markweave"
 version = "0.1.0"
-description = "Typora-inspired WYSIWYG Markdown Editor"
+description = "Typora-inspired WYSIWYG MarkWeave"
 authors = ["you"]
 license = "MIT"
 repository = ""

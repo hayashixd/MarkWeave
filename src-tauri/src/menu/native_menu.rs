@@ -294,7 +294,7 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<(), Box<dyn std::error::Error>
             Some("バージョン情報"),
             Some(
                 AboutMetadataBuilder::new()
-                    .name(Some("Markdown Editor"))
+                    .name(Some("MarkWeave"))
                     .version(Some(env!("CARGO_PKG_VERSION")))
                     .build(),
             ),

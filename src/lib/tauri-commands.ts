@@ -80,8 +80,8 @@ export async function getPathInfo(path: string): Promise<PathInfo> {
  * タイトルバーに未保存マーカーを反映する。
  *
  * tauri-ipc-interface.md §9 `set_title_bar_dirty` に準拠:
- * - dirty=true: 「● filename - Markdown Editor」
- * - dirty=false: 「filename - Markdown Editor」
+ * - dirty=true: 「● filename - MarkWeave」
+ * - dirty=false: 「filename - MarkWeave」
  * - fileName が undefined の場合はアプリ名のみ表示
  */
 export async function setTitleBarDirty(dirty: boolean, fileName?: string): Promise<void> {

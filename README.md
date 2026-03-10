@@ -55,7 +55,7 @@
 ```bash
 # リポジトリのクローン
 git clone <repository-url>
-cd markdown-editor
+cd markweave
 
 # Node.js 依存パッケージのインストール
 pnpm install
