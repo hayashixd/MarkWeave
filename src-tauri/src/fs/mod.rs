@@ -1,2 +1,3 @@
-pub mod watcher;
+pub mod indexer;
 pub mod markdown_parser;
+pub mod watcher;

@@ -4,6 +4,7 @@ mod fs;
 mod menu;
 mod models;
 
+use commands::db_commands;
 use commands::export_commands;
 use commands::fs_commands;
 use commands::plugin_commands;
@@ -61,6 +62,10 @@ pub fn run() {
             plugin_commands::is_safe_mode_active,
             plugin_commands::set_safe_mode,
             recent_files::add_to_recent_documents,
+            db_commands::init_metadata_db,
+            db_commands::index_workspace_metadata,
+            db_commands::update_metadata_for_file,
+            db_commands::execute_metadata_query,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
