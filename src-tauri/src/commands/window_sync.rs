@@ -191,7 +191,7 @@ pub async fn detach_tab_to_window(
 
     // 新しい WebviewWindow を作成
     let _new_window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
-        .title(format!("{} - Markdown Editor", file_name))
+        .title(format!("{} - MarkWeave", file_name))
         .inner_size(1000.0, 700.0)
         .min_inner_size(600.0, 400.0)
         .resizable(true)

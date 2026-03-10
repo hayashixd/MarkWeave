@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Markdown Editor",
+  "productName": "MarkWeave",
   "version": "0.1.0",
-  "identifier": "com.markdown-editor.dev",
+  "identifier": "com.markweave.dev",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Markdown Editor",
+        "title": "MarkWeave",
         "width": 1200,
         "height": 800,
         "minWidth": 600,
