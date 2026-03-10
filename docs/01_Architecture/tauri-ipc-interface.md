@@ -316,6 +316,23 @@ interface GraphData {
 const graph = await invoke<GraphData>('get_graph_data', { rootPath: '...' });
 ```
 
+### `get_backlinks`
+
+```typescript
+interface BacklinkResult {
+  sourcePath: string;   // リンク元ファイルの相対パス
+  sourceName: string;   // リンク元ファイル名（拡張子なし）
+  sourceTitle: string | null;
+  contexts: string[];   // マッチした周辺テキスト（最大3件）
+}
+
+// Rust シグネチャ: pub async fn get_backlinks(file_path: String, workspace_root: String) -> Result<Vec<BacklinkResult>, String>
+const backlinks = await invoke<BacklinkResult[]>('get_backlinks', {
+  filePath: 'relative/path/to/file.md',
+  workspaceRoot: '/absolute/workspace/root',
+});
+```
+
 ---
 
 ## 7. Git 統合コマンド

@@ -17,7 +17,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import type { FileNode, RecentWorkspaceEntry } from '../../store/workspaceStore';
 import { useTabStore } from '../../store/tabStore';
 import { readFile } from '../../lib/tauri-commands';
-import { updateMarkdownLinksInWorkspace } from '../../lib/link-updater';
+import { updateMarkdownLinksInWorkspace, updateWikilinksInWorkspace, undoWikilinkUpdate } from '../../lib/link-updater';
 import { useToastStore } from '../../store/toastStore';
 
 interface FileTreePanelProps {
@@ -478,31 +478,73 @@ function FileTreeNodeItem({
 }
 
 /**
- * リネーム・移動後にワークスペース内の Markdown リンク更新を提案する。
+ * リネーム・移動後にワークスペース内の Markdown リンクと Wikiリンクの更新を提案する。
  *
  * file-workspace-design.md §5.3 Phase 7 実装方針に準拠:
  * - 「○個のリンクが壊れる可能性があります。更新しますか？」と確認
  * - 承認後、ワークスペース内の全 .md ファイルをスキャンして相対リンクを更新
+ *
+ * wikilinks-backlinks-design.md §7 に準拠:
+ * - Wikiリンク [[old-name]] → [[new-name]] の一括更新
+ * - 更新完了後 Undo 可能なトースト通知
  */
 async function offerLinkUpdate(oldPath: string, newPath: string, workspaceRoot: string) {
   try {
-    const result = await updateMarkdownLinksInWorkspace(oldPath, newPath, workspaceRoot, {
-      dryRun: true,
-    });
+    // Markdown リンクと Wikiリンクの影響ファイル数を同時にチェック
+    const [mdResult, wikiResult] = await Promise.all([
+      updateMarkdownLinksInWorkspace(oldPath, newPath, workspaceRoot, { dryRun: true }),
+      updateWikilinksInWorkspace(oldPath, newPath, workspaceRoot, true),
+    ]);
 
-    if (result.affectedCount === 0) return;
+    const totalAffected = mdResult.affectedCount + wikiResult.affectedCount;
+    if (totalAffected === 0) return;
 
+    // §7.2: 確認ダイアログ
+    const parts: string[] = [];
+    if (mdResult.affectedCount > 0) {
+      parts.push(`Markdown リンク: ${mdResult.affectedCount} 個のファイル`);
+    }
+    if (wikiResult.affectedCount > 0) {
+      parts.push(`Wikiリンク [[${wikiResult.oldName}]]: ${wikiResult.affectedCount} 個のファイル`);
+    }
     const confirmed = window.confirm(
-      `${result.affectedCount} 個のファイルに "${result.oldRelative}" へのリンクが含まれています。\n` +
-      `新しいパス "${result.newRelative}" に更新しますか？`
+      `${totalAffected} 個のファイルにリンクが含まれています。\n` +
+      parts.join('\n') + '\n\n' +
+      '新しい名前に更新しますか？'
     );
     if (!confirmed) return;
 
-    await updateMarkdownLinksInWorkspace(oldPath, newPath, workspaceRoot, { dryRun: false });
-    useToastStore.getState().show(
-      'info',
-      `${result.affectedCount} 個のファイルのリンクを更新しました`
-    );
+    // 実行
+    const [, wikiActual] = await Promise.all([
+      mdResult.affectedCount > 0
+        ? updateMarkdownLinksInWorkspace(oldPath, newPath, workspaceRoot, { dryRun: false })
+        : Promise.resolve(null),
+      wikiResult.affectedCount > 0
+        ? updateWikilinksInWorkspace(oldPath, newPath, workspaceRoot, false)
+        : Promise.resolve(null),
+    ]);
+
+    // §7.2: 更新完了トースト（Undo 可能）
+    const toast = useToastStore.getState();
+    if (wikiActual && wikiActual.undoData.size > 0) {
+      toast.show(
+        'info',
+        `${totalAffected} 個のファイルのリンクを更新しました`,
+        {
+          label: '元に戻す',
+          onClick: async () => {
+            const restored = await undoWikilinkUpdate(wikiActual.undoData);
+            toast.show('info', `${restored} 個のファイルのWikiリンクを元に戻しました`);
+            window.dispatchEvent(new Event('wikilink-index-updated'));
+          },
+        },
+      );
+    } else {
+      toast.show('info', `${totalAffected} 個のファイルのリンクを更新しました`);
+    }
+
+    // インデックス更新を通知
+    window.dispatchEvent(new Event('wikilink-index-updated'));
   } catch {
     // リンク更新は補助機能なのでエラーは静かに無視
   }

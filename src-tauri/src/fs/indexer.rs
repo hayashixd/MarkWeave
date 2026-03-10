@@ -33,6 +33,9 @@ pub fn full_scan(conn: &Connection, workspace_root: &Path) -> Result<IndexResult
         }
     }
 
+    // リンク解決: target_file_id を設定
+    resolve_links(conn)?;
+
     let duration_ms = start.elapsed().as_millis() as u64;
     log::info!(
         "全スキャン完了: {} ファイルインデックス済み, {} スキップ, {}ms",
@@ -55,7 +58,12 @@ pub fn update_file(conn: &Connection, file_path: &Path, workspace_root: &Path) -
     conn.execute("DELETE FROM files WHERE path = ?1", params![rel_path])
         .map_err(|e| format!("既存レコード削除エラー: {}", e))?;
 
-    index_single_file(conn, file_path, workspace_root)
+    index_single_file(conn, file_path, workspace_root)?;
+
+    // リンク解決: 更新ファイルに関連する target_file_id を再解決
+    resolve_links(conn)?;
+
+    Ok(())
 }
 
 /// 単一の Markdown ファイルをパースしてインデックスに登録する
@@ -111,7 +119,7 @@ fn index_single_file(
         .map_err(|e| format!("tags 削除エラー: {}", e))?;
     conn.execute("DELETE FROM tasks WHERE file_id = ?1", params![file_id])
         .map_err(|e| format!("tasks 削除エラー: {}", e))?;
-    conn.execute("DELETE FROM links WHERE file_id = ?1", params![file_id])
+    conn.execute("DELETE FROM links WHERE source_file_id = ?1", params![file_id])
         .map_err(|e| format!("links 削除エラー: {}", e))?;
 
     insert_metadata(conn, file_id, &parsed)?;
@@ -167,6 +175,105 @@ fn insert_metadata(conn: &Connection, file_id: i64, parsed: &ParsedMarkdown) -> 
             ],
         )
         .map_err(|e| format!("links 挿入エラー: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// Wiki リンクの target_file_id を解決する（wikilinks-backlinks-design.md §5, §6）
+///
+/// links テーブル内の link_type='wiki' のレコードに対して、
+/// target_name をファイル名（拡張子なし）として files テーブルと照合し、
+/// 一意に解決できた場合は target_file_id を設定する。
+pub fn resolve_links(conn: &Connection) -> Result<(), String> {
+    // ファイル名（拡張子なし、小文字）→ file_id のマップを構築
+    let mut name_stmt = conn
+        .prepare("SELECT id, name FROM files")
+        .map_err(|e| format!("resolve_links: files 準備エラー: {}", e))?;
+
+    let file_rows: Vec<(i64, String)> = name_stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("resolve_links: files クエリエラー: {}", e))?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(|e| format!("resolve_links: files 読み取りエラー: {}", e))?;
+
+    // name(小文字) → Vec<file_id>（重複解決用）
+    let mut name_to_ids: std::collections::HashMap<String, Vec<i64>> =
+        std::collections::HashMap::new();
+    for (id, name) in &file_rows {
+        name_to_ids
+            .entry(name.to_lowercase())
+            .or_default()
+            .push(*id);
+    }
+
+    // path(相対パス) → file_id のマップ（パス指定のリンク解決用）
+    let mut path_stmt = conn
+        .prepare("SELECT id, path FROM files")
+        .map_err(|e| format!("resolve_links: files path 準備エラー: {}", e))?;
+    let path_rows: Vec<(i64, String)> = path_stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("resolve_links: files path クエリエラー: {}", e))?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(|e| format!("resolve_links: files path 読み取りエラー: {}", e))?;
+
+    let path_to_id: std::collections::HashMap<String, i64> = path_rows
+        .iter()
+        .map(|(id, path)| {
+            // .md 拡張子なしのパスでもマッチできるように
+            let without_ext = path.strip_suffix(".md").unwrap_or(path);
+            // path そのものと拡張子なしの両方を登録するため、
+            // まずは path → id のマップを返す
+            (path.to_lowercase(), *id)
+        })
+        .collect();
+    let path_no_ext_to_id: std::collections::HashMap<String, i64> = path_rows
+        .iter()
+        .map(|(id, path)| {
+            let without_ext = path.strip_suffix(".md").unwrap_or(path);
+            (without_ext.to_lowercase(), *id)
+        })
+        .collect();
+
+    // 未解決の wiki リンクを取得
+    let mut link_stmt = conn
+        .prepare("SELECT id, target_name FROM links WHERE link_type = 'wiki'")
+        .map_err(|e| format!("resolve_links: links 準備エラー: {}", e))?;
+
+    let unresolved: Vec<(i64, String)> = link_stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| format!("resolve_links: links クエリエラー: {}", e))?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(|e| format!("resolve_links: links 読み取りエラー: {}", e))?;
+
+    let mut update_stmt = conn
+        .prepare("UPDATE links SET target_file_id = ?1 WHERE id = ?2")
+        .map_err(|e| format!("resolve_links: update 準備エラー: {}", e))?;
+
+    for (link_id, target_name) in &unresolved {
+        let target_lower = target_name.to_lowercase();
+
+        // §6.1 解決優先順位:
+        // 1. パス指定（dir/name）のマッチ
+        // 2. ファイル名一意マッチ
+        let resolved_id = if target_lower.contains('/') {
+            // パス指定: 完全パスまたは拡張子なしパスで解決
+            path_to_id
+                .get(&format!("{}.md", target_lower))
+                .or_else(|| path_to_id.get(&target_lower))
+                .or_else(|| path_no_ext_to_id.get(&target_lower))
+                .copied()
+        } else {
+            // ファイル名のみ: 一意に解決できる場合のみ
+            match name_to_ids.get(&target_lower) {
+                Some(ids) if ids.len() == 1 => Some(ids[0]),
+                _ => None,
+            }
+        };
+
+        update_stmt
+            .execute(params![resolved_id, link_id])
+            .map_err(|e| format!("resolve_links: update エラー: {}", e))?;
     }
 
     Ok(())

@@ -1,18 +1,17 @@
 /**
  * バックリンクパネル
  *
- * wikilinks-backlinks-design.md §6 に準拠（フロントエンドのみ版）。
- * 現在開いているファイルへの [[リンク]] を持つ他のタブを一覧表示。
+ * wikilinks-backlinks-design.md §4, §5, §6 に準拠。
+ *
+ * - ワークスペースモード: SQLite インデックスからワークスペース全体のバックリンクを取得
+ * - タブのみモード: 現在開いているタブのみスキャン（フォールバック）
  *
  * ペルソナ対応:
  * - 知識管理者: どのノートから参照されているかを即座に把握し、ナレッジグラフを手動で辿れる
- *
- * 制限:
- * - スキャン対象は「現在開いているタブ」のみ（バックエンドインデックスは Phase 7.5 後半）
- * - ワークスペース未保存の新規タブも対象
  */
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useTabStore } from '../../store/tabStore';
 import { useOpenFileAsTab } from '../../hooks/useOpenFileAsTab';
 
@@ -20,13 +19,23 @@ interface BacklinksPanelProps {
   /** 現在アクティブなタブのファイルパス（バックリンク検出のターゲット） */
   currentFilePath: string | null;
   currentFileName: string;
+  /** ワークスペースのルートパス（null ならタブのみモード） */
+  workspaceRoot?: string | null;
 }
 
 interface BacklinkEntry {
-  tabId: string;
+  tabId?: string;
   fileName: string;
   filePath: string | null;
   /** マッチした周辺テキスト（前後 60 文字） */
+  contexts: string[];
+}
+
+/** Tauri get_backlinks コマンドの返却型 */
+interface BacklinkResultFromDb {
+  sourcePath: string;
+  sourceName: string;
+  sourceTitle: string | null;
   contexts: string[];
 }
 
@@ -58,14 +67,69 @@ function extractContexts(content: string, pattern: RegExp, maxCount = 3): string
   return contexts;
 }
 
-export function BacklinksPanel({ currentFilePath, currentFileName }: BacklinksPanelProps) {
+export function BacklinksPanel({ currentFilePath, currentFileName, workspaceRoot }: BacklinksPanelProps) {
   const { tabs } = useTabStore();
   const openFileAsTab = useOpenFileAsTab();
 
   const targetBase = baseName(currentFileName);
+  const isWorkspaceMode = !!(workspaceRoot && currentFilePath);
 
-  const backlinks = useMemo<BacklinkEntry[]>(() => {
-    if (!targetBase) return [];
+  // ワークスペースモード: DB からバックリンクを取得
+  const [dbBacklinks, setDbBacklinks] = useState<BacklinkEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchBacklinks = useCallback(async () => {
+    if (!isWorkspaceMode || !currentFilePath || !workspaceRoot) return;
+
+    setIsLoading(true);
+    try {
+      // currentFilePath からワークスペースルートの相対パスを計算
+      let relPath = currentFilePath;
+      if (currentFilePath.startsWith(workspaceRoot)) {
+        relPath = currentFilePath.slice(workspaceRoot.length);
+        // 先頭の / or \ を除去
+        relPath = relPath.replace(/^[/\\]/, '');
+      }
+
+      const results = await invoke<BacklinkResultFromDb[]>('get_backlinks', {
+        filePath: relPath,
+        workspaceRoot,
+      });
+
+      setDbBacklinks(
+        results.map((r) => ({
+          fileName: r.sourceName + '.md',
+          filePath: workspaceRoot + '/' + r.sourcePath,
+          contexts: r.contexts,
+        })),
+      );
+    } catch (e) {
+      console.warn('バックリンク取得エラー:', e);
+      setDbBacklinks([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentFilePath, workspaceRoot, isWorkspaceMode]);
+
+  useEffect(() => {
+    if (isWorkspaceMode) {
+      fetchBacklinks();
+    }
+  }, [isWorkspaceMode, fetchBacklinks]);
+
+  // ファイル保存時にバックリンクを再取得
+  useEffect(() => {
+    if (!isWorkspaceMode) return;
+    const handler = () => {
+      fetchBacklinks();
+    };
+    window.addEventListener('wikilink-index-updated', handler);
+    return () => window.removeEventListener('wikilink-index-updated', handler);
+  }, [isWorkspaceMode, fetchBacklinks]);
+
+  // タブのみモード: フォールバック（従来のロジック）
+  const tabBacklinks = useMemo<BacklinkEntry[]>(() => {
+    if (isWorkspaceMode || !targetBase) return [];
 
     const pattern = buildWikilinkPattern(targetBase);
 
@@ -82,7 +146,9 @@ export function BacklinksPanel({ currentFilePath, currentFileName }: BacklinksPa
         const contexts = extractContexts(tab.content, pattern);
         return [{ tabId: tab.id, fileName: tab.fileName, filePath: tab.filePath, contexts }];
       });
-  }, [tabs, targetBase, currentFilePath, currentFileName]);
+  }, [tabs, targetBase, currentFilePath, currentFileName, isWorkspaceMode]);
+
+  const backlinks = isWorkspaceMode ? dbBacklinks : tabBacklinks;
 
   const handleOpenTab = (entry: BacklinkEntry) => {
     if (entry.filePath) {
@@ -102,10 +168,16 @@ export function BacklinksPanel({ currentFilePath, currentFileName }: BacklinksPa
     <div className="backlinks-panel">
       <div className="backlinks-panel__header">
         <span className="backlinks-panel__title">[[{targetBase}]] へのリンク</span>
-        <span className="backlinks-panel__count">{backlinks.length}件</span>
+        <span className="backlinks-panel__count">
+          {isLoading ? '…' : `${backlinks.length}件`}
+        </span>
       </div>
 
-      {backlinks.length === 0 ? (
+      {isLoading ? (
+        <div className="backlinks-panel__empty">
+          <p>バックリンクを検索中…</p>
+        </div>
+      ) : backlinks.length === 0 ? (
         <div className="backlinks-panel__empty">
           <p>このファイルへのリンクは見つかりませんでした。</p>
           <p className="backlinks-panel__empty-hint">
@@ -114,8 +186,8 @@ export function BacklinksPanel({ currentFilePath, currentFileName }: BacklinksPa
         </div>
       ) : (
         <ul className="backlinks-panel__list">
-          {backlinks.map((entry) => (
-            <li key={entry.tabId} className="backlinks-panel__item">
+          {backlinks.map((entry, idx) => (
+            <li key={entry.filePath ?? entry.tabId ?? idx} className="backlinks-panel__item">
               <button
                 type="button"
                 className="backlinks-panel__item-name"
@@ -135,7 +207,9 @@ export function BacklinksPanel({ currentFilePath, currentFileName }: BacklinksPa
       )}
 
       <div className="backlinks-panel__footer">
-        ※ 開いているタブのみをスキャン
+        {isWorkspaceMode
+          ? '※ ワークスペース全体をスキャン'
+          : '※ 開いているタブのみをスキャン'}
       </div>
     </div>
   );
