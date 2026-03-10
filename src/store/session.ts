@@ -13,6 +13,8 @@
  */
 
 import { load } from '@tauri-apps/plugin-store';
+import { loadRecoveryData } from './crash-recovery';
+import type { RecoveryEntry } from './crash-recovery';
 
 export interface FileSession {
   path: string; // 絶対パス
@@ -35,6 +37,7 @@ export interface SessionState {
   activeFilePath: string | null; // アクティブタブのファイルパス
   sidebarVisible: boolean; // サイドバーの表示状態
   paneLayout?: PaneSessionState; // ペイン分割状態（Phase 7）
+  lastCleanExit?: boolean; // 正常終了した場合のみ true（§10.5）
 }
 
 export interface WindowState {
@@ -60,6 +63,8 @@ export async function saveSession(state: SessionState): Promise<void> {
   } else {
     await store.delete('paneLayout');
   }
+  // lastCleanExit フラグ（§10.5: 正常終了判定用）
+  await store.set('lastCleanExit', state.lastCleanExit ?? false);
   await store.save(); // 明示的に保存（autoSave: false でクラッシュ耐性向上）
 }
 
@@ -108,5 +113,23 @@ export async function loadSession(): Promise<SessionState | null> {
       (await store.get<boolean>('sidebarVisible')) ?? true,
     paneLayout:
       (await store.get<PaneSessionState>('paneLayout')) ?? undefined,
+    lastCleanExit:
+      (await store.get<boolean>('lastCleanExit')) ?? undefined,
   };
+}
+
+/**
+ * 起動時にクラッシュリカバリが必要か判定する（§10.5）。
+ *
+ * lastCleanExit === true → 正常終了 → リカバリ不要
+ * lastCleanExit === false / undefined → クラッシュの可能性 → リカバリデータを確認
+ */
+export async function checkNeedsRecovery(): Promise<RecoveryEntry[] | null> {
+  const session = await loadSession();
+
+  // 正常終了していた場合はリカバリ不要
+  if (session?.lastCleanExit === true) return null;
+
+  // クラッシュ（または初回起動）の場合のみリカバリデータを確認
+  return await loadRecoveryData();
 }

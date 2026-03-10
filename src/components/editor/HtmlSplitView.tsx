@@ -11,7 +11,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { HtmlSourceEditor } from './HtmlSourceEditor';
-import DOMPurify from 'dompurify';
+import { sanitizeHtml } from '../../utils/dompurify-config';
 
 export interface HtmlSplitViewProps {
   /** HTML テキスト */
@@ -107,20 +107,15 @@ export function HtmlSplitView({
     [splitRatio],
   );
 
-  // プレビューのサニタイズ済みHTML
-  const sanitizedHtml = DOMPurify.sanitize(value, {
-    ALLOW_UNKNOWN_PROTOCOLS: false,
-    ADD_TAGS: ['style'],
-    FORBID_TAGS: ['script'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
-  });
+  // プレビューのサニタイズ済みHTML（共通設定を使用）
+  const sanitized = sanitizeHtml(value);
 
   // プレビュー更新（<style>タグの内容も適用）
   useEffect(() => {
     if (!previewRef.current) return;
     // DOMPurifyでサニタイズ済みなのでXSSリスクは低い
-    previewRef.current.innerHTML = sanitizedHtml;
-  }, [sanitizedHtml]);
+    previewRef.current.innerHTML = sanitized;
+  }, [sanitized]);
 
   // 同期スクロール
   const handleSourceScroll = useCallback(() => {

@@ -13,6 +13,7 @@ import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import katex from 'katex';
+import { sanitizeHtml } from '../utils/dompurify-config';
 
 // ============================================================
 // 共通: 数式編集ポップアップ
@@ -49,6 +50,7 @@ function MathEditPopup({
       const html = katex.renderToString(localLatex, {
         throwOnError: true,
         displayMode,
+        trust: false,
       });
       setPreviewHtml(html);
       setPreviewError(null);
@@ -106,7 +108,7 @@ function MathEditPopup({
               {previewError ? (
                 <span className="text-red-500 text-xs">{previewError}</span>
               ) : previewHtml ? (
-                <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }} />
               ) : (
                 <span className="text-gray-400 text-sm">LaTeX を入力してください</span>
               )}
@@ -184,6 +186,7 @@ function MathInlineView({ node, updateAttributes, selected }: NodeViewProps) {
         katex.render(latex || '\\text{数式}', renderedRef.current, {
           throwOnError: false,
           displayMode: false,
+          trust: false,
         });
       } catch {
         renderedRef.current.textContent = latex || '数式';
@@ -329,6 +332,7 @@ function MathBlockView({ node, updateAttributes, selected }: NodeViewProps) {
         katex.render(latex || '\\text{数式ブロック}', renderedRef.current, {
           throwOnError: false,
           displayMode: true,
+          trust: false,
         });
       } catch {
         renderedRef.current.textContent = latex || '数式ブロック';

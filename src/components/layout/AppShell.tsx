@@ -33,7 +33,9 @@ import type { FileEncoding, LineEnding } from '../../store/tabStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useTitleBar } from '../../hooks/useTitleBar';
 import { useCloseGuard } from '../../hooks/useCloseGuard';
-import { useSessionRestore } from '../../hooks/useSessionRestore';
+import { useSessionRestore, useRecoveryCheck } from '../../hooks/useSessionRestore';
+import { startCheckpointScheduler } from '../../store/crash-recovery';
+import { RecoveryDialog } from '../RecoveryDialog';
 import { useFileOpenListener } from '../../hooks/useFileOpenListener';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useWindowState } from '../../hooks/useWindowState';
@@ -165,6 +167,27 @@ export function AppShell() {
 
   // セッション復元（前回開いていたタブを復元、なければ空タブ）
   useSessionRestore();
+
+  // クラッシュリカバリ判定（§10）
+  const { recoveryEntries, handleRestore, handleDiscard } = useRecoveryCheck();
+
+  // チェックポイントスケジューラ（30 秒ごとに未保存タブの状態を保存）
+  useEffect(() => {
+    // Tauri 環境以外では何もしない
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+
+    const cleanup = startCheckpointScheduler(() =>
+      useTabStore.getState().tabs
+        .filter((tab) => tab.filePath !== null)
+        .map((tab) => ({
+          filePath: tab.filePath!,
+          content: tab.content,
+          savedContent: tab.savedContent,
+          checkpointAt: new Date().toISOString(),
+        })),
+    );
+    return cleanup;
+  }, []);
 
   // 外部ファイルオープンイベント受信（シングルインスタンス制御・CLI引数対応）
   useFileOpenListener();
@@ -833,6 +856,15 @@ export function AppShell() {
 
       {/* トースト通知 */}
       <ToastContainer />
+
+      {/* クラッシュリカバリダイアログ（§10.4） */}
+      {recoveryEntries && (
+        <RecoveryDialog
+          entries={recoveryEntries}
+          onRestore={handleRestore}
+          onDiscard={handleDiscard}
+        />
+      )}
 
       {/* ドラッグ&ドロップオーバーレイ */}
       {isDragOver && <DropOverlay />}

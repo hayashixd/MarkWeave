@@ -12,6 +12,7 @@ import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import mermaid from 'mermaid';
+import { sanitizeMermaidSvg } from '../utils/dompurify-config';
 
 // Mermaid 初期化
 let mermaidInitialized = false;
@@ -99,7 +100,7 @@ function MermaidEditPopup({
       mermaid
         .render(id, localCode)
         .then(({ svg }) => {
-          setPreviewSvg(svg);
+          setPreviewSvg(sanitizeMermaidSvg(svg));
           setPreviewError(null);
         })
         .catch((err) => {
@@ -204,7 +205,7 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
     mermaid
       .render(id, code)
       .then(({ svg }) => {
-        setSvgHtml(svg);
+        setSvgHtml(sanitizeMermaidSvg(svg));
         setRenderError(null);
       })
       .catch((err) => {

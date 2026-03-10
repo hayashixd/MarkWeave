@@ -19,6 +19,7 @@ import { saveSession } from '../store/session';
 import type { PaneSessionState } from '../store/session';
 import { usePaneStore } from '../store/paneStore';
 import { captureAndSaveWindowState } from './useWindowState';
+import { clearRecoveryData } from '../store/crash-recovery';
 
 /** 現在のタブ状態からセッション情報を生成する */
 function getCurrentSession() {
@@ -56,6 +57,18 @@ function getCurrentSession() {
     sidebarVisible: true, // Phase 1 ではサイドバー状態の追跡は省略
     paneLayout,
   };
+}
+
+/**
+ * 正常終了時の後処理（§10.5）。
+ * 順序が重要: clearRecoveryData → saveSession（lastCleanExit: true）
+ */
+async function onNormalExit(): Promise<void> {
+  await captureAndSaveWindowState().catch(() => {});
+  // Step 1: リカバリデータを削除（失敗しても次回起動時にユーザーに確認するだけ）
+  await clearRecoveryData().catch(() => {});
+  // Step 2: セッション状態を保存（lastCleanExit フラグを設定）
+  await saveSession({ ...getCurrentSession(), lastCleanExit: true }).catch(() => {});
 }
 
 /** 未保存確認ダイアログを表示する（Tauri ダイアログ → window.confirm フォールバック） */
@@ -97,9 +110,8 @@ export function useCloseGuard() {
       if (cancelled) return;
 
       if (dirtyFileNames.length === 0) {
-        // 未保存なし → ウィンドウ状態 + セッション保存してそのまま閉じる
-        await captureAndSaveWindowState().catch(() => {});
-        await saveSession(getCurrentSession()).catch(() => {});
+        // 未保存なし → 正常終了処理してそのまま閉じる
+        await onNormalExit();
         return;
       }
 
@@ -109,14 +121,12 @@ export function useCloseGuard() {
         const confirmed = await showUnsavedConfirmation(dirtyFileNames);
 
         if (confirmed) {
-          await captureAndSaveWindowState().catch(() => {});
-          await saveSession(getCurrentSession()).catch(() => {});
+          await onNormalExit();
           appWindow.destroy(); // onCloseRequested を再トリガーしないよう destroy を使う
         }
       } catch {
         // ダイアログ表示自体が完全に失敗した場合は、安全にウィンドウを閉じる
-        await captureAndSaveWindowState().catch(() => {});
-        await saveSession(getCurrentSession()).catch(() => {});
+        await onNormalExit();
         appWindow.destroy();
       }
     });
