@@ -2181,6 +2181,7 @@ dependencies = [
  "tauri-plugin-log",
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "windows 0.58.0",

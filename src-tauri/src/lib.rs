@@ -97,6 +97,13 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // ネイティブメニューバーを構築 (app-shell-design.md §2)
+            let handle = app.handle().clone();
+            if let Err(e) = menu::native_menu::build_menu(&handle) {
+                log::error!("Failed to build native menu: {}", e);
+            }
+            menu::native_menu::setup_menu_event_handler(&handle);
+
             // 初回起動時のコマンドライン引数からファイルパスを処理
             let args: Vec<String> = std::env::args().collect();
             if let Some(path) = args.get(1) {

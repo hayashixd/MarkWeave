@@ -62,6 +62,7 @@ import { PomodoroTimer } from '../pomodoro/PomodoroTimer';
 import { WordSprintWidget } from '../wordSprint/WordSprintWidget';
 import { calculateReadability, getReadabilityLabel } from '../../lib/readability-score';
 import { FloatingTocPanel } from '../Outline/FloatingTocPanel';
+import { useMenuListener } from '../../hooks/useMenuListener';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -605,6 +606,97 @@ export function AppShell() {
     window.addEventListener('create-daily-note', handler);
     return () => window.removeEventListener('create-daily-note', handler);
   }, [createDailyNote]);
+
+  // Tauri ネイティブメニューのイベントリスナー (app-shell-design.md §2)
+  useMenuListener({
+    file_new: handleNewTab,
+    file_open: () => openFileDialogRef.current(),
+    file_open_folder: () => openFolderDialogRef.current(),
+    file_recent_files: () => { setSidebarOpen(true); setSidebarTab('files'); },
+    file_recent_workspaces: () => { setSidebarOpen(true); setSidebarTab('files'); },
+    file_save: () => {
+      const tab = getActiveTab();
+      if (!tab) return;
+      if (!tab.filePath) {
+        saveAsDialogRef.current();
+      } else {
+        saveNow();
+      }
+    },
+    file_save_as: () => saveAsDialogRef.current(),
+    file_export_html: () => setExportDialogOpen(true),
+    file_export_pdf: () => setPdfExportDialogOpen(true),
+    file_export_word: () => {
+      setPandocExportFormat('docx');
+      setPandocExportDialogOpen(true);
+    },
+    file_export_latex: () => {
+      setPandocExportFormat('latex');
+      setPandocExportDialogOpen(true);
+    },
+    file_export_epub: () => {
+      setPandocExportFormat('epub');
+      setPandocExportDialogOpen(true);
+    },
+    file_save_as_md: () => startSaveAsMarkdownRef.current(),
+    file_save_as_html: () => startSaveAsHtmlRef.current(),
+    file_template_new: () => {
+      window.dispatchEvent(new CustomEvent('menu-template-new'));
+    },
+    file_daily_note: createDailyNote,
+    file_print: () => { window.print(); },
+    edit_paste_plain: () => {
+      window.dispatchEvent(new CustomEvent('menu-paste-plain'));
+    },
+    edit_find: () => {
+      window.dispatchEvent(new CustomEvent('menu-find'));
+    },
+    edit_find_replace: () => {
+      window.dispatchEvent(new CustomEvent('menu-find-replace'));
+    },
+    edit_text_stats: () => {
+      window.dispatchEvent(new CustomEvent('menu-text-stats'));
+    },
+    edit_preferences: () => setPreferencesOpen(true),
+    view_mode_wysiwyg: () => {
+      window.dispatchEvent(new CustomEvent('menu-editor-mode', { detail: { mode: 'wysiwyg' } }));
+    },
+    view_mode_source: () => {
+      window.dispatchEvent(new CustomEvent('menu-editor-mode', { detail: { mode: 'source' } }));
+    },
+    view_sidebar_toggle: () => setSidebarOpen((v) => !v),
+    view_outline: () => { setSidebarOpen(true); setSidebarTab('outline'); },
+    view_files: () => { setSidebarOpen(true); setSidebarTab('files'); },
+    view_ai_templates: () => { setSidebarOpen(true); setSidebarTab('ai'); },
+    view_backlinks: () => { setSidebarOpen(true); setSidebarTab('backlinks'); },
+    view_tags: () => { setSidebarOpen(true); setSidebarTab('tags'); },
+    view_floating_toc: () => setFloatingTocOpen((v) => !v),
+    view_split_pane: () => {
+      const tab = getActiveTab();
+      if (tab) splitPane('vertical', tab.id);
+    },
+    view_focus_mode: () => updateSettings({ editor: { focusMode: !settings.editor.focusMode } }),
+    view_typewriter_mode: () => updateSettings({ editor: { typewriterMode: !settings.editor.typewriterMode } }),
+    view_zen_mode: () => updateSettings({ editor: { zenMode: !settings.editor.zenMode } }),
+    view_zoom_reset: () => {
+      window.dispatchEvent(new CustomEvent('menu-zoom', { detail: { action: 'reset' } }));
+    },
+    view_zoom_in: () => {
+      window.dispatchEvent(new CustomEvent('menu-zoom', { detail: { action: 'in' } }));
+    },
+    view_zoom_out: () => {
+      window.dispatchEvent(new CustomEvent('menu-zoom', { detail: { action: 'out' } }));
+    },
+    help_shortcuts: () => {
+      window.dispatchEvent(new CustomEvent('show-shortcuts-dialog'));
+    },
+    help_version: () => {
+      // バージョン情報は PredefinedMenuItem::about で OS 標準ダイアログを使用
+    },
+    help_feedback: () => {
+      window.dispatchEvent(new CustomEvent('show-feedback-dialog'));
+    },
+  });
 
   return (
     <div
