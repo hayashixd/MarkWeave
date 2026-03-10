@@ -77,6 +77,7 @@ export function HtmlEditor({
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+  const suppressNextUpdateRef = useRef(0);
 
   const editor = useEditor({
     extensions: [
@@ -127,6 +128,23 @@ export function HtmlEditor({
 
   const ime = useIMEComposition(editor);
 
+  const setEditorHtmlContent = useCallback(
+    (html: string) => {
+      if (!editor) return;
+
+      const result = htmlToTipTap(html);
+      suppressNextUpdateRef.current += 1;
+      try {
+        editor.commands.setContent(result.doc as unknown as Record<string, unknown>);
+      } catch (error) {
+        suppressNextUpdateRef.current = Math.max(0, suppressNextUpdateRef.current - 1);
+        throw error;
+      }
+      setMetadata(result.metadata);
+    },
+    [editor],
+  );
+
   // エディタ準備完了時にコールバック
   useEffect(() => {
     if (editor && onEditorReady) {
@@ -136,15 +154,11 @@ export function HtmlEditor({
 
   // 初期コンテンツの設定
   useEffect(() => {
-    if (!editor || !initialContent) return;
+    if (!editor) return;
 
-    const result = htmlToTipTap(initialContent);
-    editor.commands.setContent(
-      result.doc as unknown as Record<string, unknown>,
-    );
-    setMetadata(result.metadata);
+    setEditorHtmlContent(initialContent);
     setSourceText(initialContent);
-  }, [editor, initialContent]);
+  }, [editor, initialContent, setEditorHtmlContent]);
 
   // コンテンツ変更の監視（WYSIWYG モード）
   useEffect(() => {
@@ -152,6 +166,10 @@ export function HtmlEditor({
 
     const handler = () => {
       if (!ime.canProcess()) return;
+      if (suppressNextUpdateRef.current > 0) {
+        suppressNextUpdateRef.current -= 1;
+        return;
+      }
 
       const json = editor.getJSON() as unknown as TipTapDoc;
       const html = tiptapToHtml(json, metadata);
@@ -176,17 +194,13 @@ export function HtmlEditor({
         setSourceText(html);
       } else if (mode !== 'wysiwyg' && newMode === 'wysiwyg') {
         // ソース/スプリット → WYSIWYG: HTML → TipTap
-        const result = htmlToTipTap(sourceText);
-        editor.commands.setContent(
-          result.doc as unknown as Record<string, unknown>,
-        );
-        setMetadata(result.metadata);
+        setEditorHtmlContent(sourceText);
         onContentChangeRef.current?.(sourceText);
       }
 
       setMode(newMode);
     },
-    [editor, mode, sourceText, metadata],
+    [editor, mode, sourceText, metadata, setEditorHtmlContent],
   );
 
   // Ctrl+/ でモード切替

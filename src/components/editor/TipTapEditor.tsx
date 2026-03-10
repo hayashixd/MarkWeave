@@ -117,6 +117,7 @@ export function MarkdownEditor({
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
   const lastEmittedContentRef = useRef<string>(initialContent);
+  const suppressNextUpdateRef = useRef(0);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   // フロントマター変更時に参照するために ref に保持
   const frontMatterYamlRef = useRef(frontMatterYaml);
@@ -322,6 +323,25 @@ export function MarkdownEditor({
 
   const ime = useIMEComposition(editor);
 
+  const applyExternalMarkdownToEditor = useCallback(
+    (markdown: string) => {
+      if (!editor) return;
+
+      const doc = markdownToTipTap(markdown || '');
+
+      // setContent 起点の update イベントを 1 回だけ抑止し、
+      // 親 state との往復更新ループを防ぐ
+      suppressNextUpdateRef.current += 1;
+      try {
+        editor.commands.setContent(doc as unknown as Record<string, unknown>);
+      } catch (error) {
+        suppressNextUpdateRef.current = Math.max(0, suppressNextUpdateRef.current - 1);
+        throw error;
+      }
+    },
+    [editor],
+  );
+
   // エディタ準備完了時にコールバック通知
   useEffect(() => {
     if (editor && onEditorReady) {
@@ -447,9 +467,8 @@ export function MarkdownEditor({
     const { yaml, body } = parseFrontMatter(initialContent);
     setFrontMatterYaml(yaml);
 
-    const doc = markdownToTipTap(body || '');
-    editor.commands.setContent(doc as unknown as Record<string, unknown>);
-  }, [editor, initialContent, mode, showToast]);
+    applyExternalMarkdownToEditor(body || '');
+  }, [applyExternalMarkdownToEditor, editor, initialContent, mode, showToast]);
 
   // コンテンツ変更の監視
   useEffect(() => {
@@ -458,6 +477,10 @@ export function MarkdownEditor({
     const handler = () => {
       // IME 変換中はシリアライズしない (markdown-tiptap-conversion.md §9)
       if (!ime.canProcess()) return;
+      if (suppressNextUpdateRef.current > 0) {
+        suppressNextUpdateRef.current -= 1;
+        return;
+      }
 
       const json = editor.getJSON() as unknown as TipTapDoc;
       const markdown = tiptapToMarkdown(json);
@@ -536,12 +559,11 @@ export function MarkdownEditor({
       // ソース → WYSIWYG: ソース内の Front Matter を抽出して本文を TipTap に設定
       const { yaml, body } = parseFrontMatter(sourceText);
       setFrontMatterYaml(yaml);
-      const doc = markdownToTipTap(body || '');
-      editor.commands.setContent(doc as unknown as Record<string, unknown>);
+      applyExternalMarkdownToEditor(body || '');
       onContentChangeRef.current?.(sourceText);
       setMode('wysiwyg');
     }
-  }, [editor, mode, sourceText]);
+  }, [applyExternalMarkdownToEditor, editor, mode, sourceText]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -693,10 +715,9 @@ export function MarkdownEditor({
       if (!editor) return;
       const { yaml, body } = parseFrontMatter(markdown);
       setFrontMatterYaml(yaml);
-      const doc = markdownToTipTap(body || '');
-      editor.commands.setContent(doc as unknown as Record<string, unknown>);
+      applyExternalMarkdownToEditor(body || '');
     },
-    [editor],
+    [applyExternalMarkdownToEditor, editor],
   );
 
   // 現在の Markdown を取得するメソッド（Front Matter 含む）
