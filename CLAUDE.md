@@ -84,3 +84,45 @@ feature-list.md のタスクに紐づく設計ドキュメントを読む
 
 **設計書が存在する機能は必ず設計書を読んでから実装する。**
 設計書の参照先は `feature-list.md` の各セクション内に記載されている。
+
+---
+
+## 🍔 メニューバー実装ルール（機能追加時の必須フロー）
+
+ユーザーがメニューから操作できない機能は、発見性が低く直感的でない。
+**新しい機能を実装する際は、必ずメニューバーへの追加を検討すること。**
+
+### メニュー追加が必要なケース
+- ダイアログやパネルを開く機能（エクスポート、設定、検索など）
+- モードの切り替え（エディタモード、フォーカスモード、Zen モードなど）
+- ファイル操作（新規、開く、保存、変換など）
+- 表示の切り替え（サイドバー、パネル、ズームなど）
+
+### メニュー追加フロー（4 ステップ）
+
+```
+1. docs/03_UI_UX/menu-inventory.md を更新
+   → 該当メニューカテゴリに行を追加（ID・ショートカット・feature-list対応を記入）
+
+2. Rust 側: src-tauri/src/menu/native_menu.rs
+   → mod ids に ID 定数を追加
+   → build_menu() にメニューアイテムを追加
+
+3. フロントエンド側:
+   → src/hooks/useMenuListener.ts の MenuActions に型を追加
+   → src/components/layout/AppShell.tsx のハンドラを追加
+   → エディタ内機能の場合は TipTapEditor.tsx にカスタムイベントリスナーを追加
+
+4. docs/00_Meta/feature-list.md の「使い方」列に「メニュー → ...」パスを記載
+```
+
+### SoT（Single Source of Truth）
+| ドキュメント | 役割 |
+|---|---|
+| `docs/03_UI_UX/menu-inventory.md` | **メニュー項目の一覧と実装状況（SoT）** |
+| `src-tauri/src/menu/native_menu.rs` | Rust 側のメニュー定義 |
+| `src/hooks/useMenuListener.ts` | フロントエンド側のメニューイベントハンドラ型定義 |
+
+### ⚠️ 禁止事項
+- ショートカットキーのみで操作可能な機能を作らない（必ずメニューからもアクセス可能にする）
+- `menu-inventory.md` を更新せずにメニュー項目を追加しない
