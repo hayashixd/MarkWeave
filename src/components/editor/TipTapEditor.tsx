@@ -277,6 +277,12 @@ export function MarkdownEditor({
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
     editorProps: {
+      // contenteditable 要素の ARIA 属性 (accessibility-design.md §2.2)
+      attributes: {
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': 'ドキュメント編集エリア',
+      },
       handleKeyDown(view, event) {
         // IME 変換中の Enter キーは ProseMirror に渡さない
         if (event.isComposing || event.keyCode === 229) {

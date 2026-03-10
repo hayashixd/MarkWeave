@@ -10,6 +10,7 @@
  */
 
 import { create } from 'zustand';
+import { announcePolite, announceAssertive } from '../utils/a11y-announce';
 
 export type ToastSeverity = 'info' | 'success' | 'warning' | 'error';
 
@@ -34,6 +35,13 @@ export const useToastStore = create<ToastStore>((set) => ({
     set((state) => ({
       toasts: [...state.toasts.slice(-2), { id, severity, message, action }],
     }));
+
+    // スクリーンリーダーへのアナウンス (accessibility-design.md §6.2)
+    if (severity === 'error') {
+      announceAssertive(message);
+    } else {
+      announcePolite(message);
+    }
 
     // 自動消去タイマー
     const delay = severity === 'info' || severity === 'success' ? 3000 : severity === 'warning' ? 8000 : 0;
