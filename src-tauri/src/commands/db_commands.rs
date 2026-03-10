@@ -1,5 +1,5 @@
 use std::path::Path;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::db::connection::MetadataDb;
 use crate::db::queries::{self, MetadataQueryResult};
