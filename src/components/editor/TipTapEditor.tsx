@@ -41,6 +41,7 @@ import { common, createLowlight } from 'lowlight';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIMEComposition } from './useIMEComposition';
 import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
+import { SafeInputRulesExtension } from '../../extensions/SafeInputRulesExtension';
 import { markdownToTipTap } from '../../lib/markdown-to-tiptap';
 import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
 import { IncrementalSerializer } from '../../lib/incremental-serialize';
@@ -273,6 +274,8 @@ export function MarkdownEditor({
           return resolvedFileNames.has(target.toLowerCase());
         },
       }),
+      // IME ガード付きオートフォーマット (system-design.md §4.3)
+      SafeInputRulesExtension,
     ],
     editable: !readOnly,
     // IME 入力中にトランザクションを発行しない
