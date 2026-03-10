@@ -78,6 +78,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore';
 import { useRecentFilesStore } from '../../store/recentFilesStore';
 import { AmbientSoundControl } from './AmbientSoundControl';
 import { typewriterPlayer } from '../../lib/typewriter-sound';
+import { VirtualScrollExtension } from '../../extensions/VirtualScrollExtension';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -246,6 +247,7 @@ export function MarkdownEditor({
       TyporaFocusExtension,
       FocusModeExtension.configure({ enabled: focusMode }),
       ...(settings.slashCommands?.enabled !== false ? [SlashCommandsExtension.configure({ onStateChange: setSlashState })] : []),
+      VirtualScrollExtension.configure({ nodeThreshold: 500 }),
       WikilinkExtension.configure({
         onLinkClick: (target) => {
           window.dispatchEvent(new CustomEvent('open-wikilink', { detail: { target } }));
