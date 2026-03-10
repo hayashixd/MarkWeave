@@ -34,7 +34,17 @@ interface TabStore {
   activeTabId: string | null;
 
   // タブ操作
-  addTab: (tab: Omit<TabState, 'id' | 'isDirty' | 'encoding' | 'lineEnding' | 'fileType' | 'isReadOnly'> & { encoding?: FileEncoding; lineEnding?: LineEnding; fileType?: FileType; isReadOnly?: boolean }) => string;
+  addTab: (
+    tab: Omit<
+      TabState,
+      'id' | 'isDirty' | 'encoding' | 'lineEnding' | 'fileType' | 'isReadOnly'
+    > & {
+      encoding?: FileEncoding;
+      lineEnding?: LineEnding;
+      fileType?: FileType;
+      isReadOnly?: boolean;
+    },
+  ) => string;
   removeTab: (tabId: string) => void;
   setActiveTab: (tabId: string) => void;
 
@@ -96,8 +106,8 @@ export const useTabStore = create<TabStore>((set, get) => ({
     }
 
     // ファイル拡張子からファイル種別を自動判定
-    const detectedFileType: FileType = tabData.fileType ??
-      detectFileType(tabData.filePath ?? fileName);
+    const detectedFileType: FileType =
+      tabData.fileType ?? detectFileType(tabData.filePath ?? fileName);
 
     const newTab: TabState = {
       id,
@@ -144,17 +154,22 @@ export const useTabStore = create<TabStore>((set, get) => ({
   },
 
   updateContent: (tabId, content) => {
-    set((state) => ({
-      tabs: state.tabs.map((tab) =>
-        tab.id === tabId
-          ? {
-              ...tab,
-              content,
-              isDirty: content !== tab.savedContent,
-            }
-          : tab,
-      ),
-    }));
+    set((state) => {
+      let changed = false;
+      const nextTabs = state.tabs.map((tab) => {
+        if (tab.id !== tabId) return tab;
+        if (tab.content === content) return tab;
+
+        changed = true;
+        return {
+          ...tab,
+          content,
+          isDirty: content !== tab.savedContent,
+        };
+      });
+
+      return changed ? { tabs: nextTabs } : state;
+    });
   },
 
   markSaved: (tabId, filePath) => {
@@ -179,9 +194,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
 
   updateEncoding: (tabId, encoding) => {
     set((state) => ({
-      tabs: state.tabs.map((tab) =>
-        tab.id === tabId ? { ...tab, encoding } : tab,
-      ),
+      tabs: state.tabs.map((tab) => (tab.id === tabId ? { ...tab, encoding } : tab)),
     }));
   },
 
@@ -209,9 +222,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
 
   setReadOnly: (filePath, isReadOnly) => {
     set((state) => ({
-      tabs: state.tabs.map((tab) =>
-        tab.filePath === filePath ? { ...tab, isReadOnly } : tab,
-      ),
+      tabs: state.tabs.map((tab) => (tab.filePath === filePath ? { ...tab, isReadOnly } : tab)),
     }));
   },
 

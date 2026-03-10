@@ -68,7 +68,10 @@ import { AiCopyButton } from '../AiPanel/AiCopyButton';
 import { TyporaFocusExtension } from '../../extensions/TyporaFocusExtension';
 import { FocusModeExtension } from '../../extensions/FocusModeExtension';
 import { useSettingsStore } from '../../store/settingsStore';
-import { SlashCommandsExtension, type SlashCommandState } from '../../extensions/SlashCommandsExtension';
+import {
+  SlashCommandsExtension,
+  type SlashCommandState,
+} from '../../extensions/SlashCommandsExtension';
 import { SlashCommandMenu } from '../SlashCommands/SlashCommandMenu';
 import { FrontMatterPanel } from './FrontMatterPanel';
 import { parseFrontMatter, serializeFrontMatter } from '../../lib/frontmatter';
@@ -113,6 +116,7 @@ export function MarkdownEditor({
   const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
+  const lastEmittedContentRef = useRef<string>(initialContent);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   // フロントマター変更時に参照するために ref に保持
   const frontMatterYamlRef = useRef(frontMatterYaml);
@@ -178,7 +182,9 @@ export function MarkdownEditor({
   })();
 
   // LRU ソート: 最近開いたファイルを先頭に
-  const recentPathSet = new Map<string, number>(recentFiles.map((r, i): [string, number] => [r.path, i]));
+  const recentPathSet = new Map<string, number>(
+    recentFiles.map((r, i): [string, number] => [r.path, i]),
+  );
   const wikilinkCandidates = [...workspaceFiles].sort((a, b) => {
     const ai: number = recentPathSet.get(a.path) ?? Infinity;
     const bi: number = recentPathSet.get(b.path) ?? Infinity;
@@ -250,7 +256,9 @@ export function MarkdownEditor({
       WordCompleteExtension,
       TyporaFocusExtension,
       FocusModeExtension.configure({ enabled: focusMode }),
-      ...(settings.slashCommands?.enabled !== false ? [SlashCommandsExtension.configure({ onStateChange: setSlashState })] : []),
+      ...(settings.slashCommands?.enabled !== false
+        ? [SlashCommandsExtension.configure({ onStateChange: setSlashState })]
+        : []),
       VirtualScrollExtension.configure({ nodeThreshold: 500 }),
       WikilinkExtension.configure({
         onLinkClick: (target) => {
@@ -273,7 +281,12 @@ export function MarkdownEditor({
         }
 
         // Ctrl+K: リンク挿入 (keyboard-shortcuts.md §1-1)
-        if ((event.ctrlKey || event.metaKey) && event.key === 'k' && !event.shiftKey && !event.altKey) {
+        if (
+          (event.ctrlKey || event.metaKey) &&
+          event.key === 'k' &&
+          !event.shiftKey &&
+          !event.altKey
+        ) {
           event.preventDefault();
           window.dispatchEvent(new CustomEvent('editor-link-insert'));
           return true;
@@ -291,17 +304,13 @@ export function MarkdownEditor({
             if (tr) {
               // TipTap の chain API は view からは直接使えないため、
               // カスタムイベントで editor インスタンスに伝播させる
-              window.dispatchEvent(
-                new CustomEvent('editor-heading', { detail: { level } }),
-              );
+              window.dispatchEvent(new CustomEvent('editor-heading', { detail: { level } }));
             }
             return true;
           }
           if (key === '0') {
             event.preventDefault();
-            window.dispatchEvent(
-              new CustomEvent('editor-heading', { detail: { level: 0 } }),
-            );
+            window.dispatchEvent(new CustomEvent('editor-heading', { detail: { level: 0 } }));
             return true;
           }
         }
@@ -403,11 +412,7 @@ export function MarkdownEditor({
       const url = window.prompt('リンクURLを入力してください:');
       if (!url) return;
 
-      editor
-        .chain()
-        .focus()
-        .setLink({ href: url })
-        .run();
+      editor.chain().focus().setLink({ href: url }).run();
     };
     window.addEventListener('editor-link-insert', handler);
     return () => window.removeEventListener('editor-link-insert', handler);
@@ -417,11 +422,13 @@ export function MarkdownEditor({
   useEffect(() => {
     if (!editor) return;
 
+    // エディタ起点の更新が親経由で戻ってきた場合、再注入ループを避ける
+    if (initialContent === lastEmittedContentRef.current) {
+      return;
+    }
+
     const contentSizeBytes = new TextEncoder().encode(initialContent).length;
-    if (
-      contentSizeBytes >= LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES &&
-      mode === 'wysiwyg'
-    ) {
+    if (contentSizeBytes >= LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES && mode === 'wysiwyg') {
       setSourceText(initialContent);
       setMode('source');
       showToast(
@@ -454,8 +461,10 @@ export function MarkdownEditor({
 
       const json = editor.getJSON() as unknown as TipTapDoc;
       const markdown = tiptapToMarkdown(json);
+      const fullMarkdown = serializeFrontMatter(frontMatterYamlRef.current, markdown);
+      lastEmittedContentRef.current = fullMarkdown;
       // Front Matter を先頭に付けて完全な Markdown として通知
-      onContentChangeRef.current?.(serializeFrontMatter(frontMatterYamlRef.current, markdown));
+      onContentChangeRef.current?.(fullMarkdown);
     };
 
     editor.on('update', handler);
@@ -548,9 +557,17 @@ export function MarkdownEditor({
 
   // ネイティブメニューからのカスタムイベント受信
   useEffect(() => {
-    const onFind = () => { setSearchVisible(true); setShowReplace(false); };
-    const onFindReplace = () => { setSearchVisible(true); setShowReplace(true); };
-    const onTextStats = () => { setTextStatsVisible(true); };
+    const onFind = () => {
+      setSearchVisible(true);
+      setShowReplace(false);
+    };
+    const onFindReplace = () => {
+      setSearchVisible(true);
+      setShowReplace(true);
+    };
+    const onTextStats = () => {
+      setTextStatsVisible(true);
+    };
     const onEditorMode = (e: Event) => {
       const detail = (e as CustomEvent<{ mode: string }>).detail;
       if (detail.mode === 'wysiwyg' && mode === 'source') toggleMode();
@@ -560,15 +577,19 @@ export function MarkdownEditor({
       try {
         const text = await navigator.clipboard.readText();
         editor?.commands.insertContent(text);
-      } catch { /* clipboard access denied */ }
+      } catch {
+        /* clipboard access denied */
+      }
     };
     const onZoom = (e: Event) => {
       const { action } = (e as CustomEvent<{ action: string }>).detail;
       const root = document.documentElement;
       const current = parseFloat(root.style.getPropertyValue('--app-zoom') || '1');
       if (action === 'reset') root.style.setProperty('--app-zoom', '1');
-      else if (action === 'in') root.style.setProperty('--app-zoom', String(Math.min(current + 0.1, 2)));
-      else if (action === 'out') root.style.setProperty('--app-zoom', String(Math.max(current - 0.1, 0.5)));
+      else if (action === 'in')
+        root.style.setProperty('--app-zoom', String(Math.min(current + 0.1, 2)));
+      else if (action === 'out')
+        root.style.setProperty('--app-zoom', String(Math.max(current - 0.1, 0.5)));
       root.style.zoom = root.style.getPropertyValue('--app-zoom');
     };
 
@@ -596,13 +617,18 @@ export function MarkdownEditor({
       if (e.isComposing || e.keyCode === 229) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // 文字入力・スペース・バックスペース・エンターのみ
-      const isPrintable = e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Delete';
+      const isPrintable =
+        e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Delete';
       if (!isPrintable) return;
       typewriterPlayer.playKey(settings.editor.typewriterStyle, settings.editor.typewriterVolume);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [settings.editor.typewriterSound, settings.editor.typewriterStyle, settings.editor.typewriterVolume]);
+  }, [
+    settings.editor.typewriterSound,
+    settings.editor.typewriterStyle,
+    settings.editor.typewriterVolume,
+  ]);
 
   // コードブロックにコピーボタンを自動付与 (テクニカルライター/開発者ペルソナ向け)
   useEffect(() => {
@@ -644,13 +670,10 @@ export function MarkdownEditor({
   }, [editor, mode]);
 
   // ソースモードでのテキスト変更（CodeMirror から直接文字列を受け取る）
-  const handleSourceTextChange = useCallback(
-    (value: string) => {
-      setSourceText(value);
-      onContentChangeRef.current?.(value);
-    },
-    [],
-  );
+  const handleSourceTextChange = useCallback((value: string) => {
+    setSourceText(value);
+    onContentChangeRef.current?.(value);
+  }, []);
 
   // エディタ領域のクリックでフォーカスを設定
   const handleEditorAreaClick = useCallback(
@@ -705,20 +728,16 @@ export function MarkdownEditor({
   // WYSIWYG モードでの Alt+ドラッグ検知
   // editor-ux-design.md §11.3: ステータスバーにツールチップ表示
   const rectSelectNotifiedRef = useRef(false);
-  const handleWysiwygMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.altKey && !rectSelectNotifiedRef.current) {
-        rectSelectNotifiedRef.current = true;
-        useToastStore.getState().show(
-          'info',
-          '矩形選択はソースモード（Ctrl+/）でのみ利用可能です',
-        );
-        // 3秒後にフラグをリセット（連続通知を防止）
-        setTimeout(() => { rectSelectNotifiedRef.current = false; }, 3000);
-      }
-    },
-    [],
-  );
+  const handleWysiwygMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.altKey && !rectSelectNotifiedRef.current) {
+      rectSelectNotifiedRef.current = true;
+      useToastStore.getState().show('info', '矩形選択はソースモード（Ctrl+/）でのみ利用可能です');
+      // 3秒後にフラグをリセット（連続通知を防止）
+      setTimeout(() => {
+        rectSelectNotifiedRef.current = false;
+      }, 3000);
+    }
+  }, []);
 
   if (!editor) return null;
 
@@ -730,13 +749,9 @@ export function MarkdownEditor({
         onToggleMode={toggleMode}
         getMarkdown={() => getMarkdown() ?? ''}
       />
-      {editor && (
-        <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />
-      )}
+      {editor && <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />}
       {/* クイックオープンモーダル（Ctrl+P） */}
-      {quickOpenVisible && (
-        <QuickOpenModal onClose={() => setQuickOpenVisible(false)} />
-      )}
+      {quickOpenVisible && <QuickOpenModal onClose={() => setQuickOpenVisible(false)} />}
       {/* 行番号ジャンプダイアログ（Ctrl+G） */}
       {goToLineVisible && editor && (
         <GoToLineDialog
@@ -752,7 +767,11 @@ export function MarkdownEditor({
                 return false;
               }
             });
-            editor.chain().focus().setTextSelection(pos + 1).run();
+            editor
+              .chain()
+              .focus()
+              .setTextSelection(pos + 1)
+              .run();
             // スクロール
             const dom = editor.view.domAtPos(pos + 1);
             if (dom.node instanceof HTMLElement) {
@@ -778,9 +797,7 @@ export function MarkdownEditor({
             const md = htmlToMarkdown(smartPasteData.html);
             const doc = mdToTipTapForPaste(md);
             if (doc.content && doc.content.length > 0) {
-              editor.commands.insertContent(
-                doc.content as unknown as Record<string, unknown>[],
-              );
+              editor.commands.insertContent(doc.content as unknown as Record<string, unknown>[]);
             }
             setSmartPasteData(null);
           }}
@@ -800,7 +817,9 @@ export function MarkdownEditor({
             'flex-1 overflow-y-auto cursor-text relative',
             focusMode ? 'focus-mode-enabled' : '',
             typewriterMode ? 'typewriter-mode-enabled' : '',
-          ].filter(Boolean).join(' ')}
+          ]
+            .filter(Boolean)
+            .join(' ')}
           onClick={handleEditorAreaClick}
           onContextMenu={handleContextMenu}
           onMouseDown={handleWysiwygMouseDown}
@@ -844,7 +863,9 @@ export function MarkdownEditor({
               editor={editor}
               autoState={wikilinkAutoState}
               candidates={wikilinkCandidates}
-              onClose={() => setWikilinkAutoState({ active: false, query: '', from: -1, coords: null })}
+              onClose={() =>
+                setWikilinkAutoState({ active: false, query: '', from: -1, coords: null })
+              }
             />
           )}
           <div className="max-w-[800px] mx-auto px-12 py-8">
@@ -855,11 +876,7 @@ export function MarkdownEditor({
           </div>
         </div>
       ) : (
-        <SourceEditor
-          value={sourceText}
-          onChange={handleSourceTextChange}
-          readOnly={readOnly}
-        />
+        <SourceEditor value={sourceText} onChange={handleSourceTextChange} readOnly={readOnly} />
       )}
       <EditorHandle setMarkdown={setMarkdown} getMarkdown={getMarkdown} />
     </div>
@@ -905,7 +922,11 @@ function EditorToolbar({
   if (!editor) return null;
 
   return (
-    <div className="editor-toolbar flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200 bg-white flex-shrink-0 overflow-x-auto" role="toolbar" aria-label="書式ツールバー">
+    <div
+      className="editor-toolbar flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-200 bg-white flex-shrink-0 overflow-x-auto"
+      role="toolbar"
+      aria-label="書式ツールバー"
+    >
       {mode === 'wysiwyg' && (
         <>
           {/* ブロック種別セレクタ */}
@@ -958,9 +979,15 @@ function EditorToolbar({
           <ToolbarButton
             icon={
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <text x="1" y="5.5" fontSize="5" fontWeight="bold">1.</text>
-                <text x="1" y="9.5" fontSize="5" fontWeight="bold">2.</text>
-                <text x="1" y="13.5" fontSize="5" fontWeight="bold">3.</text>
+                <text x="1" y="5.5" fontSize="5" fontWeight="bold">
+                  1.
+                </text>
+                <text x="1" y="9.5" fontSize="5" fontWeight="bold">
+                  2.
+                </text>
+                <text x="1" y="13.5" fontSize="5" fontWeight="bold">
+                  3.
+                </text>
                 <rect x="6" y="3" width="8" height="2" rx="0.5" />
                 <rect x="6" y="7" width="8" height="2" rx="0.5" />
                 <rect x="6" y="11" width="8" height="2" rx="0.5" />
@@ -999,8 +1026,19 @@ function EditorToolbar({
           <ToolbarButton
             icon={
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                <rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                <text x="4" y="11" fontSize="8" fontFamily="monospace">{'{}'}</text>
+                <rect
+                  x="1"
+                  y="1"
+                  width="14"
+                  height="14"
+                  rx="2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <text x="4" y="11" fontSize="8" fontFamily="monospace">
+                  {'{}'}
+                </text>
               </svg>
             }
             tooltip="コードブロック"
@@ -1021,9 +1059,19 @@ function EditorToolbar({
             icon={
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M2 12h8v1.5H2V12zm0-1L7 3h2l5 8H2zm3.5-1.5h5L8 5.5l-2.5 4z" opacity="0" />
-                <path d="M1.5 3C1.5 2.17 2.17 1.5 3 1.5h6.5l4 4V13c0 .83-.67 1.5-1.5 1.5H3c-.83 0-1.5-.67-1.5-1.5V3z" fill="none" stroke="currentColor" strokeWidth="1.2" />
+                <path
+                  d="M1.5 3C1.5 2.17 2.17 1.5 3 1.5h6.5l4 4V13c0 .83-.67 1.5-1.5 1.5H3c-.83 0-1.5-.67-1.5-1.5V3z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                />
                 <path d="M8.5 1.5v4h4" fill="none" stroke="currentColor" strokeWidth="1.2" />
-                <path d="M4 7.5h5M4 10h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <path
+                  d="M4 7.5h5M4 10h3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                />
               </svg>
             }
             tooltip="リンク挿入 (Ctrl+K)"
@@ -1059,7 +1107,14 @@ function EditorToolbar({
       <ToolbarDivider />
       <ToolbarButton
         icon={
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 15 15"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
             <circle cx="7.5" cy="7.5" r="2" />
             <line x1="7.5" y1="1" x2="7.5" y2="3.5" />
             <line x1="7.5" y1="11.5" x2="7.5" y2="14" />
@@ -1073,7 +1128,14 @@ function EditorToolbar({
       />
       <ToolbarButton
         icon={
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 15 15"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
             <line x1="3" y1="7.5" x2="12" y2="7.5" />
             <line x1="1" y1="4" x2="14" y2="4" strokeOpacity="0.4" />
             <line x1="1" y1="11" x2="14" y2="11" strokeOpacity="0.4" />
@@ -1087,7 +1149,14 @@ function EditorToolbar({
       />
       <ToolbarButton
         icon={
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 15 15"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          >
             <rect x="1.5" y="1.5" width="12" height="12" rx="1" />
             <line x1="4" y1="5.5" x2="11" y2="5.5" />
             <line x1="4" y1="7.5" x2="11" y2="7.5" />
@@ -1109,10 +1178,7 @@ function EditorToolbar({
       {getMarkdown && mode === 'wysiwyg' && (
         <>
           <ToolbarDivider />
-          <AiCopyButton
-            getMarkdown={getMarkdown}
-            label="✨ AI コピー"
-          />
+          <AiCopyButton getMarkdown={getMarkdown} label="✨ AI コピー" />
         </>
       )}
     </div>
@@ -1182,9 +1248,7 @@ function ToolbarButton({
       aria-label={tooltip}
       aria-pressed={active}
       className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
-        active
-          ? 'bg-blue-100 text-blue-700'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        active ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       }`}
     >
       {icon}
@@ -1223,11 +1287,7 @@ function TableInsertButton({ editor }: { editor: ReturnType<typeof useEditor> })
 
   const insertTable = (rows: number, cols: number) => {
     if (!editor) return;
-    editor
-      .chain()
-      .focus()
-      .insertTable({ rows, cols, withHeaderRow: true })
-      .run();
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
     setOpen(false);
     setHovered(null);
   };
@@ -1251,7 +1311,16 @@ function TableInsertButton({ editor }: { editor: ReturnType<typeof useEditor> })
       >
         {/* テーブルアイコン */}
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <rect x="1" y="1" width="14" height="14" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+          <rect
+            x="1"
+            y="1"
+            width="14"
+            height="14"
+            rx="1.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.2"
+          />
           <line x1="1" y1="5" x2="15" y2="5" stroke="currentColor" strokeWidth="1" />
           <line x1="1" y1="9" x2="15" y2="9" stroke="currentColor" strokeWidth="1" />
           <line x1="5.5" y1="1" x2="5.5" y2="15" stroke="currentColor" strokeWidth="1" />
@@ -1260,11 +1329,7 @@ function TableInsertButton({ editor }: { editor: ReturnType<typeof useEditor> })
       </button>
 
       {open && (
-        <div
-          role="dialog"
-          aria-label="テーブルサイズ選択"
-          className="table-insert-picker"
-        >
+        <div role="dialog" aria-label="テーブルサイズ選択" className="table-insert-picker">
           <div className="table-insert-picker__label">
             {hovered ? `${hovered.rows} × ${hovered.cols}` : 'テーブルを挿入'}
           </div>
@@ -1275,8 +1340,7 @@ function TableInsertButton({ editor }: { editor: ReturnType<typeof useEditor> })
             {Array.from({ length: GRID_ROWS * GRID_COLS }, (_, i) => {
               const row = Math.floor(i / GRID_COLS) + 1;
               const col = (i % GRID_COLS) + 1;
-              const active =
-                hovered !== null && row <= hovered.rows && col <= hovered.cols;
+              const active = hovered !== null && row <= hovered.rows && col <= hovered.cols;
               return (
                 <button
                   key={i}
@@ -1348,8 +1412,17 @@ function TextTransformDropdown({ editor }: { editor: ReturnType<typeof useEditor
         className="flex items-center justify-center w-8 h-8 rounded transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <text x="2" y="12" fontSize="11" fontWeight="bold">T</text>
-          <path d="M10 11l3-3-3-3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <text x="2" y="12" fontSize="11" fontWeight="bold">
+            T
+          </text>
+          <path
+            d="M10 11l3-3-3-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
 
