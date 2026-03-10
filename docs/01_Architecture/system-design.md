@@ -968,21 +968,54 @@ const EditorModeExtension = Extension.create({
 
 ### 4.3 入力ルール（オートフォーマット）
 
-```
-トリガー → 変換:
-  "# "     → Heading 1
-  "## "    → Heading 2
-  "### "   → Heading 3
-  "- "     → Bullet List
-  "* "     → Bullet List
-  "1. "    → Ordered List
-  "> "     → Blockquote
-  "```"    → Code Block
-  "---"    → Thematic Break
-  "| "     → Table (次のEnterでテーブル生成)
-  "$$"     → Math Block
-  "- [ ] " → Task List Item
-```
+Typora式/常にWYSIWYGモードでは、Markdown 記法の一部を「入力中に構造化ノードへ変換」する。
+
+#### 4.3.1 対象トリガー（最小セット）
+
+| トリガー | 変換先 | 発火タイミング |
+|---------|--------|--------------|
+| `# ` / `## ` / `### ` / `#### ` / `##### ` / `###### ` | Heading 1〜6 | 行頭でスペース入力時 |
+| `- ` / `* ` / `+ ` | Bullet List Item | 行頭でスペース入力時 |
+| `1. `（`2. ` など連番も含む） | Ordered List Item | 行頭でスペース入力時 |
+| `> ` | Blockquote | 行頭でスペース入力時 |
+| `` ``` `` + `Enter` | Fenced Code Block | 行頭で Enter 入力時 |
+| `---` + `Enter` | Thematic Break | 行頭で Enter 入力時 |
+| `$$` + `Enter` | Math Block | 行頭で Enter 入力時 |
+| `- [ ] ` / `- [x] ` | Task List Item | 行頭で末尾スペース入力時 |
+| `| a | b |` + `Enter` | Table | 2 行目の区切り行（`| --- | --- |`）成立時 |
+
+> 変換ルールは `@tiptap/core` の InputRule / PasteRule で実装し、Markdown シリアライズ時に逆変換可能なノードへ正規化する。
+
+#### 4.3.2 ガード条件
+
+オートフォーマットは次の条件のいずれかを満たす場合に**発火しない**。
+
+1. `event.isComposing === true`（IME 変換中）
+2. カーソルが code block / math block / HTML ブロック内部にある
+3. エディタモードが「常にソース」または Split 左ペイン（CodeMirror）
+4. ユーザー設定 `editor.autoFormat.enabled === false`
+
+IME 中の誤爆防止は本プロジェクトの最重要要件であり、InputRule とキーボードハンドラの両方で同一ガードを適用する。
+
+#### 4.3.3 変換失敗時のフォールバック
+
+- パターン不一致時はプレーンテキストのまま保持し、入力を阻害しない
+- 変換処理で例外が発生した場合は `logger.warn` を記録し、トランザクションをキャンセルして入力継続
+- AST 整合性チェックに失敗した場合は当該トランザクションのみ破棄（ドキュメント全体はロールバックしない）
+
+#### 4.3.4 Undo/Redo 粒度
+
+- 「トリガー入力 + 構造変換」を 1 トランザクションとして履歴化する
+- `Ctrl+Z` 1 回で直前のオートフォーマット結果を取り消せること
+- YAML Front Matter（CodeMirror）側履歴とは統合しない（履歴スタック独立）
+
+#### 4.3.5 将来拡張（Phase 7 以降）
+
+- `*** ` → 水平線 + 段落分割
+- `1)` 記法の ordered list 入力補助
+- 連続入力時の list tight/loose 判定自動化
+
+上記は設計候補として保持し、既存仕様（最小セット）を優先する。
 
 ### 4.4 Undo/Redo
 
