@@ -25,6 +25,14 @@
       "csp": "default-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self'"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/hayashixd/MarkWeave/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
