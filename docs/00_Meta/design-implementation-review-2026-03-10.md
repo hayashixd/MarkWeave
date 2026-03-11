@@ -230,7 +230,46 @@ rg -n "performance\.now|virtual|throttle|debounce|forceSimulation|restart_app|se
 
 ---
 
-## 6. 変更履歴
+## 6. 是正実施ログ
+
+### 2026-03-11: P0 是正（第一弾）
+
+#### 6.1 IME ガード横断適用（§3.3 対応）
+
+以下のコンポーネント/拡張の Enter キーハンドラに `isComposing` ガードを追加:
+
+| ファイル | 修正箇所 |
+|---------|---------|
+| `src/components/SmartPaste/SmartPasteBar.tsx` | `window` keydown ハンドラに `isComposing \|\| keyCode === 229` ガード追加 |
+| `src/components/HtmlMeta/MetadataPanel.tsx` | `handleCssKeyDown` / `handleJsKeyDown` に `nativeEvent.isComposing` ガード追加 |
+| `src/components/sidebar/FileTreePanel.tsx` | リネーム入力・新規ファイル入力の Enter に `nativeEvent.isComposing` ガード追加 |
+| `src/components/editor/FrontMatterPanel.tsx` | 削除ボタンの `onKeyDown` Enter に `nativeEvent.isComposing` ガード追加 |
+| `src/extensions/SlashCommandsExtension.ts` | `handleKeyDown` 先頭に `isComposing \|\| keyCode === 229` ガード追加 |
+| `src/extensions/WordCompleteExtension.tsx` | 既にガード済み（修正不要） |
+
+#### 6.2 IPC SoT 整合化（§3.5 対応）
+
+| 不一致項目 | 是正内容 |
+|-----------|---------|
+| `restart_app` 未実装 | `src-tauri/src/commands/window_commands.rs` に実装を追加、`lib.rs` に登録 |
+| `emit_to_window` 未実装 | `src-tauri/src/commands/window_sync.rs` に実装を追加、`lib.rs` に登録 |
+| `set_title_bar_dirty` 命名ドリフト | `tauri-ipc-interface.md` §9 を実装名 `set_title_dirty` に合わせて修正 |
+| `emit_to_window` 設計書不在 | `tauri-ipc-interface.md` §9 に型定義を追記 |
+
+#### 6.3 残存課題（次回以降）
+
+以下は本セッションでは未着手。P1/P2 として継続管理:
+
+- i18n 基盤導入（P0 だが大規模タスク、feature-list.md で管理済み）
+- 配布・自動更新導線の最小接続（P1）
+- 性能設計の差分解消（ノード数閾値、自動保存 fire-and-forget 化）（P0〜P1）
+- メタデータクエリ `BETWEEN ... AND ...` 文法堅牢化（P1）
+- `feature-list.md` ステータス正規化（P2）
+
+---
+
+## 7. 変更履歴
 
 - 2026-03-10: 初版レビューを4観点で再編し、統合版として再構成。
 - 2026-03-10: `performance-design.md` 観点（準拠点/不一致点）と追加主要指摘（IPC SoT, restart_app, BETWEEN, ステータス整合）を追補。
+- 2026-03-11: P0 是正第一弾を実施。IME ガード横断適用（6箇所）、IPC SoT 整合化（restart_app / emit_to_window 実装、set_title_dirty 命名修正）。

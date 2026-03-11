@@ -87,6 +87,8 @@ export const SlashCommandsExtension = Extension.create<SlashCommandsOptions>({
               return true;
             }
 
+            if (event.isComposing || event.keyCode === 229) return false;
+
             if (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'Enter' || event.key === 'Tab') {
               // キーボードナビゲーションはメニュー UI 側で処理
               // ここでは TipTap のデフォルト処理を抑制する

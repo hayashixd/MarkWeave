@@ -33,6 +33,7 @@ export function SmartPasteBar({ onMarkdown, onPlainText, onDismiss }: SmartPaste
   // キーボード操作
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'Enter') {
         e.preventDefault();
         onMarkdown();

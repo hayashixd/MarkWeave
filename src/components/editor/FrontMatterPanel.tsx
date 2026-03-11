@@ -130,7 +130,7 @@ export function FrontMatterPanel({ yaml, onChange }: FrontMatterPanelProps) {
             title="フロントマターを削除"
             role="button"
             tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleDelete(e as unknown as React.MouseEvent); }}
+            onKeyDown={(e) => { if (!e.nativeEvent.isComposing && e.key === 'Enter') handleDelete(e as unknown as React.MouseEvent); }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8">
               <line x1="2" y1="2" x2="10" y2="10" />

@@ -24,3 +24,13 @@ pub fn set_title_dirty(
         .set_title(&title)
         .map_err(|e| format!("タイトルバーの更新に失敗しました: {}", e))
 }
+
+/// アプリケーションを再起動する。
+///
+/// tauri-ipc-interface.md §8 に準拠:
+/// - 単一起動モードと競合しないよう Tauri の再起動 API を利用する
+#[tauri::command]
+pub fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
+    app.restart();
+    Ok(())
+}

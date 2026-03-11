@@ -63,6 +63,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
   };
 
   const handleCssKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       addCssLink();
@@ -70,6 +71,7 @@ export const MetadataPanel: React.FC<MetadataPanelProps> = ({
   };
 
   const handleJsKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter') {
       e.preventDefault();
       addJsLink();
