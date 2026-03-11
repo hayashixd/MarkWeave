@@ -402,11 +402,9 @@ const safeMode = await invoke<boolean>('is_safe_mode_active');
 ### `restart_app`
 
 ```typescript
-interface RestartAppArgs {
-  safeMode: boolean;
-}
-// Rust シグネチャ: pub async fn restart_app(safe_mode: bool) -> Result<(), String>
-await invoke<void>('restart_app', { safeMode: false });
+// Rust シグネチャ: pub fn restart_app(app: AppHandle) -> Result<(), String>
+await invoke<void>('restart_app');
+// 注: セーフモード制御は別コマンド set_safe_mode で事前に切り替えてから呼び出す
 ```
 
 ---

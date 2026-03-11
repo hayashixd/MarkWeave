@@ -1,2 +1,50 @@
 {
+  "aria": {
+    "markdownEditor": "Markdown Editor",
+    "editorArea": "Editor Area"
+  },
+  "statusBar": {
+    "tab": "Tab: {{size}}",
+    "spaces": "Spaces: {{size}}",
+    "indentStyle": {
+      "spaces": "Spaces",
+      "tabs": "Tabs"
+    },
+    "indentSettings": "Indent Settings",
+    "indentStyle_label": "Style",
+    "tabWidth": "Tab Width",
+    "lineEnding": "Line Ending",
+    "encoding": "Encoding",
+    "fileFormat": "File Format (click for conversion menu)",
+    "saveAsOther": "Save As Other",
+    "saveAsMarkdown": "Save as Markdown (.md)",
+    "saveAsHtml": "Save as HTML (.html)",
+    "readingTime": "{{minutes}} min read",
+    "readingTimeTooltip": "Estimated reading time (approx. 250 words/min): {{charCount}} characters",
+    "readability": "Readability: {{score}}",
+    "readabilityTooltip": "Readability score: {{score}}/100 ({{label}})\nKanji ratio: {{kanjiRatio}}%\nAvg sentence length: {{avgSentenceLength}} chars/sentence",
+    "writingGoal": "Writing goal: {{current}} / {{target}} chars",
+    "writingGoalCount": "{{current}} / {{target}} chars",
+    "draftTooltip": "draft: true is set in YAML Front Matter"
+  },
+  "readOnly": {
+    "label": "Read-only (being edited in another window)",
+    "acquireEdit": "Acquire edit access"
+  },
+  "welcome": {
+    "tagline": "Write, convert, hand off to AI — all in one place",
+    "newFile": "New File",
+    "openFile": "Open File",
+    "recentFiles": "Recent Files",
+    "new": "New",
+    "open": "Open",
+    "zenMode": "Zen Mode",
+    "focusMode": "Focus Mode"
+  },
+  "dailyNote": {
+    "dayNames": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    "todaysTasks": "Today's Tasks",
+    "notes": "Notes",
+    "reflection": "Reflection"
+  }
 }

@@ -1,2 +1,39 @@
 {
+  "actions": {
+    "save": "Save",
+    "saveAs": "Save As",
+    "saveAndClose": "Save and Close",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "rename": "Rename",
+    "open": "Open",
+    "newFile": "New File",
+    "openFile": "Open File",
+    "openFolder": "Open Folder",
+    "undo": "Undo",
+    "redo": "Redo"
+  },
+  "status": {
+    "ready": "Ready",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "unsaved": "Unsaved",
+    "modified": "Modified",
+    "draft": "Draft"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} hr ago",
+    "daysAgo": "{{count}} days ago"
+  },
+  "confirm": {
+    "unsavedChanges": "You have unsaved changes. Are you sure you want to close?"
+  },
+  "dropOverlay": {
+    "dropHere": "Drop here to open",
+    "supportedFormats": "Supports .md / .html files",
+    "orDropFile": "Or drop a file here"
+  }
 }

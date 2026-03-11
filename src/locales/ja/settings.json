@@ -1,2 +1,11 @@
 {
+  "title": "設定",
+  "tabs": {
+    "general": "一般",
+    "editor": "エディタ",
+    "appearance": "外観",
+    "templates": "テンプレート",
+    "snippets": "スニペット",
+    "plugins": "プラグイン"
+  }
 }

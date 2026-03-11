@@ -1,2 +1,11 @@
 {
+  "title": "Settings",
+  "tabs": {
+    "general": "General",
+    "editor": "Editor",
+    "appearance": "Appearance",
+    "templates": "Templates",
+    "snippets": "Snippets",
+    "plugins": "Plugins"
+  }
 }
