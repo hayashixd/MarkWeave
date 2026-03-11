@@ -91,6 +91,7 @@
 | AI テンプレート | `view_ai_templates` | Ctrl+Shift+3 | AI テンプレート | AppShell |
 | バックリンク | `view_backlinks` | Ctrl+Shift+4 | バックリンクパネル | AppShell |
 | タグビュー | `view_tags` | Ctrl+Shift+5 | タグビュー | AppShell |
+| Git パネル | `view_git` | Ctrl+Shift+7 | Git パネル | AppShell |
 | ─ セパレータ ─ | | | | |
 | フローティング目次 | `view_floating_toc` | Ctrl+Shift+T | フローティング TOC パネル | AppShell |
 | ペイン分割 | `view_split_pane` | Ctrl+\\ | SplitEditorLayout | AppShell |

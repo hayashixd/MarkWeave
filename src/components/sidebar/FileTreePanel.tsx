@@ -20,6 +20,8 @@ import { readFile } from '../../lib/tauri-commands';
 import { updateMarkdownLinksInWorkspace, updateWikilinksInWorkspace, undoWikilinkUpdate } from '../../lib/link-updater';
 import { useToastStore } from '../../store/toastStore';
 import { useMetadataStore } from '../../features/metadata/metadataStore';
+import { useGitStore } from '../../store/gitStore';
+import { useSettingsStore } from '../../store/settingsStore';
 import { logger } from '../../utils/logger';
 
 interface FileTreePanelProps {
@@ -181,6 +183,16 @@ export function FileTreePanel({ onOpenFolder }: FileTreePanelProps) {
  * - ファイルノードをドラッグして別フォルダへ移動
  * - ディレクトリノードがドロップターゲットになる
  */
+/** Git バッジ色・ラベルのマッピング */
+const GIT_BADGE_MAP: Record<string, { label: string; className: string }> = {
+  modified: { label: 'M', className: 'text-orange-500' },
+  added: { label: 'A', className: 'text-green-600' },
+  deleted: { label: 'D', className: 'text-red-500' },
+  renamed: { label: 'R', className: 'text-orange-500' },
+  untracked: { label: 'U', className: 'text-green-600' },
+  conflicted: { label: 'C', className: 'text-red-600 font-bold' },
+};
+
 function FileTreeNodeItem({
   node,
   depth,
@@ -193,6 +205,32 @@ function FileTreeNodeItem({
   const { toggleNode, createFile, deleteFile, renameFile, moveFile } = useWorkspaceStore();
   const rebuildMetadataIndex = useMetadataStore((s) => s.rebuildIndex);
   const { addTab, tabs } = useTabStore();
+  const showGitBadges = useSettingsStore((s) => s.settings.git.showFileTreeBadges);
+  const gitStatuses = useGitStore((s) => s.fileStatuses);
+  const isGitRepo = useGitStore((s) => s.isGitRepo);
+
+  // ファイル or フォルダの Git バッジを計算
+  const gitBadge = (() => {
+    if (!showGitBadges || !isGitRepo) return null;
+    // ワークスペースルートからの相対パスで比較
+    const relPath = node.path.startsWith(workspaceRoot)
+      ? node.path.slice(workspaceRoot.length).replace(/^[/\\]/, '')
+      : node.path;
+
+    if (node.type === 'file') {
+      // ファイル: 完全一致
+      const fileStatus = gitStatuses.find((s) => s.path === relPath);
+      if (!fileStatus) return null;
+      const badge = GIT_BADGE_MAP[fileStatus.status];
+      return badge ? { label: badge.label, className: badge.className } : null;
+    } else {
+      // フォルダ: 配下の変更ファイル数を集計
+      const prefix = relPath ? relPath + '/' : '';
+      const count = gitStatuses.filter((s) => s.path.startsWith(prefix)).length;
+      return count > 0 ? { label: String(count), className: 'text-gray-500' } : null;
+    }
+  })();
+
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -415,9 +453,19 @@ function FileTreeNodeItem({
             }}
           />
         ) : (
-          <span className="file-tree-node__name" title={node.path}>
-            {node.type === 'directory' ? `📁 ${node.name}` : node.name}
-          </span>
+          <>
+            <span className="file-tree-node__name flex-1 truncate" title={node.path}>
+              {node.type === 'directory' ? `📁 ${node.name}` : node.name}
+            </span>
+            {gitBadge && (
+              <span
+                className={`file-tree-node__git-badge text-xs font-mono ml-1 flex-shrink-0 ${gitBadge.className}`}
+                aria-label={`Git: ${gitBadge.label}`}
+              >
+                [{gitBadge.label}]
+              </span>
+            )}
+          </>
         )}
       </div>
 

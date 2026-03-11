@@ -7,6 +7,7 @@ mod models;
 use commands::db_commands;
 use commands::export_commands;
 use commands::fs_commands;
+use commands::git_commands;
 use commands::plugin_commands;
 use commands::recent_files;
 use commands::window_commands;
@@ -71,6 +72,13 @@ pub fn run() {
             db_commands::execute_metadata_query,
             db_commands::get_graph_data,
             db_commands::get_backlinks,
+            git_commands::git_status,
+            git_commands::git_diff,
+            git_commands::git_stage,
+            git_commands::git_unstage,
+            git_commands::git_commit,
+            git_commands::git_log,
+            git_commands::git_branch_info,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
