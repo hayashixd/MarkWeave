@@ -244,8 +244,10 @@ function splitWhereConditions(text: string): string[] {
       const after = i + 3 >= text.length || /\s/.test(text[i + 3]);
       if (before && after) {
         // BETWEEN ... AND ... の AND かどうかを判定
-        // current に BETWEEN が含まれ、まだ value2 が来ていない場合は区切りではない
-        if (/\bBETWEEN\s+["']?[^"']*["']?\s*$/i.test(current.trimEnd())) {
+        // current から引用符内の文字列を除去してから BETWEEN キーワードを検出する
+        // これにより CONTAINS "foo between bar" 等の誤検出を防ぐ
+        const unquoted = current.replace(/["'][^"']*["']/g, '""');
+        if (/\bBETWEEN\s+["']?[^"']*["']?\s*$/i.test(unquoted.trimEnd())) {
           current += text.slice(i, i + 3);
           i += 3;
           continue;

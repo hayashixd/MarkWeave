@@ -179,6 +179,27 @@ describe('parseQuery - BETWEEN...AND 文法堅牢化', () => {
     });
   });
 
+  it('文字列リテラル内の "between" を BETWEEN キーワードと誤認しない', () => {
+    const ast = parseQuery(`
+      SELECT title, status
+      FROM files
+      WHERE title CONTAINS "foo between bar"
+      AND status = "active"
+      VIEW table
+    `);
+    expect(ast.where).toHaveLength(2);
+    expect(ast.where[0]).toEqual({
+      field: 'title',
+      operator: 'CONTAINS',
+      value: 'foo between bar',
+    });
+    expect(ast.where[1]).toEqual({
+      field: 'status',
+      operator: '=',
+      value: 'active',
+    });
+  });
+
   it('引用符なしの BETWEEN 値もパースできる', () => {
     const ast = parseQuery(`
       SELECT title
