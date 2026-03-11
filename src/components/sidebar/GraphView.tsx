@@ -222,6 +222,9 @@ export function GraphView({
       .on('drag', (event, d) => {
         d.fx = event.x;
         d.fy = event.y;
+
+        // 大規模グラフでは tick を間引くため、ドラッグ中は手動で座標を反映する
+        applyGraphPositions();
       })
       .on('end', (event, d) => {
         if (!event.active) simulation.alphaTarget(0);
@@ -247,8 +250,7 @@ export function GraphView({
         .attr('pointer-events', 'none');
     }
 
-    if (isLargeGraph) {
-      // 事前計算済み: 静的に座標を適用
+    const applyGraphPositions = () => {
       link
         .attr('x1', (d) => ((d.source as SimNode).x ?? 0))
         .attr('y1', (d) => ((d.source as SimNode).y ?? 0))
@@ -262,23 +264,14 @@ export function GraphView({
           .attr('x', (d) => (d.x ?? 0))
           .attr('y', (d) => (d.y ?? 0));
       }
+    };
+
+    if (isLargeGraph) {
+      // 事前計算済み: 静的に座標を適用
+      applyGraphPositions();
     } else {
       // 小規模グラフ: リアルタイム tick 更新
-      simulation.on('tick', () => {
-        link
-          .attr('x1', (d) => ((d.source as SimNode).x ?? 0))
-          .attr('y1', (d) => ((d.source as SimNode).y ?? 0))
-          .attr('x2', (d) => ((d.target as SimNode).x ?? 0))
-          .attr('y2', (d) => ((d.target as SimNode).y ?? 0));
-        node
-          .attr('cx', (d) => (d.x ?? 0))
-          .attr('cy', (d) => (d.y ?? 0));
-        if (label) {
-          label
-            .attr('x', (d) => (d.x ?? 0))
-            .attr('y', (d) => (d.y ?? 0));
-        }
-      });
+      simulation.on('tick', applyGraphPositions);
     }
 
     return () => {
