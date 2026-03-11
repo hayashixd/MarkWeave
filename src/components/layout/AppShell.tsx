@@ -203,7 +203,7 @@ export function AppShell() {
   // ファイルダイアログ
   const openFileDialog = useOpenFileDialog();
   const saveAsDialog = useSaveAsDialog();
-  const { openWorkspace, loadRecentWorkspaces } = useWorkspaceStore();
+  const { root: workspaceRoot, openWorkspace, loadRecentWorkspaces } = useWorkspaceStore();
 
   // 起動時に最近使ったワークスペース履歴を読み込む（Phase 7）
   useEffect(() => {
@@ -742,6 +742,7 @@ export function AppShell() {
           onOpenFolder={openFolderDialog}
           currentFilePath={activeTab?.filePath ?? null}
           currentFileName={activeTab?.fileName ?? ''}
+          workspaceRoot={workspaceRoot}
         />
 
         {/* エディタエリア - Phase 7: ペイン分割対応 */}

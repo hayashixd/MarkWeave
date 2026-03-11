@@ -14,6 +14,8 @@ import { useRef, useCallback, useEffect } from 'react';
 import { useTabStore } from '../store/tabStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { useToastStore } from '../store/toastStore';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { useMetadataStore } from '../features/metadata/metadataStore';
 
 interface AutoSaveOptions {
   tabId: string;
@@ -31,6 +33,8 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
   const { settings } = useSettingsStore();
   const { getTab, markSaved } = useTabStore();
   const show = useToastStore((s) => s.show);
+  const workspaceRoot = useWorkspaceStore((s) => s.root);
+  const updateIndex = useMetadataStore((s) => s.updateIndex);
 
   // デバウンス保存のスケジュール
   const scheduleSave = useCallback(() => {
@@ -61,6 +65,12 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
         await writeFn(currentTab.filePath, currentTab.content);
         markSaved(tabId);
         pendingSaveRef.current = false;
+        // Wikiリンクインデックス更新（wikilinks-backlinks-design.md §5.2）
+        if (workspaceRoot && currentTab.filePath) {
+          updateIndex(currentTab.filePath, workspaceRoot).then(() => {
+            window.dispatchEvent(new Event('wikilink-index-updated'));
+          }).catch(() => { /* インデックス更新失敗は無視 */ });
+        }
       } catch (err) {
         const fileName = currentTab.filePath.split(/[/\\]/).pop() ?? currentTab.filePath;
         const detail = err instanceof Error ? err.message : String(err);
@@ -69,7 +79,7 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
         isSavingRef.current = false;
       }
     }, settings.file.autoSaveDelay);
-  }, [tabId, settings.file.autoSaveDelay, getTab, markSaved, writeFn, isComposing, show]);
+  }, [tabId, settings.file.autoSaveDelay, getTab, markSaved, writeFn, isComposing, show, workspaceRoot, updateIndex]);
 
   // 即時保存（Ctrl+S 用）
   const saveNow = useCallback(async () => {
@@ -86,6 +96,12 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
       await writeFn(tab.filePath, tab.content);
       markSaved(tabId);
       pendingSaveRef.current = false;
+      // Wikiリンクインデックス更新（wikilinks-backlinks-design.md §5.2）
+      if (workspaceRoot && tab.filePath) {
+        updateIndex(tab.filePath, workspaceRoot).then(() => {
+          window.dispatchEvent(new Event('wikilink-index-updated'));
+        }).catch(() => { /* インデックス更新失敗は無視 */ });
+      }
     } catch (err) {
       const fileName = tab.filePath.split(/[/\\]/).pop() ?? tab.filePath;
       const detail = err instanceof Error ? err.message : String(err);
@@ -93,7 +109,7 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
     } finally {
       isSavingRef.current = false;
     }
-  }, [tabId, getTab, markSaved, writeFn, show]);
+  }, [tabId, getTab, markSaved, writeFn, show, workspaceRoot, updateIndex]);
 
   // IME 変換終了後の pending 保存を処理
   const flushPendingSave = useCallback(() => {

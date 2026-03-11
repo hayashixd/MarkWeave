@@ -43,6 +43,8 @@ interface SidebarProps {
   currentFilePath?: string | null;
   /** バックリンクパネル用: アクティブなタブのファイル名 */
   currentFileName?: string;
+  /** ワークスペースルートパス（バックリンクパネル用） */
+  workspaceRoot?: string | null;
 }
 
 export function Sidebar({
@@ -54,6 +56,7 @@ export function Sidebar({
   onOpenFolder,
   currentFilePath = null,
   currentFileName = '',
+  workspaceRoot = null,
 }: SidebarProps) {
   const [internalTab, setInternalTab] = useState<SidebarTab>('outline');
   const activeTab = controlledTab ?? internalTab;
@@ -222,6 +225,7 @@ export function Sidebar({
             <BacklinksPanel
               currentFilePath={currentFilePath}
               currentFileName={currentFileName}
+              workspaceRoot={workspaceRoot}
             />
           </div>
         )}

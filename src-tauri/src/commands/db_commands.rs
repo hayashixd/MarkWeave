@@ -48,6 +48,147 @@ pub async fn execute_metadata_query(
     queries::execute_query(&conn, &sql)
 }
 
+// ─── バックリンク取得 ─────────────────────────────────────────────────────────
+
+/// バックリンクエントリ（wikilinks-backlinks-design.md §4, §5）
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinkResult {
+    /// リンク元ファイルの相対パス
+    pub source_path: String,
+    /// リンク元ファイル名（拡張子なし）
+    pub source_name: String,
+    /// リンク元ファイルのタイトル（frontmatter title）
+    pub source_title: Option<String>,
+    /// マッチした周辺テキスト（コンテキスト）
+    pub contexts: Vec<String>,
+}
+
+/// 指定ファイルへのバックリンク（Wikiリンク）一覧を取得する。
+///
+/// SQLite の links テーブルを使い、ワークスペース全体からバックリンクを検索する。
+/// BacklinksPanel がワークスペースモードで使用する。
+#[tauri::command]
+pub async fn get_backlinks(
+    db: State<'_, MetadataDb>,
+    file_path: String,
+    workspace_root: String,
+) -> Result<Vec<BacklinkResult>, String> {
+    let conn = db.lock()?;
+
+    // 対象ファイルの file_id を取得
+    let target_file_id: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM files WHERE path = ?1",
+            params![&file_path],
+            |row| row.get(0),
+        )
+        .ok();
+
+    // 対象ファイルのベース名（拡張子なし、小文字）でもマッチ
+    let target_name = std::path::Path::new(&file_path)
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+
+    // バックリンクを検索: target_file_id が一致 OR target_name がファイル名に一致
+    let sql = if let Some(tid) = target_file_id {
+        format!(
+            "SELECT DISTINCT f.path, f.name, f.title, l.target_name \
+             FROM links l \
+             JOIN files f ON l.source_file_id = f.id \
+             WHERE l.link_type = 'wiki' \
+               AND (l.target_file_id = {} OR LOWER(l.target_name) = ?1) \
+             ORDER BY f.path",
+            tid
+        )
+    } else {
+        "SELECT DISTINCT f.path, f.name, f.title, l.target_name \
+         FROM links l \
+         JOIN files f ON l.source_file_id = f.id \
+         WHERE l.link_type = 'wiki' AND LOWER(l.target_name) = ?1 \
+         ORDER BY f.path"
+            .to_string()
+    };
+
+    let mut stmt = conn
+        .prepare(&sql)
+        .map_err(|e| format!("バックリンク検索準備エラー: {}", e))?;
+
+    let rows: Vec<(String, String, Option<String>, String)> = stmt
+        .query_map(params![target_name], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .map_err(|e| format!("バックリンク検索エラー: {}", e))?
+        .collect::<rusqlite::Result<_>>()
+        .map_err(|e| format!("バックリンク読み取りエラー: {}", e))?;
+
+    // 各ソースファイルからコンテキストを抽出
+    let ws_root = std::path::Path::new(&workspace_root);
+    let mut results: Vec<BacklinkResult> = Vec::new();
+
+    for (source_path, source_name, source_title, _target_name) in &rows {
+        let abs_path = ws_root.join(source_path);
+        let contexts = match std::fs::read_to_string(&abs_path) {
+            Ok(content) => extract_wikilink_contexts(&content, &target_name, 3),
+            Err(_) => vec![],
+        };
+
+        results.push(BacklinkResult {
+            source_path: source_path.clone(),
+            source_name: source_name.clone(),
+            source_title: source_title.clone(),
+            contexts,
+        });
+    }
+
+    Ok(results)
+}
+
+/// ファイル内容から Wikiリンクの周辺テキスト（コンテキスト）を抽出する
+fn extract_wikilink_contexts(content: &str, target_name: &str, max_count: usize) -> Vec<String> {
+    let pattern = format!(
+        r"\[\[{}(?:\|[^\]]+)?\]\]",
+        regex::escape(target_name)
+    );
+    let re = match regex::RegexBuilder::new(&pattern)
+        .case_insensitive(true)
+        .build()
+    {
+        Ok(r) => r,
+        Err(_) => return vec![],
+    };
+
+    let mut contexts = Vec::new();
+    for m in re.find_iter(content) {
+        if contexts.len() >= max_count {
+            break;
+        }
+        let start = content[..m.start()]
+            .char_indices()
+            .rev()
+            .nth(59)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        let end = content[m.end()..]
+            .char_indices()
+            .nth(59)
+            .map(|(i, _)| m.end() + i + 1)
+            .unwrap_or(content.len());
+
+        let mut snippet = content[start..end].replace('\n', " ");
+        snippet = snippet.trim().to_string();
+        if start > 0 {
+            snippet = format!("…{}", snippet);
+        }
+        if end < content.len() {
+            snippet = format!("{}…", snippet);
+        }
+        contexts.push(snippet);
+    }
+    contexts
+}
+
 // ─── グラフビュー用型定義 ─────────────────────────────────────────────────────
 
 /// グラフビュー用のノード（wikilinks-backlinks-design.md §11.2）

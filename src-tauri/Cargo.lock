@@ -2185,6 +2185,7 @@ dependencies = [
  "dirs 5.0.1",
  "log",
  "notify",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",
