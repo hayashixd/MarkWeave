@@ -251,7 +251,7 @@ pub fn resolve_links(conn: &Connection) -> Result<(), String> {
         .map_err(|e| format!("resolve_links: update 準備エラー: {}", e))?;
 
     for (link_id, target_name) in &unresolved {
-        let target_lower = target_name.to_lowercase();
+        let target_lower = normalize_wikilink_target(target_name).to_lowercase();
 
         // §6.1 解決優先順位:
         // 1. パス指定（dir/name）のマッチ
@@ -277,6 +277,15 @@ pub fn resolve_links(conn: &Connection) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Wikiリンク解決用に target_name を正規化する。
+///
+/// `[[note#heading]]` / `[[note|label]]` / `[[dir/note#heading|label]]` 形式を
+/// 解決時には `note` / `dir/note` として扱う。
+fn normalize_wikilink_target(target_name: &str) -> &str {
+    let no_alias = target_name.split('|').next().unwrap_or(target_name);
+    no_alias.split('#').next().unwrap_or(no_alias)
 }
 
 /// ワークスペースルートからの相対パスを生成する
