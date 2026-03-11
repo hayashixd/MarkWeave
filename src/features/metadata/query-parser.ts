@@ -167,6 +167,14 @@ function conditionToSql(cond: WhereCondition): string {
   if (!BUILTIN_FIELDS.has(cond.field)) {
     // frontmatter フィールド
     const col = `(SELECT fm.value FROM frontmatter fm WHERE fm.file_id = f.id AND fm.key = ${quote(cond.field)} LIMIT 1)`;
+    if (cond.operator === 'BETWEEN') {
+      return `${col} BETWEEN ${quote(cond.value)} AND ${quote(cond.value2)}`;
+    }
+    if (cond.operator === 'IS NULL') return `${col} IS NULL`;
+    if (cond.operator === 'IS NOT NULL') return `${col} IS NOT NULL`;
+    if (cond.operator === 'CONTAINS') {
+      return `${col} LIKE ${quote('%' + cond.value + '%')}`;
+    }
     return `${col} ${operatorToSql(cond.operator)} ${quote(cond.value)}`;
   }
   const col = builtinToColumn(cond.field);
@@ -203,9 +211,72 @@ function operatorToSql(op: string): string {
   return op === 'CONTAINS' ? 'LIKE' : op;
 }
 
+/**
+ * WHERE 句をトークンベースで分割する。
+ * BETWEEN ... AND ... の AND を条件区切りと誤認しないよう、
+ * 単純な正規表現分割ではなくトークナイザを使用する。
+ */
+function splitWhereConditions(text: string): string[] {
+  const conditions: string[] = [];
+  let current = '';
+  let i = 0;
+
+  while (i < text.length) {
+    // 引用符内はスキップ
+    if (text[i] === '"' || text[i] === "'") {
+      const quote = text[i];
+      current += quote;
+      i++;
+      while (i < text.length && text[i] !== quote) {
+        current += text[i];
+        i++;
+      }
+      if (i < text.length) {
+        current += text[i]; // closing quote
+        i++;
+      }
+      continue;
+    }
+
+    // AND キーワードの検出（単語境界チェック付き）
+    if (/\bAND\b/i.test(text.slice(i, i + 4))) {
+      const before = i === 0 || /\s/.test(text[i - 1]);
+      const after = i + 3 >= text.length || /\s/.test(text[i + 3]);
+      if (before && after) {
+        // BETWEEN ... AND ... の AND かどうかを判定
+        // current に BETWEEN が含まれ、まだ value2 が来ていない場合は区切りではない
+        if (/\bBETWEEN\s+["']?[^"']*["']?\s*$/i.test(current.trimEnd())) {
+          current += text.slice(i, i + 3);
+          i += 3;
+          continue;
+        }
+        // 条件区切りの AND
+        const trimmed = current.trim();
+        if (trimmed) {
+          conditions.push(trimmed);
+        }
+        current = '';
+        i += 3;
+        continue;
+      }
+    }
+
+    current += text[i];
+    i++;
+  }
+
+  const trimmed = current.trim();
+  if (trimmed) {
+    conditions.push(trimmed);
+  }
+
+  return conditions;
+}
+
 function parseWhereClause(text: string): WhereCondition[] {
-  return text.split(/\bAND\b/i).map((part) => {
-    const trimmed = part.trim();
+  const parts = splitWhereConditions(text);
+
+  return parts.map((trimmed) => {
     const betweenM = trimmed.match(
       /^(\w+)\s+BETWEEN\s+["']?([^"']+)["']?\s+AND\s+["']?([^"']+)["']?$/i,
     );
@@ -213,8 +284,8 @@ function parseWhereClause(text: string): WhereCondition[] {
       return {
         field: betweenM[1].toLowerCase(),
         operator: 'BETWEEN' as const,
-        value: betweenM[2],
-        value2: betweenM[3],
+        value: betweenM[2].trim(),
+        value2: betweenM[3].trim(),
       };
     }
     const containsM = trimmed.match(
