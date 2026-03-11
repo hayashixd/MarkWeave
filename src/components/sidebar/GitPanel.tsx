@@ -161,8 +161,9 @@ export function GitPanel({ workspaceRoot }: GitPanelProps) {
   const refreshLog = useGitStore((s) => s.refreshLog);
   const commitLog = useGitStore((s) => s.commitLog);
   const showToast = useToastStore((s) => s.show);
+  const storeRoot = useWorkspaceStore((s) => s.root);
 
-  const wsRoot = workspaceRoot ?? useWorkspaceStore((s) => s.root);
+  const wsRoot = workspaceRoot ?? storeRoot;
 
   const [commitMessage, setCommitMessage] = useState('');
   const [showHistory, setShowHistory] = useState(false);

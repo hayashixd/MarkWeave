@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { parseQuery, astToSql } from './query-parser';
-import type { WhereCondition } from './query-parser';
 
 describe('parseQuery', () => {
   it('基本的な SELECT / FROM / VIEW をパースできる', () => {
@@ -52,13 +51,13 @@ describe('parseQuery', () => {
       VIEW table
     `);
     expect(ast.where).toHaveLength(3);
-    expect(ast.where[0].operator).toBe('CONTAINS');
-    expect(ast.where[1]).toEqual({
+    expect(ast.where[0]!.operator).toBe('CONTAINS');
+    expect(ast.where[1]!).toEqual({
       field: 'status',
       operator: '=',
       value: 'active',
     });
-    expect(ast.where[2]).toEqual({
+    expect(ast.where[2]!).toEqual({
       field: 'wordcount',
       operator: '>',
       value: 500,
@@ -150,12 +149,12 @@ describe('parseQuery - BETWEEN...AND 文法堅牢化', () => {
       VIEW table
     `);
     expect(ast.where).toHaveLength(2);
-    expect(ast.where[0].operator).toBe('BETWEEN');
-    expect(ast.where[0].value).toBe('2026-01-01');
-    expect(ast.where[0].value2).toBe('2026-06-30');
-    expect(ast.where[1].operator).toBe('BETWEEN');
-    expect(ast.where[1].value).toBe('2026-03-01');
-    expect(ast.where[1].value2).toBe('2026-03-31');
+    expect(ast.where[0]!.operator).toBe('BETWEEN');
+    expect(ast.where[0]!.value).toBe('2026-01-01');
+    expect(ast.where[0]!.value2).toBe('2026-06-30');
+    expect(ast.where[1]!.operator).toBe('BETWEEN');
+    expect(ast.where[1]!.value).toBe('2026-03-01');
+    expect(ast.where[1]!.value2).toBe('2026-03-31');
   });
 
   it('BETWEEN + CONTAINS + 比較演算子が混在するクエリ', () => {
@@ -168,11 +167,11 @@ describe('parseQuery - BETWEEN...AND 文法堅牢化', () => {
       VIEW table
     `);
     expect(ast.where).toHaveLength(3);
-    expect(ast.where[0].operator).toBe('CONTAINS');
-    expect(ast.where[1].operator).toBe('BETWEEN');
-    expect(ast.where[1].value).toBe('2026-01-01');
-    expect(ast.where[1].value2).toBe('2026-12-31');
-    expect(ast.where[2]).toEqual({
+    expect(ast.where[0]!.operator).toBe('CONTAINS');
+    expect(ast.where[1]!.operator).toBe('BETWEEN');
+    expect(ast.where[1]!.value).toBe('2026-01-01');
+    expect(ast.where[1]!.value2).toBe('2026-12-31');
+    expect(ast.where[2]!).toEqual({
       field: 'wordcount',
       operator: '>=',
       value: 1000,
@@ -208,7 +207,7 @@ describe('parseQuery - BETWEEN...AND 文法堅牢化', () => {
       VIEW table
     `);
     expect(ast.where).toHaveLength(1);
-    expect(ast.where[0].operator).toBe('BETWEEN');
+    expect(ast.where[0]!.operator).toBe('BETWEEN');
   });
 });
 

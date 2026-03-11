@@ -10,7 +10,7 @@
  * unified diff を解析して行番号ごとのマーカーを生成する。
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useGitStore } from '../../store/gitStore';
 import { useSettingsStore } from '../../store/settingsStore';
 
@@ -39,7 +39,7 @@ export function parseDiffMarkers(diff: string): DiffLineMarker[] {
   for (const line of lines) {
     const hunkMatch = line.match(hunkHeaderRe);
     if (hunkMatch) {
-      currentLine = parseInt(hunkMatch[1], 10);
+      currentLine = parseInt(hunkMatch[1]!, 10);
       continue;
     }
 

@@ -61,6 +61,7 @@ export const FocusModeExtension = Extension.create<FocusModeOptions>({
   },
 
   addProseMirrorPlugins() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- needed to access extension options in ProseMirror plugin callbacks
     const self = this;
     return [
       new Plugin({

@@ -36,7 +36,7 @@ export const useMetadataStore = create<MetadataQueryStore>(() => ({
     const rows: QueryResultRow[] = result.rows.map((row) => {
       const fields: Record<string, string | number | null> = {};
       result.columns.forEach((col, idx) => {
-        fields[col] = row[idx];
+        fields[col] = row[idx] ?? null;
       });
       return {
         path: (fields['path'] as string) ?? '',
