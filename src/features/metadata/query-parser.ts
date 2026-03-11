@@ -48,7 +48,7 @@ export function parseQuery(queryText: string): QueryAST {
 
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i];
+    const line = lines[i]!;
 
     if (/^SELECT\s+/i.test(line)) {
       ast.select = line
@@ -59,16 +59,16 @@ export function parseQuery(queryText: string): QueryAST {
       // FROM files は固定なのでスキップ
     } else if (/^WHERE\s+/i.test(line)) {
       let whereText = line.replace(/^WHERE\s+/i, '');
-      while (i + 1 < lines.length && /^AND\s+/i.test(lines[i + 1])) {
+      while (i + 1 < lines.length && /^AND\s+/i.test(lines[i + 1]!)) {
         i++;
-        whereText += ' AND ' + lines[i].replace(/^AND\s+/i, '');
+        whereText += ' AND ' + lines[i]!.replace(/^AND\s+/i, '');
       }
       ast.where = parseWhereClause(whereText);
     } else if (/^ORDER BY\s+/i.test(line)) {
       const m = line.match(/^ORDER BY\s+(\w+)\s*(ASC|DESC)?$/i);
       if (m) {
         ast.orderBy = {
-          field: m[1].toLowerCase(),
+          field: m[1]!.toLowerCase(),
           direction: (m[2]?.toUpperCase() as 'ASC' | 'DESC') ?? 'DESC',
         };
       }
@@ -159,34 +159,37 @@ export function astToSql(ast: QueryAST): string {
 }
 
 function conditionToSql(cond: WhereCondition): string {
+  const val = cond.value ?? '';
+  const val2 = cond.value2 ?? '';
+
   if (cond.field === 'tags') {
     if (cond.operator === 'CONTAINS') {
-      return `EXISTS (SELECT 1 FROM tags t2 WHERE t2.file_id = f.id AND t2.tag = ${quote(cond.value)})`;
+      return `EXISTS (SELECT 1 FROM tags t2 WHERE t2.file_id = f.id AND t2.tag = ${quote(val)})`;
     }
   }
   if (!BUILTIN_FIELDS.has(cond.field)) {
     // frontmatter フィールド
     const col = `(SELECT fm.value FROM frontmatter fm WHERE fm.file_id = f.id AND fm.key = ${quote(cond.field)} LIMIT 1)`;
     if (cond.operator === 'BETWEEN') {
-      return `${col} BETWEEN ${quote(cond.value)} AND ${quote(cond.value2)}`;
+      return `${col} BETWEEN ${quote(val)} AND ${quote(val2)}`;
     }
     if (cond.operator === 'IS NULL') return `${col} IS NULL`;
     if (cond.operator === 'IS NOT NULL') return `${col} IS NOT NULL`;
     if (cond.operator === 'CONTAINS') {
-      return `${col} LIKE ${quote('%' + cond.value + '%')}`;
+      return `${col} LIKE ${quote('%' + val + '%')}`;
     }
-    return `${col} ${operatorToSql(cond.operator)} ${quote(cond.value)}`;
+    return `${col} ${operatorToSql(cond.operator)} ${quote(val)}`;
   }
   const col = builtinToColumn(cond.field);
   if (cond.operator === 'BETWEEN') {
-    return `${col} BETWEEN ${quote(cond.value)} AND ${quote(cond.value2)}`;
+    return `${col} BETWEEN ${quote(val)} AND ${quote(val2)}`;
   }
   if (cond.operator === 'IS NULL') return `${col} IS NULL`;
   if (cond.operator === 'IS NOT NULL') return `${col} IS NOT NULL`;
   if (cond.operator === 'CONTAINS') {
-    return `${col} LIKE ${quote('%' + cond.value + '%')}`;
+    return `${col} LIKE ${quote('%' + val + '%')}`;
   }
-  return `${col} ${operatorToSql(cond.operator)} ${quote(cond.value)}`;
+  return `${col} ${operatorToSql(cond.operator)} ${quote(val)}`;
 }
 
 function builtinToColumn(field: string): string {
@@ -240,8 +243,8 @@ function splitWhereConditions(text: string): string[] {
 
     // AND キーワードの検出（単語境界チェック付き）
     if (/\bAND\b/i.test(text.slice(i, i + 4))) {
-      const before = i === 0 || /\s/.test(text[i - 1]);
-      const after = i + 3 >= text.length || /\s/.test(text[i + 3]);
+      const before = i === 0 || /\s/.test(text[i - 1]!);
+      const after = i + 3 >= text.length || /\s/.test(text[i + 3]!);
       if (before && after) {
         // BETWEEN ... AND ... の AND かどうかを判定
         // current から引用符内の文字列を除去してから BETWEEN キーワードを検出する
@@ -284,10 +287,10 @@ function parseWhereClause(text: string): WhereCondition[] {
     );
     if (betweenM) {
       return {
-        field: betweenM[1].toLowerCase(),
+        field: betweenM[1]!.toLowerCase(),
         operator: 'BETWEEN' as const,
-        value: betweenM[2].trim(),
-        value2: betweenM[3].trim(),
+        value: betweenM[2]!.trim(),
+        value2: betweenM[3]!.trim(),
       };
     }
     const containsM = trimmed.match(
@@ -295,22 +298,22 @@ function parseWhereClause(text: string): WhereCondition[] {
     );
     if (containsM) {
       return {
-        field: containsM[1].toLowerCase(),
+        field: containsM[1]!.toLowerCase(),
         operator: 'CONTAINS' as const,
-        value: containsM[2],
+        value: containsM[2]!,
       };
     }
     const isNullM = trimmed.match(/^(\w+)\s+IS\s+NULL$/i);
     if (isNullM) {
       return {
-        field: isNullM[1].toLowerCase(),
+        field: isNullM[1]!.toLowerCase(),
         operator: 'IS NULL' as const,
       };
     }
     const isNotNullM = trimmed.match(/^(\w+)\s+IS\s+NOT\s+NULL$/i);
     if (isNotNullM) {
       return {
-        field: isNotNullM[1].toLowerCase(),
+        field: isNotNullM[1]!.toLowerCase(),
         operator: 'IS NOT NULL' as const,
       };
     }
@@ -318,11 +321,11 @@ function parseWhereClause(text: string): WhereCondition[] {
       /^(\w+)\s*(!=|>=|<=|>|<|=)\s*["']?([^"']+)["']?$/,
     );
     if (opM) {
-      const val = opM[3];
+      const val = opM[3]!;
       const numVal = Number(val);
       return {
-        field: opM[1].toLowerCase(),
-        operator: opM[2] as WhereCondition['operator'],
+        field: opM[1]!.toLowerCase(),
+        operator: opM[2]! as WhereCondition['operator'],
         value: isNaN(numVal) ? val : numVal,
       };
     }

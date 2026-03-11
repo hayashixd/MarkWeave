@@ -51,6 +51,7 @@ export const SlashCommandsExtension = Extension.create<SlashCommandsOptions>({
   },
 
   addProseMirrorPlugins() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- needed to access extension options in ProseMirror plugin callbacks
     const self = this;
 
     return [

@@ -126,6 +126,7 @@ export const WikilinkExtension = Node.create<WikilinkOptions>({
 
   addProseMirrorPlugins() {
     const pluginKey = new PluginKey('wikilinkInput');
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- needed to access extension options in ProseMirror plugin callbacks
     const extension = this;
     /** `[[` が検出された位置（オートコンプリート開始） */
     let autoFrom = -1;

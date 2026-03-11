@@ -598,6 +598,7 @@ export function AppShell() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleNewTab, handleCloseTab, getActiveTab, getTab, saveNow, settings.editor.zenMode, updateSettings, splitPane, setActivePaneId]);
 
   // デイリーノート作成関数 (知識管理者ペルソナ向け)
@@ -943,7 +944,6 @@ function EmptyState({
   onOpenFile: () => void;
   recentFiles: import('../../store/recentFilesStore').RecentFileEntry[];
 }) {
-  const { addRecentFile: _addRecent } = useRecentFilesStore();
   const openFileAsTab = useOpenFileAsTab();
   const { t } = useTranslation(['common', 'editor']);
 
@@ -1172,6 +1172,7 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
   // 可読性スコア
   const readability = useMemo(
     () => (tab ? calculateReadability(tab.content) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [tab?.content],
   );
 

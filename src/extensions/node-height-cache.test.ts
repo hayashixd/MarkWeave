@@ -15,6 +15,7 @@ function mockNode(typeName: string, textContent: string) {
   return {
     type: { name: typeName },
     textContent,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal mock for ProseMirrorNode
   } as any;
 }
 
