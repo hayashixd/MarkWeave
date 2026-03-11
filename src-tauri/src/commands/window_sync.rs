@@ -224,6 +224,21 @@ pub async fn detach_tab_to_window(
     Ok(label)
 }
 
+/// 指定ウィンドウにイベントを送信する。
+///
+/// window-tab-session-design.md §12.3 に準拠:
+/// フロントエンドから他ウィンドウへのイベント送信を仲介する。
+#[tauri::command]
+pub fn emit_to_window(
+    app: AppHandle,
+    label: String,
+    event: String,
+    payload: serde_json::Value,
+) -> Result<(), String> {
+    app.emit_to(&label, &event, payload)
+        .map_err(|e| format!("ウィンドウへのイベント送信に失敗しました: {}", e))
+}
+
 /// ウィンドウ連番カウンタ
 pub struct WindowCounter(Mutex<u32>);
 

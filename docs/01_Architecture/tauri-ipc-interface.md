@@ -413,12 +413,12 @@ await invoke<void>('restart_app', { safeMode: false });
 
 ## 9. ウィンドウ・アプリ管理コマンド
 
-### `set_title_bar_dirty`
+### `set_title_dirty`
 
 ```typescript
-// Rust シグネチャ: pub async fn set_title_bar_dirty(dirty: bool, file_name: Option<String>) -> Result<(), String>
-await invoke<void>('set_title_bar_dirty', { dirty: true, fileName: 'README.md' });
-// 効果: タイトルバーに「● README.md - Editor」と表示（Windows の WM_SETTEXT 経由）
+// Rust シグネチャ: pub fn set_title_dirty(window: Window, dirty: bool, file_name: Option<String>) -> Result<(), String>
+await invoke<void>('set_title_dirty', { dirty: true, fileName: 'README.md' });
+// 効果: タイトルバーに「● README.md - MarkWeave」と表示
 ```
 
 ### `get_app_version`
@@ -507,6 +507,22 @@ const transferred = await invoke<boolean>('transfer_file_lock', {
 await invoke<void>('notify_write_access_denied', {
   filePath: '/path/to/file.md',
   requesterLabel: 'detached-1',
+});
+```
+
+### `emit_to_window`
+
+```typescript
+interface EmitToWindowArgs {
+  label: string;        // 送信先ウィンドウの label
+  event: string;        // イベント名
+  payload: unknown;     // 任意のペイロード
+}
+// Rust シグネチャ: pub fn emit_to_window(app: AppHandle, label: String, event: String, payload: serde_json::Value) -> Result<(), String>
+await invoke<void>('emit_to_window', {
+  label: 'detached-1',
+  event: 'write-access-transfer-requested',
+  payload: { filePath: '...', requesterLabel: 'main', ownerLabel: 'detached-1' },
 });
 ```
 

@@ -409,6 +409,7 @@ function FileTreeNodeItem({
             onChange={(e) => setInputValue(e.target.value)}
             onBlur={handleInputSubmit}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
               if (e.key === 'Enter') { void handleInputSubmit(); }
               if (e.key === 'Escape') { setIsRenaming(false); }
             }}
@@ -456,6 +457,7 @@ function FileTreeNodeItem({
             onChange={(e) => setInputValue(e.target.value)}
             onBlur={handleInputSubmit}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
               if (e.key === 'Enter') { void handleInputSubmit(); }
               if (e.key === 'Escape') { setIsCreating(false); }
             }}
