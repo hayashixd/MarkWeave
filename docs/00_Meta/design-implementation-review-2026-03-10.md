@@ -281,3 +281,4 @@ rg -n "performance\.now|virtual|throttle|debounce|forceSimulation|restart_app|se
 - 2026-03-10: `performance-design.md` 観点（準拠点/不一致点）と追加主要指摘（IPC SoT, restart_app, BETWEEN, ステータス整合）を追補。
 - 2026-03-11: P0 是正第一弾を実施。IME ガード横断適用（6箇所）、IPC SoT 整合化（restart_app / emit_to_window 実装、set_title_dirty 命名修正）。
 - 2026-03-11: P0 是正完了を確認。残存課題（i18n・配布導線・性能設計差分・メタデータクエリ堅牢化）を P1/P2 として再分類。§2 統合サマリー・§5 是正アクション・§6.3 残存課題を更新。
+- 2026-03-11: P1 是正を実施。i18n 基盤導入（i18next + react-i18next、AppShell t()化）、配布導線（updater設定枠・release.yml）、性能設計差分解消（ノード数閾値・fire-and-forget・デバウンス可変化・D3大規模グラフ最適化）、運用スクリプト（bump-version.mjs）。
