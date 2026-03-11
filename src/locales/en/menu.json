@@ -1,2 +1,40 @@
 {
+  "file": {
+    "label": "File",
+    "newFile": "New File",
+    "openFile": "Open File",
+    "openFolder": "Open Folder",
+    "save": "Save",
+    "saveAs": "Save As",
+    "export": "Export",
+    "print": "Print",
+    "close": "Close",
+    "quit": "Quit"
+  },
+  "edit": {
+    "label": "Edit",
+    "undo": "Undo",
+    "redo": "Redo",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "selectAll": "Select All",
+    "find": "Find",
+    "findReplace": "Find and Replace"
+  },
+  "view": {
+    "label": "View",
+    "sidebar": "Sidebar",
+    "zenMode": "Zen Mode",
+    "focusMode": "Focus Mode",
+    "sourceMode": "Source Mode",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "resetZoom": "Reset Zoom"
+  },
+  "help": {
+    "label": "Help",
+    "about": "About MarkWeave",
+    "checkForUpdates": "Check for Updates"
+  }
 }

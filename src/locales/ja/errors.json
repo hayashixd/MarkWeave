@@ -1,2 +1,16 @@
 {
+  "file": {
+    "readFailed": "ファイルの読み込みに失敗しました",
+    "writeFailed": "ファイルの保存に失敗しました",
+    "notFound": "ファイルが見つかりません",
+    "permissionDenied": "ファイルへのアクセスが拒否されました"
+  },
+  "editor": {
+    "parseFailed": "Markdown の解析に失敗しました",
+    "exportFailed": "エクスポートに失敗しました"
+  },
+  "general": {
+    "unexpected": "予期しないエラーが発生しました",
+    "networkError": "ネットワークエラーが発生しました"
+  }
 }
