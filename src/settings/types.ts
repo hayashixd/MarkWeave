@@ -106,6 +106,20 @@ export interface ExportSettings {
   pandocPath: string;
 }
 
+/** Git 統合設定（git-integration-design.md §9） */
+export interface GitSettings {
+  /** Git 統合の有効/無効 */
+  enabled: boolean;
+  /** ファイルツリーのバッジ表示 */
+  showFileTreeBadges: boolean;
+  /** ガターの差分インジケーター */
+  showGutterIndicators: boolean;
+  /** ステータスバーのブランチ表示 */
+  showStatusBarBranch: boolean;
+  /** 自動更新間隔（秒、0 で無効） */
+  autoPollInterval: number;
+}
+
 /** アプリ設定の全体型 */
 export interface AppSettings {
   /** 設定ファイルのバージョン。マイグレーションに使用 */
@@ -117,6 +131,7 @@ export interface AppSettings {
   aiCopy: AiCopySettings;
   slashCommands: SlashCommandSettings;
   export: ExportSettings;
+  git: GitSettings;
 }
 
 /** ネストされたオブジェクトの部分更新用ユーティリティ型 */

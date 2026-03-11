@@ -41,6 +41,7 @@ mod ids {
     pub const VIEW_AI_TEMPLATES: &str = "view_ai_templates";
     pub const VIEW_BACKLINKS: &str = "view_backlinks";
     pub const VIEW_TAGS: &str = "view_tags";
+    pub const VIEW_GIT: &str = "view_git";
     pub const VIEW_FLOATING_TOC: &str = "view_floating_toc";
     pub const VIEW_SPLIT_PANE: &str = "view_split_pane";
     pub const VIEW_FOCUS_MODE: &str = "view_focus_mode";
@@ -235,6 +236,11 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<(), Box<dyn std::error::Error>
         .item(
             &MenuItemBuilder::with_id(ids::VIEW_TAGS, "タグビュー")
                 .accelerator("CmdOrCtrl+Shift+5")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id(ids::VIEW_GIT, "Git パネル")
+                .accelerator("CmdOrCtrl+Shift+7")
                 .build(app)?,
         )
         .separator()

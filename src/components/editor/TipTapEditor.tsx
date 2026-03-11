@@ -84,6 +84,8 @@ import { useRecentFilesStore } from '../../store/recentFilesStore';
 import { AmbientSoundControl } from './AmbientSoundControl';
 import { typewriterPlayer } from '../../lib/typewriter-sound';
 import { VirtualScrollExtension } from '../../extensions/VirtualScrollExtension';
+import { GitGutterIndicator } from './GitGutterIndicator';
+import { useTabStore } from '../../store/tabStore';
 
 export type EditorMode = 'wysiwyg' | 'source';
 
@@ -132,6 +134,13 @@ export function MarkdownEditor({
   const { settings, updateSettings } = useSettingsStore();
   const focusMode = settings.editor.focusMode;
   const typewriterMode = settings.editor.typewriterMode;
+
+  // Git ガター差分インジケーター用（Phase 7.5）
+  const workspaceRootForGit = useWorkspaceStore((s) => s.root);
+  const activeTabFilePath = useTabStore((s) => {
+    const activeId = s.activeTabId;
+    return s.tabs.find((t) => t.id === activeId)?.filePath ?? null;
+  });
 
   // 検索バーの状態
   const [searchVisible, setSearchVisible] = useState(false);
@@ -895,6 +904,13 @@ export function MarkdownEditor({
           onContextMenu={handleContextMenu}
           onMouseDown={handleWysiwygMouseDown}
         >
+          {/* Git ガター差分インジケーター (Phase 7.5) */}
+          <GitGutterIndicator
+            repoPath={workspaceRootForGit}
+            filePath={activeTabFilePath}
+            lineHeight={Math.round(settings.appearance.editorFontSize * settings.appearance.editorLineHeight)}
+            editorContainerRef={editorWrapperRef}
+          />
           {/* YAML Front Matter パネル (Phase 7) */}
           <div className="max-w-[800px] mx-auto px-12 pt-6">
             <FrontMatterPanel

@@ -81,4 +81,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   export: {
     pandocPath: '',
   },
+  git: {
+    enabled: true,
+    showFileTreeBadges: true,
+    showGutterIndicators: true,
+    showStatusBarBranch: true,
+    autoPollInterval: 30,
+  },
 };

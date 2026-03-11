@@ -67,6 +67,7 @@ import { FloatingTocPanel } from '../Outline/FloatingTocPanel';
 import { useMenuListener } from '../../hooks/useMenuListener';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
+import { useGitStore } from '../../store/gitStore';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -211,6 +212,21 @@ export function AppShell() {
   useEffect(() => {
     loadRecentWorkspaces();
   }, [loadRecentWorkspaces]);
+
+  // Git 統合: ワークスペース変更時に Git 状態を更新しポーリングを開始 (Phase 7.5)
+  const gitSettings = useSettingsStore((s) => s.settings.git);
+  useEffect(() => {
+    const gitStore = useGitStore.getState();
+    if (workspaceRoot && gitSettings.enabled) {
+      gitStore.refreshAll(workspaceRoot);
+      gitStore.startPolling(workspaceRoot, gitSettings.autoPollInterval);
+    } else {
+      gitStore.reset();
+    }
+    return () => {
+      gitStore.stopPolling();
+    };
+  }, [workspaceRoot, gitSettings.enabled, gitSettings.autoPollInterval]);
 
   // HTML ↔ MD 変換フック（Phase 6）
   const {
@@ -695,6 +711,7 @@ export function AppShell() {
     view_ai_templates: () => { setSidebarOpen(true); setSidebarTab('ai'); },
     view_backlinks: () => { setSidebarOpen(true); setSidebarTab('backlinks'); },
     view_tags: () => { setSidebarOpen(true); setSidebarTab('tags'); },
+    view_git: () => { setSidebarOpen(true); setSidebarTab('git'); },
     view_floating_toc: () => setFloatingTocOpen((v) => !v),
     view_split_pane: () => {
       const tab = getActiveTab();
@@ -1057,6 +1074,36 @@ function countWritingChars(content: string): number {
   return text.length;
 }
 
+/**
+ * ステータスバー内の Git ブランチ情報ウィジェット。
+ * git-integration-design.md §4.2 に準拠。
+ */
+function GitStatusBarWidget() {
+  const showBranch = useSettingsStore((s) => s.settings.git.showStatusBarBranch);
+  const isGitRepo = useGitStore((s) => s.isGitRepo);
+  const branchInfo = useGitStore((s) => s.branchInfo);
+
+  if (!showBranch || !isGitRepo || !branchInfo) return null;
+
+  const parts: string[] = [];
+  if (branchInfo.modifiedCount > 0) parts.push(`M:${branchInfo.modifiedCount}`);
+  if (branchInfo.untrackedCount > 0) parts.push(`U:${branchInfo.untrackedCount}`);
+  if (branchInfo.stagedCount > 0) parts.push(`S:${branchInfo.stagedCount}`);
+  if (branchInfo.conflictedCount > 0) parts.push(`C:${branchInfo.conflictedCount}`);
+
+  return (
+    <span
+      className="text-gray-500 cursor-pointer hover:text-gray-700 transition-colors"
+      title={`ブランチ: ${branchInfo.branch ?? '(detached)'}\n${parts.join(' ') || '変更なし'}`}
+    >
+      ⎇ {branchInfo.branch ?? '(detached)'}
+      {parts.length > 0 && (
+        <span className="ml-1 text-orange-500">{parts.join(' ')}</span>
+      )}
+    </span>
+  );
+}
+
 function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
   tab: ReturnType<typeof useTabStore.getState>['tabs'][number] | null;
   onSaveAsMarkdown?: () => void;
@@ -1183,6 +1230,8 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
             {t('editor:statusBar.readability', { score: readability.score })}
           </span>
         )}
+        {/* Git ブランチ情報 (git-integration-design.md §4.2) */}
+        <GitStatusBarWidget />
         {/* インデント設定 */}
         <div ref={indentRef} className="relative">
           <button

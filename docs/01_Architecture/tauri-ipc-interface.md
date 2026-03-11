@@ -388,6 +388,37 @@ interface GitCommitResult {
 const result = await invoke<GitCommitResult>('git_commit', { repoPath: '...', message: 'feat: ...' });
 ```
 
+### `git_log`
+
+```typescript
+interface GitCommitInfo {
+  sha: string;
+  shortSha: string;
+  message: string;
+  author: string;
+  authorEmail: string;
+  timestamp: number; // Unix タイムスタンプ（秒）
+}
+
+// Rust シグネチャ: pub async fn git_log(repo_path: String, limit: Option<usize>) -> Result<Vec<GitCommitInfo>, String>
+const commits = await invoke<GitCommitInfo[]>('git_log', { repoPath: '...', limit: 50 });
+```
+
+### `git_branch_info`
+
+```typescript
+interface GitBranchInfo {
+  branch: string | null;
+  modifiedCount: number;
+  untrackedCount: number;
+  stagedCount: number;
+  conflictedCount: number;
+}
+
+// Rust シグネチャ: pub async fn git_branch_info(repo_path: String) -> Result<GitBranchInfo, String>
+const info = await invoke<GitBranchInfo>('git_branch_info', { repoPath: '...' });
+```
+
 ---
 
 ## 8. プラグイン管理コマンド

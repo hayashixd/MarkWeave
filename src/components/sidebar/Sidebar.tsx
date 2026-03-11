@@ -29,8 +29,9 @@ import { TemplatePanel } from '../AiPanel/TemplatePanel';
 import { BacklinksPanel } from './BacklinksPanel';
 import { TagViewPanel } from './TagViewPanel';
 import { GraphViewPanel } from './GraphViewPanel';
+import { GitPanel } from './GitPanel';
 
-export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks' | 'tags' | 'graph';
+export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks' | 'tags' | 'graph' | 'git';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -169,6 +170,17 @@ export function Sidebar({
           >
             🕸 Graph
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'git'}
+            aria-controls="sidebar-panel-git"
+            className={`sidebar-tab ${activeTab === 'git' ? 'sidebar-tab--active' : ''} whitespace-nowrap`}
+            onClick={() => setActiveTab('git')}
+            title="Git (Ctrl+Shift+7)"
+          >
+            ⎇ Git
+          </button>
         </div>
         <button
           type="button"
@@ -246,6 +258,16 @@ export function Sidebar({
             className="h-full"
           >
             <GraphViewPanel />
+          </div>
+        )}
+        {activeTab === 'git' && (
+          <div
+            id="sidebar-panel-git"
+            role="tabpanel"
+            aria-labelledby="tab-git"
+            className="h-full"
+          >
+            <GitPanel workspaceRoot={workspaceRoot} />
           </div>
         )}
       </div>
