@@ -65,6 +65,8 @@ import { WordSprintWidget } from '../wordSprint/WordSprintWidget';
 import { calculateReadability, getReadabilityLabel } from '../../lib/readability-score';
 import { FloatingTocPanel } from '../Outline/FloatingTocPanel';
 import { useMenuListener } from '../../hooks/useMenuListener';
+import { useTranslation } from 'react-i18next';
+import i18next from 'i18next';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -320,7 +322,7 @@ export function AppShell() {
         // Phase 1 では window.confirm を使用。
         // Phase 3 以降で Tauri ダイアログに置き換え。
         const confirmed = window.confirm(
-          '変更が保存されていません。閉じてもよろしいですか？',
+          i18next.t('confirm.unsavedChanges'),
         );
         if (!confirmed) return;
       }
@@ -589,7 +591,7 @@ export function AppShell() {
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     const dateStr = `${yyyy}-${mm}-${dd}`;
-    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    const dayNames = i18next.t('editor:dailyNote.dayNames', { returnObjects: true }) as string[];
     const dayName = dayNames[now.getDay()];
 
     const content = [
@@ -602,15 +604,15 @@ export function AppShell() {
       '',
       `# ${dateStr} (${dayName})`,
       '',
-      '## 今日のタスク',
+      `## ${i18next.t('editor:dailyNote.todaysTasks')}`,
       '',
       '- [ ] ',
       '',
-      '## メモ',
+      `## ${i18next.t('editor:dailyNote.notes')}`,
       '',
       '',
       '',
-      '## 振り返り',
+      `## ${i18next.t('editor:dailyNote.reflection')}`,
       '',
       '',
     ].join('\n');
@@ -725,13 +727,13 @@ export function AppShell() {
     <div
       className={['app-shell flex flex-col h-screen relative', zenMode ? 'zen-mode' : ''].filter(Boolean).join(' ')}
       role="application"
-      aria-label="Markdown エディタ"
+      aria-label={i18next.t('editor:aria.markdownEditor')}
     >
       {/* タブバー */}
       <TabBar onCloseTab={handleCloseTab} onNewTab={handleNewTab} onDetachTab={handleDetachTab} />
 
       {/* メインエリア */}
-      <main id="editor-panel" className="flex flex-1 min-h-0" role="main" aria-label="エディタ領域">
+      <main id="editor-panel" className="flex flex-1 min-h-0" role="main" aria-label={i18next.t('editor:aria.editorArea')}>
         {/* サイドバー */}
         <Sidebar
           isOpen={sidebarOpen}
@@ -773,7 +775,7 @@ export function AppShell() {
           )}
           renderReadOnlyBanner={(tab: TabState) => (
             <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-b border-amber-200 text-sm text-amber-800" role="status">
-              <span>🔒 読み取り専用（別のウィンドウで編集中）</span>
+              <span>🔒 {i18next.t('editor:readOnly.label')}</span>
               <button
                 type="button"
                 className="ml-2 px-3 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-amber-900 text-xs font-medium transition-colors"
@@ -783,7 +785,7 @@ export function AppShell() {
                   }
                 }}
               >
-                編集権限を取得する
+                {i18next.t('editor:readOnly.acquireEdit')}
               </button>
             </div>
           )}
@@ -878,6 +880,7 @@ export function AppShell() {
  * file-workspace-design.md §15.3 に準拠。
  */
 function DropOverlay() {
+  const { t } = useTranslation('common');
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-blue-500/10 border-2 border-dashed border-blue-400 pointer-events-none">
       <div className="flex flex-col items-center gap-3 bg-white/90 rounded-xl px-10 py-8 shadow-lg">
@@ -896,10 +899,10 @@ function DropOverlay() {
           <polyline points="9 15 12 12 15 15" />
         </svg>
         <p className="text-lg font-medium text-gray-700">
-          ここにドロップして開く
+          {t('dropOverlay.dropHere')}
         </p>
         <p className="text-sm text-gray-400">
-          .md / .html ファイルに対応
+          {t('dropOverlay.supportedFormats')}
         </p>
       </div>
     </div>
@@ -925,6 +928,7 @@ function EmptyState({
 }) {
   const { addRecentFile: _addRecent } = useRecentFilesStore();
   const openFileAsTab = useOpenFileAsTab();
+  const { t } = useTranslation(['common', 'editor']);
 
   const handleOpenRecent = useCallback(async (path: string) => {
     await openFileAsTab(path);
@@ -935,10 +939,10 @@ function EmptyState({
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
-    if (minutes < 1) return 'たった今';
-    if (minutes < 60) return `${minutes}分前`;
-    if (hours < 24) return `${hours}時間前`;
-    if (days < 7) return `${days}日前`;
+    if (minutes < 1) return t('common:time.justNow');
+    if (minutes < 60) return t('common:time.minutesAgo', { count: minutes });
+    if (hours < 24) return t('common:time.hoursAgo', { count: hours });
+    if (days < 7) return t('common:time.daysAgo', { count: days });
     return new Date(ms).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
   };
 
@@ -954,7 +958,7 @@ function EmptyState({
             <line x1="16" y1="17" x2="8" y2="17" />
           </svg>
           <h1 className="text-2xl font-bold text-gray-800 mb-1">MarkWeave</h1>
-          <p className="text-sm text-gray-400">書く・変換する・AIに渡す — 全部ここで</p>
+          <p className="text-sm text-gray-400">{t('editor:welcome.tagline')}</p>
         </div>
 
         {/* アクション */}
@@ -968,7 +972,7 @@ function EmptyState({
               <line x1="7" y1="1" x2="7" y2="13" />
               <line x1="1" y1="7" x2="13" y2="7" />
             </svg>
-            新しいファイル
+            {t('editor:welcome.newFile')}
           </button>
           <button
             type="button"
@@ -978,14 +982,14 @@ function EmptyState({
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
-            ファイルを開く
+            {t('editor:welcome.openFile')}
           </button>
         </div>
 
         {/* 最近使ったファイル */}
         {recentFiles.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">最近使ったファイル</h2>
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('editor:welcome.recentFiles')}</h2>
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden divide-y divide-gray-100">
               {recentFiles.slice(0, 8).map((entry) => {
                 const fileExt = entry.name.split('.').pop()?.toUpperCase() ?? 'MD';
@@ -1020,21 +1024,21 @@ function EmptyState({
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-gray-400">
           <span>
             <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+N</kbd>
-            {' '}新規
+            {' '}{t('editor:welcome.new')}
           </span>
           <span>
             <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+O</kbd>
-            {' '}開く
+            {' '}{t('editor:welcome.open')}
           </span>
           <span>
             <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">F11</kbd>
-            {' '}Zen モード
+            {' '}{t('editor:welcome.zenMode')}
           </span>
           <span>
             <kbd className="px-1.5 py-0.5 bg-gray-200 rounded text-gray-600 font-mono">Ctrl+Shift+F</kbd>
-            {' '}フォーカスモード
+            {' '}{t('editor:welcome.focusMode')}
           </span>
-          <span className="text-gray-300">またはここにファイルをドロップ</span>
+          <span className="text-gray-300">{t('common:dropOverlay.orDropFile')}</span>
         </div>
       </div>
     </div>
@@ -1089,12 +1093,13 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
     return () => document.removeEventListener('pointerdown', handler);
   }, [encodingPopover, lineEndingPopover, indentPopover, fileTypePopover]);
 
+  const { t } = useTranslation(['common', 'editor']);
   const encodings: FileEncoding[] = ['UTF-8', 'UTF-8 BOM', 'Shift-JIS', 'EUC-JP'];
   const lineEndings: LineEnding[] = ['LF', 'CRLF'];
 
   const indentLabel = settings.editor.indentStyle === 'tabs'
-    ? `タブ: ${settings.editor.sourceTabSize}`
-    : `スペース: ${settings.editor.sourceTabSize}`;
+    ? t('editor:statusBar.tab', { size: settings.editor.sourceTabSize })
+    : t('editor:statusBar.spaces', { size: settings.editor.sourceTabSize });
 
   // 執筆目標文字数
   const writingGoal = settings.editor.writingGoal;
@@ -1128,21 +1133,21 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
       <div className="flex items-center gap-3">
         {tab ? (
           <>
-            <span>{tab.filePath ?? '未保存'}</span>
+            <span>{tab.filePath ?? t('common:status.unsaved')}</span>
             {tab.isDirty && (
-              <span className="text-orange-500">● 変更あり</span>
+              <span className="text-orange-500">● {t('common:status.modified')}</span>
             )}
             {/* 下書きバッジ (YAML Front Matter: draft: true) */}
             {isDraft && (
-              <span className="status-bar__draft-badge" title="YAML Front Matter に draft: true が設定されています">
-                下書き
+              <span className="status-bar__draft-badge" title={t('editor:statusBar.draftTooltip')}>
+                {t('common:status.draft')}
               </span>
             )}
             {/* 執筆目標進捗 */}
             {writingGoal > 0 && (
-              <div className="flex items-center gap-1.5" title={`執筆目標: ${charCount.toLocaleString()} / ${writingGoal.toLocaleString()}文字`}>
+              <div className="flex items-center gap-1.5" title={t('editor:statusBar.writingGoal', { current: charCount.toLocaleString(), target: writingGoal.toLocaleString() })}>
                 <span className={goalReached ? 'text-green-600 font-medium' : 'text-gray-500'}>
-                  {charCount.toLocaleString()} / {writingGoal.toLocaleString()}文字
+                  {t('editor:statusBar.writingGoalCount', { current: charCount.toLocaleString(), target: writingGoal.toLocaleString() })}
                 </span>
                 <div className="w-20 h-1.5 bg-gray-300 rounded-full overflow-hidden">
                   <div
@@ -1155,7 +1160,7 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
             )}
           </>
         ) : (
-          <span>準備完了</span>
+          <span>{t('common:status.ready')}</span>
         )}
       </div>
       <div className="flex items-center gap-3">
@@ -1165,17 +1170,17 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
         <WordSprintWidget charCount={charCount} />
         {/* 読了時間 (ブロガー向け) */}
         {tab && readingTimeMin > 0 && (
-          <span className="text-gray-400" title={`推定読了時間（約500文字/分で計算）: ${charCount.toLocaleString()}文字`}>
-            {readingTimeMin}分で読了
+          <span className="text-gray-400" title={t('editor:statusBar.readingTimeTooltip', { charCount: charCount.toLocaleString() })}>
+            {t('editor:statusBar.readingTime', { minutes: readingTimeMin })}
           </span>
         )}
         {/* 可読性スコア */}
         {readability && readability.totalChars > 0 && (
           <span
             className={`readability-indicator readability-indicator--${readability.level}`}
-            title={`可読性スコア: ${readability.score}/100（${getReadabilityLabel(readability.level)}）\n漢字率: ${(readability.kanjiRatio * 100).toFixed(1)}%\n平均文長: ${readability.averageSentenceLength}文字/文`}
+            title={t('editor:statusBar.readabilityTooltip', { score: readability.score, label: getReadabilityLabel(readability.level), kanjiRatio: (readability.kanjiRatio * 100).toFixed(1), avgSentenceLength: readability.averageSentenceLength })}
           >
-            可読性: {readability.score}
+            {t('editor:statusBar.readability', { score: readability.score })}
           </span>
         )}
         {/* インデント設定 */}
@@ -1184,15 +1189,15 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
             type="button"
             className="status-bar__button"
             onClick={() => { setIndentPopover((v) => !v); setEncodingPopover(false); setLineEndingPopover(false); }}
-            title="インデント設定"
+            title={t('editor:statusBar.indentSettings')}
           >
             {indentLabel}
           </button>
           {indentPopover && (
             <div className="status-bar__popover">
-              <div className="status-bar__popover-title">インデント設定</div>
+              <div className="status-bar__popover-title">{t('editor:statusBar.indentSettings')}</div>
               <div className="status-bar__popover-group">
-                <div className="status-bar__popover-label">スタイル</div>
+                <div className="status-bar__popover-label">{t('editor:statusBar.indentStyle_label')}</div>
                 {(['spaces', 'tabs'] as const).map((style) => (
                   <button
                     key={style}
@@ -1200,12 +1205,12 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
                     className={`status-bar__popover-item${settings.editor.indentStyle === style ? ' status-bar__popover-item--active' : ''}`}
                     onClick={() => { updateSettings({ editor: { indentStyle: style } }); }}
                   >
-                    {style === 'spaces' ? 'スペース' : 'タブ'}
+                    {t(`editor:statusBar.indentStyle.${style}`)}
                   </button>
                 ))}
               </div>
               <div className="status-bar__popover-group">
-                <div className="status-bar__popover-label">タブ幅</div>
+                <div className="status-bar__popover-label">{t('editor:statusBar.tabWidth')}</div>
                 {[2, 4, 8].map((size) => (
                   <button
                     key={size}
@@ -1228,13 +1233,13 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
               type="button"
               className="status-bar__button"
               onClick={() => { setLineEndingPopover((v) => !v); setEncodingPopover(false); setIndentPopover(false); }}
-              title="改行コード"
+              title={t('editor:statusBar.lineEnding')}
             >
               {tab.lineEnding}
             </button>
             {lineEndingPopover && (
               <div className="status-bar__popover">
-                <div className="status-bar__popover-title">改行コード</div>
+                <div className="status-bar__popover-title">{t('editor:statusBar.lineEnding')}</div>
                 {lineEndings.map((le) => (
                   <button
                     key={le}
@@ -1260,13 +1265,13 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
               type="button"
               className="status-bar__button"
               onClick={() => { setEncodingPopover((v) => !v); setLineEndingPopover(false); setIndentPopover(false); }}
-              title="文字コード"
+              title={t('editor:statusBar.encoding')}
             >
               {tab.encoding}
             </button>
             {encodingPopover && (
               <div className="status-bar__popover">
-                <div className="status-bar__popover-title">文字コード</div>
+                <div className="status-bar__popover-title">{t('editor:statusBar.encoding')}</div>
                 {encodings.map((enc) => (
                   <button
                     key={enc}
@@ -1291,13 +1296,13 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
             type="button"
             className="status-bar__button"
             onClick={() => { setFileTypePopover((v) => !v); setEncodingPopover(false); setLineEndingPopover(false); setIndentPopover(false); }}
-            title="ファイル形式（クリックで変換メニュー）"
+            title={t('editor:statusBar.fileFormat')}
           >
             {tab?.fileType === 'html' ? 'HTML' : 'Markdown'}
           </button>
           {fileTypePopover && tab && (
             <div className="status-bar__popover">
-              <div className="status-bar__popover-title">別名で保存</div>
+              <div className="status-bar__popover-title">{t('editor:statusBar.saveAsOther')}</div>
               {tab.fileType === 'html' ? (
                 <button
                   type="button"
@@ -1307,7 +1312,7 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
                     onSaveAsMarkdown?.();
                   }}
                 >
-                  Markdown として保存 (.md)
+                  {t('editor:statusBar.saveAsMarkdown')}
                 </button>
               ) : (
                 <button
@@ -1318,7 +1323,7 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
                     onSaveAsHtml?.();
                   }}
                 >
-                  HTML として保存 (.html)
+                  {t('editor:statusBar.saveAsHtml')}
                 </button>
               )}
             </div>

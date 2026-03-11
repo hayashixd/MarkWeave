@@ -146,6 +146,18 @@ export function GraphView({
 
     simulationRef.current = simulation;
 
+    // performance-design.md §9.3: 大規模グラフはメインスレッド負荷軽減のため
+    // シミュレーションを事前計算し、tick イベントによるリアルタイム更新を省略
+    const isLargeGraph = nodes.length > 200;
+    if (isLargeGraph) {
+      simulation.stop();
+      // 固定回数のイテレーションで収束させる（tick イベントなし）
+      const iterations = Math.min(300, Math.max(100, nodes.length));
+      for (let i = 0; i < iterations; ++i) {
+        simulation.tick();
+      }
+    }
+
     // エッジ描画
     const link = g
       .append('g')
@@ -210,6 +222,9 @@ export function GraphView({
       .on('drag', (event, d) => {
         d.fx = event.x;
         d.fy = event.y;
+
+        // 大規模グラフでは tick を間引くため、ドラッグ中は手動で座標を反映する
+        applyGraphPositions();
       })
       .on('end', (event, d) => {
         if (!event.active) simulation.alphaTarget(0);
@@ -235,7 +250,7 @@ export function GraphView({
         .attr('pointer-events', 'none');
     }
 
-    simulation.on('tick', () => {
+    const applyGraphPositions = () => {
       link
         .attr('x1', (d) => ((d.source as SimNode).x ?? 0))
         .attr('y1', (d) => ((d.source as SimNode).y ?? 0))
@@ -249,7 +264,15 @@ export function GraphView({
           .attr('x', (d) => (d.x ?? 0))
           .attr('y', (d) => (d.y ?? 0));
       }
-    });
+    };
+
+    if (isLargeGraph) {
+      // 事前計算済み: 静的に座標を適用
+      applyGraphPositions();
+    } else {
+      // 小規模グラフ: リアルタイム tick 更新
+      simulation.on('tick', applyGraphPositions);
+    }
 
     return () => {
       simulation.stop();

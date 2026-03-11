@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./i18n"; // i18n 初期化（i18n-design.md §4: main.tsx の先頭でインポート）
 import App from "./app";
 import "./styles.css";
 import { themeManager } from "./themes/theme-manager";
