@@ -88,6 +88,8 @@ import { VirtualScrollExtension } from '../../extensions/VirtualScrollExtension'
 export type EditorMode = 'wysiwyg' | 'source';
 
 const LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES = 3 * 1024 * 1024;
+/** performance-design.md §2: ノード数が閾値を超えたらソースモードに切替 */
+const LARGE_FILE_NODE_COUNT_THRESHOLD = 3000;
 
 export interface EditorProps {
   /** 初期 Markdown テキスト */
@@ -482,6 +484,20 @@ export function MarkdownEditor({
     setFrontMatterYaml(yaml);
 
     applyExternalMarkdownToEditor(body || '');
+
+    // performance-design.md §2: ノード数による大規模ファイル判定
+    // パース後にノード数をチェックし、閾値超過時はソースモードへ切替
+    if (editor) {
+      const nodeCount = editor.state.doc.nodeSize;
+      if (nodeCount >= LARGE_FILE_NODE_COUNT_THRESHOLD) {
+        setSourceText(initialContent);
+        setMode('source');
+        showToast(
+          'warning',
+          `ノード数が多いため（${nodeCount}）、ソースモードで開きました。`,
+        );
+      }
+    }
   }, [applyExternalMarkdownToEditor, editor, initialContent, mode, showToast]);
 
   // コンテンツ変更の監視

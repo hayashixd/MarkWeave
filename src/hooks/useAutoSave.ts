@@ -53,7 +53,13 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
       clearTimeout(timerRef.current);
     }
 
-    timerRef.current = setTimeout(async () => {
+    // performance-design.md §5.2: ファイルサイズ連動デバウンス（500〜2000ms）
+    const contentLength = tab.content.length;
+    const delay = contentLength < 100_000 ? 500
+      : contentLength < 1_000_000 ? 1000
+      : Math.min(settings.file.autoSaveDelay, 2000);
+
+    timerRef.current = setTimeout(() => {
       const currentTab = getTab(tabId);
       if (!currentTab || !currentTab.isDirty || !currentTab.filePath) return;
 
@@ -61,24 +67,27 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
       if (isSavingRef.current) return;
       isSavingRef.current = true;
 
-      try {
-        await writeFn(currentTab.filePath, currentTab.content);
-        markSaved(tabId);
-        pendingSaveRef.current = false;
-        // Wikiリンクインデックス更新（wikilinks-backlinks-design.md §5.2）
-        if (workspaceRoot && currentTab.filePath) {
-          updateIndex(currentTab.filePath, workspaceRoot).then(() => {
-            window.dispatchEvent(new Event('wikilink-index-updated'));
-          }).catch(() => { /* インデックス更新失敗は無視 */ });
-        }
-      } catch (err) {
-        const fileName = currentTab.filePath.split(/[/\\]/).pop() ?? currentTab.filePath;
-        const detail = err instanceof Error ? err.message : String(err);
-        show('error', `「${fileName}」の自動保存に失敗しました: ${detail}`);
-      } finally {
-        isSavingRef.current = false;
-      }
-    }, settings.file.autoSaveDelay);
+      // performance-design.md §5: fire-and-forget パターン（UIスレッドをブロックしない）
+      writeFn(currentTab.filePath, currentTab.content)
+        .then(() => {
+          markSaved(tabId);
+          pendingSaveRef.current = false;
+          // Wikiリンクインデックス更新（wikilinks-backlinks-design.md §5.2）
+          if (workspaceRoot && currentTab.filePath) {
+            updateIndex(currentTab.filePath, workspaceRoot).then(() => {
+              window.dispatchEvent(new Event('wikilink-index-updated'));
+            }).catch(() => { /* インデックス更新失敗は無視 */ });
+          }
+        })
+        .catch((err) => {
+          const fileName = currentTab.filePath!.split(/[/\\]/).pop() ?? currentTab.filePath;
+          const detail = err instanceof Error ? err.message : String(err);
+          show('error', `「${fileName}」の自動保存に失敗しました: ${detail}`);
+        })
+        .finally(() => {
+          isSavingRef.current = false;
+        });
+    }, delay);
   }, [tabId, settings.file.autoSaveDelay, getTab, markSaved, writeFn, isComposing, show, workspaceRoot, updateIndex]);
 
   // 即時保存（Ctrl+S 用）
