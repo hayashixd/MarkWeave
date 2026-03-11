@@ -28,14 +28,9 @@ pub fn set_title_dirty(
 /// アプリケーションを再起動する。
 ///
 /// tauri-ipc-interface.md §8 に準拠:
-/// - 新しいプロセスを起動してから現在のプロセスを終了する
+/// - 単一起動モードと競合しないよう Tauri の再起動 API を利用する
 #[tauri::command]
 pub fn restart_app(app: tauri::AppHandle) -> Result<(), String> {
-    let exe = std::env::current_exe()
-        .map_err(|e| format!("実行ファイルのパス取得に失敗しました: {}", e))?;
-    std::process::Command::new(exe)
-        .spawn()
-        .map_err(|e| format!("再起動に失敗しました: {}", e))?;
-    app.exit(0);
+    app.restart();
     Ok(())
 }
