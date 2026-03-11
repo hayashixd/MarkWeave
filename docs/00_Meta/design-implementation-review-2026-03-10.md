@@ -47,11 +47,12 @@ rg -n "performance\.now|virtual|throttle|debounce|forceSimulation|restart_app|se
 
 | 項目 | V1 | V2 | V3 | V4 | 統合判定 | 優先度 |
 |---|---|---|---|---|---|---|
-| i18n基盤（i18next, 辞書, 初期化） | 未整合 | 未整合 | 影響大 | ルール違反あり（ハードコード） | **不一致** | P0 |
-| 配布/自動更新導線（updater, release.yml） | 未整合 | 未整合 | 運用不可 | - | **不一致** | P0 |
-| IME Enterガードの一貫適用 | 部分整合 | 未整合 | 影響中 | 最重要制約に抵触 | **不一致** | P0 |
-| `performance-design.md` 準拠 | 部分整合 | 未整合あり | 影響大 | - | **部分準拠（要改善）** | P0〜P1 |
-| IPC SoTドリフト（tauri-ipc-interface） | 未整合 | 未整合 | 影響大 | - | **不一致** | P0 |
+| i18n基盤（i18next, 辞書, 初期化） | 未整合 | 未整合 | 影響大 | ルール違反あり（ハードコード） | **不一致→P1継続管理** | P1 |
+| 配布/自動更新導線（updater, release.yml） | 未整合 | 未整合 | 運用不可 | - | **不一致→P1継続管理** | P1 |
+| IME Enterガードの一貫適用 | ✅是正済 | ✅是正済 | - | ✅是正済 | **✅ 是正完了（2026-03-11）** | ~~P0~~ |
+| `performance-design.md` 準拠 | 部分整合 | 未整合あり | 影響大 | - | **部分準拠→P1継続管理** | P1 |
+| IPC SoTドリフト（tauri-ipc-interface） | ✅是正済 | ✅是正済 | - | - | **✅ 是正完了（2026-03-11）** | ~~P0~~ |
+| メタデータクエリ BETWEEN 文法堅牢化 | 部分整合 | リスクあり | 影響中 | - | **P2継続管理** | P2 |
 | 将来フェーズ機能（git, metadata query, mobile等） | 未実装 | - | - | - | **保留（管理済み）** | P2 |
 
 ---
@@ -183,49 +184,46 @@ rg -n "performance\.now|virtual|throttle|debounce|forceSimulation|restart_app|se
 
 ## 5. 是正アクション（統合版）
 
-### P0（直近で着手）
+### ~~P0（直近で着手）~~ → 是正完了 or P1/P2 に再分類
 
-1. **i18n最小実装の導入**
+1. ~~**i18n最小実装の導入**~~ → **P1 に再分類**（§6.3 参照）
+
+2. ~~**IMEガードの横断適用**~~ → **✅ 是正完了**（2026-03-11、§6.1 参照）
+
+3. ~~**IPC SoT 整合化**~~ → **✅ 是正完了**（2026-03-11、§6.2 参照）
+
+4. ~~**性能設計の必須差分解消（第一段）**~~ → **P1 に再分類**（§6.3 参照）
+
+### P1（継続管理）
+
+5. **i18n 基盤導入**
    - `i18next` / `react-i18next` を導入
    - `src/i18n.ts` と `src/locales/ja/common.json` など最小辞書を追加
    - 主要UI（AppShell周辺）を `t()` 化
 
-2. **IMEガードの横断適用**
-   - Enter処理を持つ箇所を棚卸しし、`isComposing` 判定を統一
-   - `window` リスナ使用コンポーネントを優先修正
-
-3. **IPC SoT 整合化**
-   - `tauri-ipc-interface.md` と `src-tauri/src/lib.rs` の `invoke_handler` を突合
-   - コマンド名ドリフト（例: `set_title_bar_dirty` 系）を是正
-   - `restart_app` の実装/登録有無を確定し、契約を一本化
-
-4. **性能設計の必須差分解消（第一段）**
-   - 大規模ファイル判定にノード数閾値を追加
-   - 自動保存の実行モデルを設計方針（fire-and-forget）に揃える
-
-### P1（P0完了後）
-
-5. **配布導線の最小接続**
+6. **配布導線の最小接続**
    - `tauri.conf.json` に updater 設定枠を追加
    - `.github/workflows/release.yml` の最小ワークフローを追加
 
-6. **性能設計の差分解消（第二段）**
+7. **性能設計の差分解消**
+   - 大規模ファイル判定にノード数閾値（3000）を追加
+   - 自動保存の実行モデルを設計方針（fire-and-forget）に揃える
    - 自動保存デバウンスの可変化（500〜2000ms）
    - D3 グラフ計算の Worker オフロード検討・導入
 
-7. **運用スクリプト整備**
+8. **運用スクリプト整備**
    - `scripts/bump-version.mjs` の追加
    - バージョン運用手順を `docs/` に明文化
 
-8. **メタデータクエリ文法の堅牢化**
-   - `BETWEEN ... AND ...` を壊さないトークナイズ/構文解析へ修正
-
 ### P2（将来フェーズ）
 
-9. **Phase 7.5 / 将来フェーズ項目の順次実装**
+9. **メタデータクエリ文法の堅牢化**
+   - `BETWEEN ... AND ...` を壊さないトークナイズ/構文解析へ修正
+
+10. **Phase 7.5 / 将来フェーズ項目の順次実装**
    - `feature-list.md` の優先順位に従って実装・チェックオフ
 
-10. **`feature-list.md` ステータス正規化**
+11. **`feature-list.md` ステータス正規化**
    - 章内機能表と設計書↔実装対応表の整合ルールを定義
 
 ---
@@ -256,15 +254,24 @@ rg -n "performance\.now|virtual|throttle|debounce|forceSimulation|restart_app|se
 | `set_title_bar_dirty` 命名ドリフト | `tauri-ipc-interface.md` §9 を実装名 `set_title_dirty` に合わせて修正 |
 | `emit_to_window` 設計書不在 | `tauri-ipc-interface.md` §9 に型定義を追記 |
 
-#### 6.3 残存課題（次回以降）
+#### 6.3 残存課題（P1/P2 として継続管理）
 
-以下は本セッションでは未着手。P1/P2 として継続管理:
+以下は P1/P2 として `feature-list.md` で継続管理する。
 
-- i18n 基盤導入（P0 だが大規模タスク、feature-list.md で管理済み）
-- 配布・自動更新導線の最小接続（P1）
-- 性能設計の差分解消（ノード数閾値、自動保存 fire-and-forget 化）（P0〜P1）
-- メタデータクエリ `BETWEEN ... AND ...` 文法堅牢化（P1）
-- `feature-list.md` ステータス正規化（P2）
+##### P1（次期改善対象）
+
+| 課題 | 概要 | 管理先 |
+|------|------|--------|
+| i18n 基盤導入 | `i18next` / `react-i18next` 導入、UIハードコード文字列の `t()` 化 | feature-list.md 技術的負債 §i18n（🔶） |
+| 配布・自動更新導線 | `tauri.conf.json` updater 設定、`release.yml`、署名鍵運用 | feature-list.md 配布・アップデート章（❌） |
+| 性能設計差分解消 | ノード数閾値判定、自動保存 fire-and-forget 化、デバウンス可変化、D3 Worker オフロード | feature-list.md 技術的負債 §performance（🔶） |
+
+##### P2（将来フェーズ）
+
+| 課題 | 概要 | 管理先 |
+|------|------|--------|
+| メタデータクエリ堅牢化 | `BETWEEN ... AND ...` 文法のトークナイズ/構文解析改善 | feature-list.md Phase 7.5 §メタデータクエリ |
+| `feature-list.md` ステータス正規化 | 章内機能表と設計書↔実装対応表の整合ルール定義 | 本ドキュメント §3.5.4 |
 
 ---
 
@@ -273,3 +280,4 @@ rg -n "performance\.now|virtual|throttle|debounce|forceSimulation|restart_app|se
 - 2026-03-10: 初版レビューを4観点で再編し、統合版として再構成。
 - 2026-03-10: `performance-design.md` 観点（準拠点/不一致点）と追加主要指摘（IPC SoT, restart_app, BETWEEN, ステータス整合）を追補。
 - 2026-03-11: P0 是正第一弾を実施。IME ガード横断適用（6箇所）、IPC SoT 整合化（restart_app / emit_to_window 実装、set_title_dirty 命名修正）。
+- 2026-03-11: P0 是正完了を確認。残存課題（i18n・配布導線・性能設計差分・メタデータクエリ堅牢化）を P1/P2 として再分類。§2 統合サマリー・§5 是正アクション・§6.3 残存課題を更新。
