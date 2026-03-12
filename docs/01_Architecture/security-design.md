@@ -473,7 +473,7 @@ export async function isPathWithinBase(
         "style-src 'self' 'unsafe-inline'",
         // ★ script-src に 'unsafe-eval' を含めない（KaTeX / Mermaid の代替手段を使う）
         "script-src 'self'",
-        "connect-src 'none'"   // 外部APIへの直接接続を禁止
+        "connect-src ipc: http://ipc.localhost"  // Tauri 2.0 IPC 通信を許可し、それ以外の外部接続を禁止
       ].join("; ")
     }
   }
@@ -483,7 +483,8 @@ export async function isPathWithinBase(
 **注意点**:
 - `'unsafe-eval'` は KaTeX / Mermaid が動的コード生成を行う場合に必要になることがある。
   KaTeX は `'unsafe-eval'` 不要のビルドを使用し、Mermaid は CSP 対応モードを確認する（具体的な対応は下記 §4.5 参照）。
-- `connect-src 'none'` により、WebView から直接外部 API を叩くことを禁止する。
+- `connect-src ipc: http://ipc.localhost` により、Tauri 2.0 の IPC 通信（`invoke()` / イベントシステム）のみを許可し、外部 API への直接接続を禁止する。
+  Tauri 2.0 では WebView ↔ Rust 間の通信に `ipc:` スキームおよび `http://ipc.localhost` を使用するため、これらを許可しないとアプリが機能しない。
   AI API 等の外部通信は必ず Rust（Tauri コマンド）側を経由させる（具体的な実装は §4.6 参照）。
 
 ### 4.1.1 KaTeX の CSP 対応（`unsafe-eval` 不使用）

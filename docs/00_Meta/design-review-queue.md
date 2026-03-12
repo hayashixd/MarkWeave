@@ -9,9 +9,9 @@
 
 | # | 設計書ファイル | ステータス | レビュー日 | レビューファイル | 実装対応 |
 |---|---|---|---|---|---|
-| 1 | `docs/01_Architecture/system-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-system-design.md` | 未対応 |
-| 2 | `docs/01_Architecture/tauri-ipc-interface.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-tauri-ipc-interface.md` | 未対応 |
-| 3 | `docs/01_Architecture/security-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-security-design.md` | 未対応 |
+| 1 | `docs/01_Architecture/system-design.md` | done | 2026-03-12 | `docs/00_Meta/bk/design-review-2026-03-12-system-design.md` | 対応済み（2026-03-12） |
+| 2 | `docs/01_Architecture/tauri-ipc-interface.md` | done | 2026-03-12 | `docs/00_Meta/bk/design-review-2026-03-12-tauri-ipc-interface.md` | 対応済み（2026-03-12） |
+| 3 | `docs/01_Architecture/security-design.md` | done | 2026-03-12 | `docs/00_Meta/bk/design-review-2026-03-12-security-design.md` | 対応済み（2026-03-12） |
 | 4 | `docs/01_Architecture/performance-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-performance-design.md` | 未対応 |
 | 5 | `docs/01_Architecture/plugin-api-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-plugin-api-design.md` | 未対応 |
 | 6 | `docs/02_Core_Editor/markdown-tiptap-conversion.md` | pending | — | — | — |
