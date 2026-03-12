@@ -90,8 +90,45 @@ export function AppShell() {
   useEffect(() => {
     loadRecentFiles();
   }, [loadRecentFiles]);
-  const { tabs, activeTabId, addTab, removeTab, updateContent, getActiveTab, getTab } =
-    useTabStore();
+  // タブストアの購読を分離:
+  // - tabIds: タブ一覧の ID のみ（ペイン同期用）。content 変更では再レンダリングしない。
+  // - activeTabId: アクティブタブ ID
+  // - activeTab: アクティブタブのメタデータ（content 除外で比較）
+  // - アクション関数は安定参照のため個別に取得
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const addTab = useTabStore((s) => s.addTab);
+  const removeTab = useTabStore((s) => s.removeTab);
+  const updateContent = useTabStore((s) => s.updateContent);
+  const getActiveTab = useTabStore((s) => s.getActiveTab);
+  const getTab = useTabStore((s) => s.getTab);
+
+  // タブ ID リストのみ購読（content 変更では再レンダリングしない）
+  const tabIds = useTabStore(
+    (s) => s.tabs.map((t) => t.id),
+    (prev, next) => prev.length === next.length && prev.every((id, i) => id === next[i]),
+  );
+
+  // アクティブタブ: content/savedContent 以外のフィールドが変わったときのみ再レンダリング
+  const activeTab = useTabStore(
+    (s) => {
+      if (!s.activeTabId) return undefined;
+      return s.tabs.find((t) => t.id === s.activeTabId);
+    },
+    (prev, next) => {
+      if (prev === next) return true;
+      if (!prev || !next) return false;
+      return (
+        prev.id === next.id &&
+        prev.fileName === next.fileName &&
+        prev.fileType === next.fileType &&
+        prev.isReadOnly === next.isReadOnly &&
+        prev.isDirty === next.isDirty &&
+        prev.filePath === next.filePath &&
+        prev.encoding === next.encoding &&
+        prev.lineEnding === next.lineEnding
+      );
+    },
+  );
 
   // ペイン分割ストア
   const panes = usePaneStore((s) => s.panes);
@@ -106,7 +143,7 @@ export function AppShell() {
   // 新しいタブが追加されたらアクティブペインに登録する
   const prevTabIdsRef = useRef<string[]>([]);
   useEffect(() => {
-    const currentIds = tabs.map((t) => t.id);
+    const currentIds = tabIds;
     const prevIds = prevTabIdsRef.current;
 
     // 追加されたタブをペインに登録
@@ -122,7 +159,7 @@ export function AppShell() {
     }
 
     prevTabIdsRef.current = currentIds;
-  }, [tabs, addTabToPane, removeTabFromPane]);
+  }, [tabIds, addTabToPane, removeTabFromPane]);
 
   // アクティブペインのアクティブタブを tabStore の activeTabId に同期
   const activePane = panes.find((p) => p.id === activePaneId) ?? panes[0];
@@ -147,8 +184,6 @@ export function AppShell() {
       setPaneActiveTab(paneForTab.id, activeTabId);
     }
   }, [activeTabId, panes, setPaneActiveTab]);
-
-  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   // アクティブタブが保存済みのファイルになったら最近使ったファイルに追加
   useEffect(() => {
@@ -766,23 +801,27 @@ export function AppShell() {
 
         {/* エディタエリア - Phase 7: ペイン分割対応 */}
         <SplitEditorLayout
-          renderEditor={(tab: TabState, _paneId: string) => (
-            <EditorErrorBoundary key={tab.id}>
-              {tab.fileType === 'html' ? (
-                <HtmlEditor
-                  initialContent={tab.content}
-                  onContentChange={handleContentChange}
-                  onEditorReady={setCurrentEditor}
-                />
-              ) : (
-                <MarkdownEditor
-                  initialContent={tab.content}
-                  onContentChange={handleContentChange}
-                  onEditorReady={setCurrentEditor}
-                />
-              )}
-            </EditorErrorBoundary>
-          )}
+          renderEditor={(tab: TabState, _paneId: string) => {
+            // content は shallow 比較で除外されるため、マウント時にストアから直接取得
+            const freshContent = useTabStore.getState().getTab(tab.id)?.content ?? tab.content;
+            return (
+              <EditorErrorBoundary key={tab.id}>
+                {tab.fileType === 'html' ? (
+                  <HtmlEditor
+                    initialContent={freshContent}
+                    onContentChange={handleContentChange}
+                    onEditorReady={setCurrentEditor}
+                  />
+                ) : (
+                  <MarkdownEditor
+                    initialContent={freshContent}
+                    onContentChange={handleContentChange}
+                    onEditorReady={setCurrentEditor}
+                  />
+                )}
+              </EditorErrorBoundary>
+            );
+          }}
           renderEmpty={(_paneId: string) => (
             <EmptyState
               onNewTab={handleNewTab}
@@ -827,7 +866,7 @@ export function AppShell() {
       {/* HTML エクスポートダイアログ */}
       {exportDialogOpen && activeTab && (
         <ExportDialog
-          markdown={activeTab.content}
+          markdown={useTabStore.getState().getActiveTab()?.content ?? ''}
           currentFilePath={activeTab.filePath ?? undefined}
           onClose={() => setExportDialogOpen(false)}
         />
@@ -836,7 +875,7 @@ export function AppShell() {
       {/* PDF エクスポートダイアログ（Phase 7） */}
       {pdfExportDialogOpen && activeTab && (
         <PdfExportDialog
-          markdown={activeTab.content}
+          markdown={useTabStore.getState().getActiveTab()?.content ?? ''}
           currentFilePath={activeTab.filePath ?? undefined}
           onClose={() => setPdfExportDialogOpen(false)}
         />
@@ -845,7 +884,7 @@ export function AppShell() {
       {/* Pandoc エクスポートダイアログ（Phase 7: Word / LaTeX / ePub） */}
       {pandocExportDialogOpen && activeTab && (
         <PandocExportDialog
-          markdown={activeTab.content}
+          markdown={useTabStore.getState().getActiveTab()?.content ?? ''}
           currentFilePath={activeTab.filePath ?? undefined}
           onClose={() => setPandocExportDialogOpen(false)}
           onOpenSettings={() => setPreferencesOpen(true)}
@@ -1112,7 +1151,8 @@ function StatusBar({ tab, onSaveAsMarkdown, onSaveAsHtml }: {
   const [lineEndingPopover, setLineEndingPopover] = useState(false);
   const [indentPopover, setIndentPopover] = useState(false);
   const [fileTypePopover, setFileTypePopover] = useState(false);
-  const { updateEncoding, updateLineEnding } = useTabStore();
+  const updateEncoding = useTabStore((s) => s.updateEncoding);
+  const updateLineEnding = useTabStore((s) => s.updateLineEnding);
   const { settings, updateSettings } = useSettingsStore();
   const encodingRef = useRef<HTMLDivElement>(null);
   const lineEndingRef = useRef<HTMLDivElement>(null);

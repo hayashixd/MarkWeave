@@ -129,7 +129,10 @@ export function MarkdownEditor({
   const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
   onContentChangeRef.current = onContentChange;
-  const lastEmittedContentRef = useRef<string>(initialContent);
+  // 初回マウント時は必ず initialContent をエディタに反映するため、
+  // sentinel 値で初期化する。以降はエディタから emit された最新の Markdown を保持し、
+  // 親経由で戻ってきた同一内容の再注入を防ぐ。
+  const lastEmittedContentRef = useRef<string | null>(null);
   const suppressNextUpdateRef = useRef(0);
   const incrementalSerializerRef = useRef(new IncrementalSerializer());
   const editorWrapperRef = useRef<HTMLDivElement>(null);
@@ -479,6 +482,9 @@ export function MarkdownEditor({
   }, [editor]);
 
   // 初期コンテンツの設定（タブ切り替え時も含む）
+  // 大規模ファイルのパース処理を requestAnimationFrame で遅延実行し、
+  // UI スレッドのブロッキングを最小限に抑える。
+  const pendingContentLoadRef = useRef(0);
   useEffect(() => {
     if (!editor) return;
 
@@ -489,6 +495,7 @@ export function MarkdownEditor({
 
     const contentSizeBytes = new TextEncoder().encode(initialContent).length;
     if (contentSizeBytes >= LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES && mode === 'wysiwyg') {
+      lastEmittedContentRef.current = initialContent;
       setSourceText(initialContent);
       setMode('source');
       showToast(
@@ -499,21 +506,29 @@ export function MarkdownEditor({
     }
 
     if (mode === 'source') {
+      lastEmittedContentRef.current = initialContent;
       setSourceText(initialContent);
       return;
     }
 
-    // Front Matter を抽出して本文のみ TipTap に渡す
-    const { yaml, body } = parseFrontMatter(initialContent);
-    setFrontMatterYaml(yaml);
+    /**
+     * コンテンツをエディタに反映する処理。
+     * 大規模ファイルの場合は RAF で次フレームに遅延し、UI 描画を先に完了させる。
+     */
+    const applyContent = () => {
+      if (editor.isDestroyed) return;
 
-    applyExternalMarkdownToEditor(body || '');
+      // Front Matter を抽出して本文のみ TipTap に渡す
+      const { yaml, body } = parseFrontMatter(initialContent);
+      setFrontMatterYaml(yaml);
 
-    // performance-design.md §2: ノード数による大規模ファイル判定
-    // パース後にノード数をチェックし、閾値超過時はソースモードへ切替
-    if (editor) {
+      applyExternalMarkdownToEditor(body || '');
+
+      // performance-design.md §2: ノード数による大規模ファイル判定
+      // パース後にノード数をチェックし、閾値超過時はソースモードへ切替
       const nodeCount = editor.state.doc.nodeSize;
       if (nodeCount >= LARGE_FILE_NODE_COUNT_THRESHOLD) {
+        lastEmittedContentRef.current = initialContent;
         setSourceText(initialContent);
         setMode('source');
         showToast(
@@ -521,7 +536,27 @@ export function MarkdownEditor({
           `ノード数が多いため（${nodeCount}）、ソースモードで開きました。`,
         );
       }
+    };
+
+    // 大規模コンテンツは RAF で遅延実行し、UI をまずペイントさせる
+    if (contentSizeBytes > 50_000) {
+      if (pendingContentLoadRef.current) {
+        cancelAnimationFrame(pendingContentLoadRef.current);
+      }
+      pendingContentLoadRef.current = requestAnimationFrame(() => {
+        pendingContentLoadRef.current = 0;
+        applyContent();
+      });
+    } else {
+      applyContent();
     }
+
+    return () => {
+      if (pendingContentLoadRef.current) {
+        cancelAnimationFrame(pendingContentLoadRef.current);
+        pendingContentLoadRef.current = 0;
+      }
+    };
   }, [applyExternalMarkdownToEditor, editor, initialContent, mode, showToast]);
 
   // コンテンツ変更の監視

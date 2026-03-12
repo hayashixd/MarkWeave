@@ -30,6 +30,15 @@ const SCROLL_THROTTLE_MS = 100;
 /** スクロール終了後の高さ再計測デバウンス（ms） */
 const SCROLL_END_DEBOUNCE_MS = 200;
 
+/** スクロールコンテナ検出リトライの間隔 (ms) */
+const CONTAINER_DETECT_INTERVAL_MS = 50;
+
+/** スクロールコンテナ検出の最大リトライ回数 */
+const CONTAINER_DETECT_MAX_RETRIES = 20;
+
+/** docChanged 後にビューポートを再計算するまでの遅延 (ms) */
+const POST_DOC_CHANGE_RECALC_DELAY_MS = 30;
+
 interface ViewportRange {
   top: number;
   bottom: number;
@@ -52,6 +61,11 @@ function getViewportRange(scrollContainer: Element | null): ViewportRange {
 }
 
 function findScrollContainer(editorView: EditorView): HTMLElement | null {
+  // editorView.dom がドキュメントに接続されていない場合は検出不可
+  if (!editorView.dom.isConnected) {
+    return null;
+  }
+
   const direct = editorView.dom.closest('.editor-scroll-container');
   if (direct instanceof HTMLElement) {
     return direct;
@@ -68,9 +82,7 @@ function findScrollContainer(editorView: EditorView): HTMLElement | null {
   while (current) {
     const style = window.getComputedStyle(current);
     const overflowY = style.overflowY;
-    const isScrollable = (overflowY === 'auto' || overflowY === 'scroll')
-      && current.scrollHeight > current.clientHeight;
-    if (isScrollable) {
+    if (overflowY === 'auto' || overflowY === 'scroll') {
       return current;
     }
     current = current.parentElement;
@@ -198,26 +210,18 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
         },
 
         view(editorView: EditorView) {
-          // スクロールコンテナを特定（TipTapEditor の専用ラッパー）
-          const scrollContainer = findScrollContainer(editorView);
-          let initialViewportRaf = 0;
-
-          // 初回描画時に実際のスクロールコンテナでビューポート計算を実行する。
-          // init() は window.innerHeight ベースのため、ここで補正しないと一部環境で
-          // ビューポート外判定が固定され、先頭付近しか描画されないことがある。
-          if (scrollContainer && editorView.state.doc.childCount >= threshold) {
-            initialViewportRaf = window.requestAnimationFrame(() => {
-              if (editorView.isDestroyed) return;
-              editorView.dispatch(
-                editorView.state.tr
-                  .setMeta('viewportChanged', true)
-                  .setMeta('scrollContainer', scrollContainer),
-              );
-            });
-          }
+          // スクロールコンテナの遅延検出:
+          // useEditor() が DOM 接続前に EditorView を作成するため、
+          // view() 時点ではスクロールコンテナが見つからないことがある。
+          // リトライ付きの遅延検出で DOM マウント後にスクロールハンドラを接続する。
+          let scrollContainer: HTMLElement | null = null;
+          let detectTimer: ReturnType<typeof setInterval> | null = null;
+          let detectRetries = 0;
+          let postDocChangeTimer: ReturnType<typeof setTimeout> | null = null;
 
           // スクロールイベントで仮想スクロールを更新
           const handleScroll = throttle(() => {
+            if (editorView.isDestroyed) return;
             if (editorView.state.doc.childCount < threshold) return;
             editorView.dispatch(
               editorView.state.tr
@@ -231,6 +235,7 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
           const handleScrollEnd = () => {
             if (scrollEndTimer) clearTimeout(scrollEndTimer);
             scrollEndTimer = setTimeout(() => {
+              if (editorView.isDestroyed) return;
               if (editorView.state.doc.childCount < threshold) return;
 
               // ビューポート内の全ノードの実測高さをキャッシュ
@@ -244,19 +249,104 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
             }, SCROLL_END_DEBOUNCE_MS);
           };
 
-          if (scrollContainer) {
-            scrollContainer.addEventListener('scroll', handleScroll as EventListener, { passive: true });
-            scrollContainer.addEventListener('scroll', handleScrollEnd as EventListener, { passive: true });
+          /** スクロールコンテナにイベントリスナーを接続する */
+          const attachListeners = (container: HTMLElement) => {
+            container.addEventListener('scroll', handleScroll as EventListener, { passive: true });
+            container.addEventListener('scroll', handleScrollEnd as EventListener, { passive: true });
+          };
+
+          /** スクロールコンテナからイベントリスナーを解除する */
+          const detachListeners = (container: HTMLElement) => {
+            container.removeEventListener('scroll', handleScroll as EventListener);
+            container.removeEventListener('scroll', handleScrollEnd as EventListener);
+          };
+
+          /** ビューポートを再計算するトランザクションをディスパッチする */
+          const dispatchViewportRecalc = () => {
+            if (editorView.isDestroyed) return;
+            if (editorView.state.doc.childCount < threshold) return;
+            editorView.dispatch(
+              editorView.state.tr
+                .setMeta('viewportChanged', true)
+                .setMeta('scrollContainer', scrollContainer),
+            );
+          };
+
+          /**
+           * スクロールコンテナの検出を試みる。
+           * 見つかったらリスナーを接続し、初回ビューポート再計算を実行する。
+           */
+          const tryDetectContainer = () => {
+            if (editorView.isDestroyed) return true; // stop retrying
+
+            const found = findScrollContainer(editorView);
+            if (!found) return false;
+
+            scrollContainer = found;
+            attachListeners(scrollContainer);
+
+            // 初回ビューポート再計算
+            if (editorView.state.doc.childCount >= threshold) {
+              // RAF で次フレームに実行し、レイアウト確定後の正確なビューポートを使う
+              window.requestAnimationFrame(() => {
+                if (!editorView.isDestroyed) {
+                  dispatchViewportRecalc();
+                }
+              });
+            }
+
+            return true;
+          };
+
+          // 即座に検出を試みる
+          if (!tryDetectContainer()) {
+            // DOM 未接続の場合、定期的にリトライ
+            detectTimer = setInterval(() => {
+              detectRetries++;
+              if (tryDetectContainer() || detectRetries >= CONTAINER_DETECT_MAX_RETRIES) {
+                if (detectTimer) {
+                  clearInterval(detectTimer);
+                  detectTimer = null;
+                }
+              }
+            }, CONTAINER_DETECT_INTERVAL_MS);
           }
 
           return {
+            update(view: EditorView, prevState: EditorState) {
+              // ドキュメントが変更され、かつ閾値を超えている場合、
+              // 遅延後にビューポート再計算をスケジュールする。
+              // setContent/paste 後に正しいスクロール位置でデコレーションを再構築するため。
+              if (view.state.doc !== prevState.doc && view.state.doc.childCount >= threshold) {
+                // スクロールコンテナが未検出なら再検出を試みる
+                if (!scrollContainer) {
+                  tryDetectContainer();
+                }
+
+                if (postDocChangeTimer) clearTimeout(postDocChangeTimer);
+                postDocChangeTimer = setTimeout(() => {
+                  postDocChangeTimer = null;
+                  dispatchViewportRecalc();
+                  // 実測高さを取得して精度を上げる
+                  setTimeout(() => {
+                    if (!editorView.isDestroyed && scrollContainer) {
+                      recalculateVisibleHeights(view, scrollContainer);
+                      dispatchViewportRecalc();
+                    }
+                  }, SCROLL_END_DEBOUNCE_MS);
+                }, POST_DOC_CHANGE_RECALC_DELAY_MS);
+              }
+            },
+
             destroy() {
-              if (initialViewportRaf) {
-                window.cancelAnimationFrame(initialViewportRaf);
+              if (detectTimer) {
+                clearInterval(detectTimer);
+              }
+              if (postDocChangeTimer) {
+                clearTimeout(postDocChangeTimer);
               }
               if (scrollContainer) {
-                scrollContainer.removeEventListener('scroll', handleScroll as EventListener);
-                scrollContainer.removeEventListener('scroll', handleScrollEnd as EventListener);
+                detachListeners(scrollContainer);
               }
               if (scrollEndTimer) clearTimeout(scrollEndTimer);
             },

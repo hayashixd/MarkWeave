@@ -17,6 +17,31 @@ import { PaneTabBar, PANE_TAB_DRAG_TYPE } from './PaneTabBar';
 import { Splitter } from './Splitter';
 import { useScrollSync } from './useScrollSync';
 
+/**
+ * タブ配列の浅い等価比較（content / savedContent を除外）。
+ * content の頻繁な更新でエディタ全体が再レンダリングされるのを防ぐ。
+ */
+function tabsShallowEqual(prev: TabState[], next: TabState[]): boolean {
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    const a = prev[i]!;
+    const b = next[i]!;
+    if (
+      a.id !== b.id ||
+      a.fileName !== b.fileName ||
+      a.fileType !== b.fileType ||
+      a.isReadOnly !== b.isReadOnly ||
+      a.isDirty !== b.isDirty ||
+      a.filePath !== b.filePath ||
+      a.encoding !== b.encoding ||
+      a.lineEnding !== b.lineEnding
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 interface SplitEditorLayoutProps {
   /** エディタ本体のレンダリング関数（タブに応じてエディタを表示） */
   renderEditor: (tab: TabState, paneId: string) => React.ReactNode;
@@ -44,7 +69,8 @@ export function SplitEditorLayout({
   const closePane = usePaneStore((s) => s.closePane);
   const setActivePaneId = usePaneStore((s) => s.setActivePaneId);
   const moveTabToPane = usePaneStore((s) => s.moveTabToPane);
-  const allTabs = useTabStore((s) => s.tabs);
+  // content/savedContent の変更では再レンダリングしない（パフォーマンス最適化）
+  const allTabs = useTabStore((s) => s.tabs, tabsShallowEqual);
   const [dropTargetPaneId, setDropTargetPaneId] = useState<string | null>(null);
 
   // 同一ファイル分割時のスクロール同期
