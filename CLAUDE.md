@@ -74,6 +74,82 @@ feature-list.md のタスクに紐づく設計ドキュメントを読む
 
 ---
 
+## 🏎️ パフォーマンス設計原則（大規模ファイル対応）
+
+本プロジェクトは 200KB 以上の Markdown ファイルを日常的に扱うユーザーを想定している。
+以下の原則を**すべての修正・機能追加**で遵守すること。
+
+### 原則 1: Zustand セレクターは必ず細粒度にする
+
+`useTabStore()` のようにセレクター無しで呼び出すと、ストア内の**あらゆる値の変更**（content の 1 文字変更を含む）でコンポーネントが再レンダリングされる。
+
+```typescript
+// ❌ 禁止: ストア全体を購読（content 変更のたびに再レンダリング）
+const { tabs, activeTabId, addTab } = useTabStore();
+
+// ✅ 必須: 必要なフィールド・アクションのみを個別に購読
+const activeTabId = useTabStore((s) => s.activeTabId);
+const addTab = useTabStore((s) => s.addTab);
+
+// ✅ content を含む配列を購読する場合は shallow 等価関数で content 変更を除外
+const allTabs = useTabStore((s) => s.tabs, tabsShallowEqual);
+```
+
+**特に注意すべきパターン:**
+- `tab.content`（数百 KB になりうる文字列）を React の props として渡すと、内容が変わるたびにコンポーネントツリー全体が再レンダリングされる。`key={tab.id}` で一度だけマウントされるコンポーネントには、マウント時に `useTabStore.getState()` で直接読むことを検討する。
+- `useTitleBar` や `StatusBar` のようなグローバル UI は、必要な値（`fileName`, `isDirty` 等）のみを購読する。
+
+### 原則 2: ProseMirror プラグインの `view()` は DOM 未接続を前提にする
+
+TipTap の `useEditor()` は React の DOM マウント前に EditorView を作成する場合がある。プラグインの `view()` コールバックで DOM 要素（スクロールコンテナ等）を検出する場合は、**遅延検出（リトライ付き）** を実装すること。
+
+```typescript
+// ❌ 禁止: view() 内で1回だけ検出し、見つからなければ諦める
+view(editorView) {
+  const container = editorView.dom.closest('.editor-scroll-container');
+  // container が null の場合、スクロールイベントが永久に捕捉されない
+}
+
+// ✅ 必須: editorView.dom.isConnected を確認し、未接続なら定期リトライ
+view(editorView) {
+  let container = null;
+  const tryDetect = () => {
+    if (!editorView.dom.isConnected) return false;
+    container = findScrollContainer(editorView);
+    return !!container;
+  };
+  if (!tryDetect()) {
+    const timer = setInterval(() => { if (tryDetect()) clearInterval(timer); }, 50);
+  }
+}
+```
+
+### 原則 3: 大規模コンテンツの同期処理を避ける
+
+200KB の Markdown パース（`markdownToTipTap`）や `editor.commands.setContent()` はメインスレッドを数百 ms ブロックする可能性がある。
+
+- **50KB 超のコンテンツ**: `requestAnimationFrame` で UI ペイント後に遅延実行する
+- **3MB 超のコンテンツ**: ソースモードに自動切替し、WYSIWYG パースを回避する
+- **3000 ノード超のドキュメント**: パース後にノード数チェックしソースモードへフォールバック
+
+### 原則 4: VirtualScrollExtension の不変条件
+
+仮想スクロールが正しく動作するための条件:
+1. スクロールコンテナが検出されていること（`findScrollContainer` が非 null を返す）
+2. `docChanged` 後に必ずビューポート再計算がスケジュールされること
+3. 高さキャッシュが `docChanged` 時にクリアされ、スクロール停止時に実測値で更新されること
+
+新しい TipTap 拡張やエディタ周りの変更を加える際は、これらの不変条件を壊していないか確認すること。
+
+### 原則 5: `lastEmittedContentRef` パターン
+
+TipTapEditor の `initialContent` → エディタ → `onContentChange` → ストア → `initialContent` の循環を防ぐために `lastEmittedContentRef` を使用している。
+
+- `lastEmittedContentRef` は `null`（sentinel）で初期化する。`initialContent` で初期化すると初回ロードがスキップされる。
+- `emitMarkdown()` で設定し、`useEffect` で比較する。同一参照なら再注入をスキップする。
+
+---
+
 ## 📐 設計書・ロードマップの読み方
 
 | ファイル | 役割 |
