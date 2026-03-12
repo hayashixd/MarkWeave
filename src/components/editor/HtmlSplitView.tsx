@@ -20,12 +20,15 @@ export interface HtmlSplitViewProps {
   onChange: (value: string) => void;
   /** 読み取り専用 */
   readOnly?: boolean;
+  /** iframe sandbox 方式でプレビューを隔離する（security-design.md §1.2 二次防衛） */
+  useSandbox?: boolean;
 }
 
 export function HtmlSplitView({
   value,
   onChange,
   readOnly = false,
+  useSandbox = false,
 }: HtmlSplitViewProps) {
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [syncScroll, setSyncScroll] = useState(true);
@@ -207,11 +210,23 @@ export function HtmlSplitView({
         </div>
 
         {/* プレビュー本体 */}
-        <div
-          ref={previewRef}
-          className="flex-1 overflow-auto p-6 bg-white"
-          data-testid="html-preview"
-        />
+        {useSandbox ? (
+          /* iframe sandbox 方式: ブラウザレベルでスクリプト実行不可（security-design.md §1.2） */
+          <iframe
+            sandbox="allow-same-origin"
+            srcDoc={sanitized}
+            className="flex-1 w-full border-none bg-white"
+            title="HTML Preview (sandbox)"
+            data-testid="html-preview"
+          />
+        ) : (
+          /* DOMPurify のみ方式: サニタイズ済み HTML を直接挿入 */
+          <div
+            ref={previewRef}
+            className="flex-1 overflow-auto p-6 bg-white"
+            data-testid="html-preview"
+          />
+        )}
       </div>
     </div>
   );

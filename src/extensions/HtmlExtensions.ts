@@ -9,6 +9,7 @@
 
 import { Mark, Node, Extension, mergeAttributes } from '@tiptap/core';
 import type { RawCommands } from '@tiptap/core';
+import { RawHtmlBlockNode } from './RawHtmlBlockExtension';
 
 // ---------------------------------------------------------------------------
 // TipTap v3 コマンド型拡張
@@ -434,4 +435,5 @@ export const htmlExtensions = [
   TextAlignExtension,
   DivBlockNode,
   SemanticBlockNode,
+  RawHtmlBlockNode,
 ];
