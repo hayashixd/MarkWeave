@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
+use rusqlite::params;
 use std::path::Path;
 use tauri::{AppHandle, Manager, State};
 

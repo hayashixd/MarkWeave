@@ -9,7 +9,7 @@
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
+use tauri_plugin_store::StoreExt;
 
 /// サポートするプロバイダ/モデルのホワイトリスト。
 /// 新モデル追加時はここを編集する。
