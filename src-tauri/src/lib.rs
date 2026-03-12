@@ -8,8 +8,11 @@ use commands::db_commands;
 use commands::export_commands;
 use commands::fs_commands;
 use commands::git_commands;
+use commands::image_commands;
 use commands::plugin_commands;
 use commands::recent_files;
+use commands::search_commands;
+use commands::watch_commands;
 use commands::window_commands;
 use commands::window_sync;
 use tauri::{Emitter, Manager};
@@ -36,6 +39,7 @@ pub fn run() {
         }))
         .manage(window_sync::FileLockRegistry::new())
         .manage(window_sync::WindowCounter::new())
+        .manage(watch_commands::WatcherRegistry::new())
         .invoke_handler(tauri::generate_handler![
             export_commands::print_to_pdf,
             export_commands::check_pandoc,
@@ -81,6 +85,12 @@ pub fn run() {
             git_commands::git_commit,
             git_commands::git_log,
             git_commands::git_branch_info,
+            watch_commands::watch_file,
+            watch_commands::watch_workspace,
+            image_commands::save_image,
+            image_commands::cache_remote_image,
+            image_commands::purge_image_cache,
+            search_commands::search_workspace,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
