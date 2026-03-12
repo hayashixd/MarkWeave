@@ -3,8 +3,8 @@
 ## 概要
 
 - 設計書セクション数: 12（共通型定義 + 1〜10章 + 追加ガイドライン）
-- 確認済み実装: 26 項目
-- 未実装（要注意）: 8 項目
+- 確認済み実装: 29 項目
+- 未実装（要注意）: 5 項目
 - 保留（feature-list.md 管理済み）: 2 項目
 
 ---
@@ -14,15 +14,17 @@
 ### §共通型定義
 
 #### 設計要件（抜粋）
-- `src/types/tauri-commands.ts` に `TauriError` / `TauriResult<T>` を定義する。
+- `src/utils/error-translator.ts` に `AppError` / `translateError()` を定義する。
+- `src/lib/tauri-commands.ts` に型安全な invoke ラッパーを提供する。
 
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| `src/types/tauri-commands.ts` に共通型が存在する | ❌ 未実装 | （該当ファイル未確認） |
+| `src/utils/error-translator.ts` に `AppError` / `translateError` が存在する | ✅ 準拠 | `src/utils/error-translator.ts:10-19`, `src/utils/error-translator.ts:31-55` |
+| `src/lib/tauri-commands.ts` に型安全な invoke ラッパーが存在する | ✅ 準拠 | `src/lib/tauri-commands.ts:25-166` |
 
-#### 未実装・不一致の詳細
-- **共通型定義ファイル**: 設計書では `src/types/tauri-commands.ts` を定義先としているが、実装側に同名ファイルが存在しない。
+#### 訂正メモ（2026-03-12）
+- 初回レビューで `src/types/tauri-commands.ts` に `TauriError` / `TauriResult<T>` が必要と記載したが、設計書（tauri-ipc-interface.md §共通型定義・§10）にそのようなファイル・型名の記述は存在しない。設計書が定義するのは `src/utils/error-translator.ts`（`AppError` / `translateError`）と `src/lib/tauri-commands.ts`（invoke ラッパー）であり、いずれも実装済み。本項目のレビュー判定を ❌ → ✅ に訂正する。
 
 ---
 
@@ -193,17 +195,17 @@
 ### §10 エラー型定義
 
 #### 設計要件（抜粋）
-- `src/utils/tauri-error.ts` に `TauriCommandError` / `parseTauriError` / `tauriInvoke<T>` を定義する。
+- エラー翻訳層: `src/utils/error-translator.ts` に `AppError` / `translateError()` を定義する。
+- コマンドラッパー層: `src/lib/tauri-commands.ts` で `translateError()` を使用しエラー変換する。
 
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| `src/utils/tauri-error.ts` の存在 | ❌ 未実装 | （該当ファイル未確認） |
-| 代替のエラー翻訳層 | ⚠️ 部分準拠 | `src/lib/tauri-commands.ts:1` |
+| `src/utils/error-translator.ts` のエラー翻訳層 | ✅ 準拠 | `src/utils/error-translator.ts:10-55` |
+| `src/lib/tauri-commands.ts` の invoke ラッパーでの translateError 使用 | ✅ 準拠 | `src/lib/tauri-commands.ts:175-211` |
 
-#### 未実装・不一致の詳細
-- **tauri-error.ts**: 設計書指定ファイル/型/関数を確認できない。
-- **エラー変換契約差分**: 実装は `translateError` による変換を行うが、設計書で定義された `TauriCommandError` クラス体系とは一致しない。
+#### 訂正メモ（2026-03-12）
+- 初回レビューで `src/utils/tauri-error.ts` に `TauriCommandError` / `parseTauriError` / `tauriInvoke<T>` が必要と記載したが、設計書（tauri-ipc-interface.md §10）にそのようなファイル・型名・関数名の記述は存在しない。設計書 §10 が定義するのはエラー翻訳層（`src/utils/error-translator.ts`）とコマンドラッパー層（`src/lib/tauri-commands.ts`）の 2 層構成であり、いずれも実装済み。本項目のレビュー判定を ❌/⚠️ → ✅ に訂正する。
 
 ---
 
@@ -226,16 +228,16 @@
 
 | 判定 | 件数 |
 |---|---|
-| ✅ 準拠 | 26 |
-| ⚠️ 部分準拠 | 6 |
-| ❌ 未実装 | 8 |
+| ✅ 準拠 | 29 |
+| ⚠️ 部分準拠 | 5 |
+| ❌ 未実装 | 5 |
 | 🔶 保留（管理済み） | 2 |
 
 ### 主要な未実装・不一致（❌ / ⚠️ のみ列挙）
 
-1. **共通型定義ファイル** — `src/types/tauri-commands.ts` の `TauriError` / `TauriResult` を確認できない。
+1. ~~**共通型定義ファイル** — `src/types/tauri-commands.ts` の `TauriError` / `TauriResult` を確認できない。~~ → **訂正済み（2026-03-12）**: 設計書にそのようなファイル・型名の記述なし。設計書が定義する `src/utils/error-translator.ts` と `src/lib/tauri-commands.ts` は実装済み。
 2. **ファイル監視コマンド** — `watch_file` が未実装。
 3. **ワークスペース監視コマンド** — `watch_workspace` が未実装。
 4. **画像系コマンド** — `save_image` / `cache_remote_image` / `purge_image_cache` が未実装。
 5. **検索コマンド** — `search_workspace` が未実装。
-6. **契約差分（workspace/metadata/wiki/pdf/error）** — 引数・戻り値または型体系が設計書定義と一致しない箇所を確認。
+6. **契約差分（workspace/metadata/wiki/pdf）** — 引数・戻り値が設計書定義と一致しない箇所を確認。

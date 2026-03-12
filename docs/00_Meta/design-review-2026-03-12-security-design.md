@@ -3,8 +3,8 @@
 ## 概要
 
 - 設計書セクション数: 4
-- 確認済み実装: 15 項目
-- 未実装（要注意）: 2 項目
+- 確認済み実装: 16 項目
+- 未実装（要注意）: 1 項目
 - 保留（feature-list.md 管理済み）: 0 項目
 
 ---
@@ -90,7 +90,7 @@
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
 | `script-src 'self'` | ✅ 準拠 | `src-tauri/tauri.conf.json:25` |
-| `connect-src 'none'` | ❌ 未実装 | `src-tauri/tauri.conf.json:25`（`ipc:` / `http://ipc.localhost` を許可） |
+| `connect-src` で外部接続を禁止（IPC 通信のみ許可） | ✅ 準拠 | `src-tauri/tauri.conf.json:25`（Tauri 2.0 IPC に必要な `ipc:` / `http://ipc.localhost` を許可）、設計書を `connect-src ipc: http://ipc.localhost` に修正済み（2026-03-12） |
 | KaTeX の `trust: false` | ✅ 準拠 | `src/extensions/MathExtension.tsx:50-54`, `src/extensions/MathExtension.tsx:186-190` |
 | Mermaid の sandbox iframe 経由レンダリング | ❌ 未実装 | `src/extensions/MermaidExtension.tsx:20-25`, `src/extensions/MermaidExtension.tsx:205-209`（主 WebView で直接 render） |
 | 外部リンクを `@tauri-apps/plugin-shell` で開く処理 | ❌ 未実装 | `rg -n "@tauri-apps/plugin-shell|open\(href|editor.on\('click'" src`（ヒットなし） |
@@ -100,7 +100,7 @@
 | プラグイン sandbox + 権限モデル | ✅ 準拠 | `src/plugins/plugin-bridge.ts:85-90`, `src/plugins/plugin-api.ts:22-35` |
 
 #### 未実装・不一致の詳細
-- **CSP `connect-src`**: 設計の `none` と実装値が異なる。
+- ~~**CSP `connect-src`**: 設計の `none` と実装値が異なる。~~ → **解消済み（2026-03-12）**: Tauri 2.0 IPC に `ipc:` / `http://ipc.localhost` が必須であるため、設計書側を `connect-src ipc: http://ipc.localhost` に修正。
 - **Mermaid 実行分離**: 設計は sandbox iframe 経由だが、実装は主 WebView で `mermaid.render()` を直接実行。
 - **外部リンクの安全な遷移**: 設計書記載のリンクインターセプト実装が確認できない。
 - **アップデート鍵管理**: updater 設定はあるが公開鍵が未設定。
@@ -111,13 +111,13 @@
 
 | 判定 | 件数 |
 |---|---|
-| ✅ 準拠 | 11 |
+| ✅ 準拠 | 12 |
 | ⚠️ 部分準拠 | 4 |
-| ❌ 未実装 | 6 |
+| ❌ 未実装 | 5 |
 | 🔶 保留（管理済み） | 0 |
 
 ### 主要な未実装・不一致（❌ / ⚠️ のみ列挙）
 
 1. **ファイルシステム最小権限化** — capabilities にスコープ付き `allow` ルールが確認できない。
-2. **CSP `connect-src` 方針差分** — 設計の `none` と実装設定が不一致。
+2. ~~**CSP `connect-src` 方針差分** — 設計の `none` と実装設定が不一致。~~ → **解消済み（2026-03-12）**: 設計書を Tauri 2.0 IPC 要件に合わせて修正。
 3. **Mermaid sandbox 分離未適用** — 設計想定の iframe 分離ではなく主 WebView 実行。

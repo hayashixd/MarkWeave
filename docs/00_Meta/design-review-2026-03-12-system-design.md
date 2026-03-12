@@ -3,8 +3,8 @@
 ## 概要
 
 - 設計書セクション数: 8
-- 確認済み実装: 14 項目
-- 未実装（要注意）: 5 項目
+- 確認済み実装: 16 項目
+- 未実装（要注意）: 3 項目
 - 保留（feature-list.md 管理済み）: 0 項目
 
 ---
@@ -19,7 +19,7 @@
 ### 統合時に正規化したポイント
 
 1. モード設計の評価軸を Markdown エディタ実装に限定（HTML エディタの3モード実装は別要件として扱う）。
-2. `EditorModeExtension` / `useEditorMode` は「命名一致」ではなく「同等実装の存在」で確認し、同等実装が確認できないため ❌ を維持。
+2. ~~`EditorModeExtension` / `useEditorMode` は「命名一致」ではなく「同等実装の存在」で確認し、同等実装が確認できないため ❌ を維持。~~ → **訂正（2026-03-12）**: 設計書 §2.2 の設計メモで TyporaFocusExtension への統合が設計判断として記録されており、❌ → ✅ に訂正。
 3. `hast` SoT は `mdast` 中心実装との乖離として ⚠️ に統一。
 4. `public/` サンドボックス構成は `plugin-runtime.html` の存在のみ確認できるため ⚠️ に統一。
 
@@ -55,13 +55,13 @@
 |---|---|---|
 | 3MB・3,000ノード閾値で source へ切替する判定がある | ✅ 準拠 | `src/components/editor/TipTapEditor.tsx:95-97`, `src/components/editor/TipTapEditor.tsx:485-518` |
 | AI最適化モジュール（normalize/annotate/analyze/buildReport）が存在する | ✅ 準拠 | `src/ai/optimizer/ai-optimizer.ts:7-15`, `src/ai/optimizer/ai-optimizer.ts:83-135`, `src/ai/optimizer/ai-optimizer.ts:189-220` |
-| Markdownエディタのモードが4種（typora/wysiwyg/source/split） | ❌ 未実装 | `src/components/editor/TipTapEditor.tsx:93`, `src/components/editor/TipTapEditor.tsx:119`, `src/components/editor/TipTapEditor.tsx:620-634` |
-| `EditorModeExtension` / `useEditorMode` による共通モード購読実装 | ❌ 未実装 | `src/components/editor/TipTapEditor.tsx:233-286`, `src/extensions/TyporaFocusExtension.ts:22-29` |
+| Markdownエディタのモードが2種（wysiwyg/source） | ✅ 準拠 | `src/components/editor/TipTapEditor.tsx:93`, `src/components/editor/TipTapEditor.tsx:119`, `src/components/editor/TipTapEditor.tsx:620-634`。設計書 §2.2（line 221-228）で2モード構成に確定済み |
+| Typora式フォーカスデコレーションが wysiwyg モード内で実現 | ✅ 準拠 | `src/extensions/TyporaFocusExtension.ts:22-29`。設計書の設計メモ（line 228）で TyporaFocusExtension による統合を明記 |
 | 内部 AST が hast 互換を基準として統一されている | ⚠️ 部分準拠 | `src/core/document/ast.ts:4-6`, `src/core/document/ast.ts:33-103`, `src/lib/markdown-to-tiptap.ts:4-5` |
 
 #### 未実装・不一致の詳細
-- **Markdown 4モード**: 設計書は `typora / wysiwyg / source / split` を要求しているが、MarkdownEditor の `EditorMode` は `wysiwyg | source` の2値のみ。
-- **NodeView 共通モード購読**: 設計書の `EditorModeExtension` + `useEditorMode` パターンに相当する実装は確認できず、Typora 表示は別拡張（Decoration）で実装されている。
+- ~~**Markdown 4モード**: 設計書は `typora / wysiwyg / source / split` を要求しているが、MarkdownEditor の `EditorMode` は `wysiwyg | source` の2値のみ。~~ → **訂正済み（2026-03-12）**: 設計書 §2.2（line 221-228）は2モード構成（wysiwyg / source）に確定済み。typora は wysiwyg 内の TyporaFocusExtension に統合、split は将来保留と明記されている。
+- ~~**NodeView 共通モード購読**: 設計書の `EditorModeExtension` + `useEditorMode` パターンに相当する実装は確認できず、Typora 表示は別拡張（Decoration）で実装されている。~~ → **訂正済み（2026-03-12）**: 設計書の設計メモにより TyporaFocusExtension（ProseMirror Decoration ベース）での統合が設計判断として記録されており、現在の実装は設計書と整合している。
 - **hast SoT**: ドキュメント型定義は mdast 準拠と明記されており、hast 互換 SoT の明示統一は確認できない。
 
 ---
@@ -169,15 +169,15 @@
 
 | 判定 | 件数 |
 |---|---|
-| ✅ 準拠 | 14 |
+| ✅ 準拠 | 16 |
 | ⚠️ 部分準拠 | 4 |
-| ❌ 未実装 | 5 |
+| ❌ 未実装 | 3 |
 | 🔶 保留（管理済み） | 0 |
 
 ### 主要な未実装・不一致（❌ / ⚠️ のみ列挙）
 
-1. **Markdown エディタ4モード要件** — 現状は `wysiwyg/source` の2モード実装。
-2. **EditorModeExtension + useEditorMode パターン** — 設計書で規定された共通購読パターンを確認できない。
+1. ~~**Markdown エディタ4モード要件** — 現状は `wysiwyg/source` の2モード実装。~~ → **訂正済み（2026-03-12）**: 設計書 §2.2 で2モード構成に確定済み。
+2. ~~**EditorModeExtension + useEditorMode パターン** — 設計書で規定された共通購読パターンを確認できない。~~ → **訂正済み（2026-03-12）**: 設計書の設計メモで TyporaFocusExtension 統合を明記。
 3. **hast 互換 SoT の明示統一** — mdast 準拠定義が中心で、hast SoT の統一実装は確認できない。
 4. **ai_commands.rs** — 設計書構成例にあるコマンドモジュールが commands 登録に存在しない。
 5. **Typora クリックハンドラ実装差異** — 設計書例示の専用プラグイン実装を確認できない。
