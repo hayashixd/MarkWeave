@@ -729,7 +729,7 @@ export function MarkdownEditor({
 
       // data URI の場合はアノテーション非対応（外部URLも対象外）
       if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
-        showToast('アノテーションはローカル画像ファイルのみ対応しています', 'warning');
+        showToast('warning', 'アノテーションはローカル画像ファイルのみ対応しています');
         return;
       }
 
@@ -1008,7 +1008,7 @@ export function MarkdownEditor({
           onClose={() => setAnnotationTarget(null)}
           onSaved={() => {
             setAnnotationTarget(null);
-            showToast('アノテーション画像を保存しました', 'success');
+            showToast('success', 'アノテーション画像を保存しました');
             // エディタの画像を再表示するためにリフレッシュ
             editor?.commands.focus();
           }}

@@ -102,11 +102,16 @@ export function drawFreehand(
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  const firstPoint = points[0];
+  if (!firstPoint) return;
+
   ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
+  ctx.moveTo(firstPoint.x, firstPoint.y);
 
   for (let i = 1; i < points.length; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
+    const point = points[i];
+    if (!point) continue;
+    ctx.lineTo(point.x, point.y);
   }
   ctx.stroke();
 }
@@ -157,10 +162,10 @@ export function drawMosaic(
       for (let py = by; py < by + bh; py++) {
         for (let px = bx; px < bx + bw; px++) {
           const idx = (py * w + px) * 4;
-          r += data[idx];
-          g += data[idx + 1];
-          b += data[idx + 2];
-          a += data[idx + 3];
+          r += data[idx] ?? 0;
+          g += data[idx + 1] ?? 0;
+          b += data[idx + 2] ?? 0;
+          a += data[idx + 3] ?? 0;
           count++;
         }
       }

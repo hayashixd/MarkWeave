@@ -30,7 +30,7 @@ export const ImageAnnotationExtension = Extension.create({
       new Plugin({
         key: new PluginKey('imageAnnotation'),
         props: {
-          handleDoubleClickOn(view, pos, node) {
+          handleDoubleClickOn(_view, pos, node) {
             if (node.type.name !== 'image') return false;
 
             const src = node.attrs.src as string;
