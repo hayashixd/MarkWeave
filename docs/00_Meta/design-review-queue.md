@@ -13,7 +13,7 @@
 | 2 | `docs/01_Architecture/tauri-ipc-interface.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-tauri-ipc-interface.md` |
 | 3 | `docs/01_Architecture/security-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-security-design.md` |
 | 4 | `docs/01_Architecture/performance-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-performance-design.md` |
-| 5 | `docs/01_Architecture/plugin-api-design.md` | pending | — | — |
+| 5 | `docs/01_Architecture/plugin-api-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-plugin-api-design.md` |
 | 6 | `docs/02_Core_Editor/markdown-tiptap-conversion.md` | pending | — | — |
 | 7 | `docs/02_Core_Editor/tiptap-roundtrip-test-strategy.md` | pending | — | — |
 | 8 | `docs/02_Core_Editor/undo-redo-design.md` | pending | — | — |
