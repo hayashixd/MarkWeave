@@ -257,6 +257,95 @@ fn collect_md_files(dir: &Path, files: &mut Vec<String>) -> std::io::Result<()> 
     Ok(())
 }
 
+/// バイナリデータをファイルに書き込む Tauri コマンド。
+///
+/// image-design.md §9.6 に準拠:
+/// アノテーション済み画像（Canvas blob）を保存するために使用。
+/// フロントエンドから `invoke('write_file_bytes', { path, bytes })` で呼び出す。
+#[tauri::command]
+pub async fn write_file_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    log::info!("write_file_bytes: {} ({} bytes)", path, bytes.len());
+
+    let file_path = Path::new(&path);
+
+    if !file_path.is_absolute() {
+        return Err(AppError::InvalidPath {
+            path: path.clone(),
+        }
+        .into());
+    }
+
+    if let Some(parent) = file_path.parent() {
+        if !parent.exists() {
+            if let Err(err) = tokio::fs::create_dir_all(parent).await {
+                log::error!("write_file_bytes: failed to create parent dir: {}", err);
+                return Err(AppError::from_io(err, &path).into());
+            }
+        }
+    }
+
+    match tokio::fs::write(&path, &bytes).await {
+        Ok(()) => {
+            log::info!("write_file_bytes: success");
+            Ok(())
+        }
+        Err(err) => {
+            log::error!("write_file_bytes: failed: {}", err);
+            Err(AppError::WriteFailed {
+                path: path.clone(),
+                reason: err.to_string(),
+            }
+            .into())
+        }
+    }
+}
+
+/// ファイルのバックアップコピーを作成する Tauri コマンド。
+///
+/// image-design.md §9.6 に準拠:
+/// アノテーション前に元画像を `_original` サフィックス付きでバックアップ。
+/// フロントエンドから `invoke('backup_file', { path })` で呼び出す。
+#[tauri::command]
+pub async fn backup_file(path: String) -> Result<String, String> {
+    log::info!("backup_file: {}", path);
+
+    let file_path = Path::new(&path);
+    if !file_path.exists() {
+        return Err(AppError::FileNotFound {
+            path: path.clone(),
+        }
+        .into());
+    }
+
+    let stem = file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+    let ext = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png");
+    let parent = file_path.parent().unwrap();
+    let backup_path = parent.join(format!("{}_original.{}", stem, ext));
+
+    // バックアップが既に存在する場合はスキップ（最初のオリジナルを保持）
+    if backup_path.exists() {
+        log::info!("backup_file: backup already exists, skipping");
+        return Ok(backup_path.to_string_lossy().to_string());
+    }
+
+    match tokio::fs::copy(&path, &backup_path).await {
+        Ok(_) => {
+            log::info!("backup_file: success → {}", backup_path.display());
+            Ok(backup_path.to_string_lossy().to_string())
+        }
+        Err(err) => {
+            log::error!("backup_file: failed: {}", err);
+            Err(AppError::from_io(err, &path).into())
+        }
+    }
+}
+
 /// ファイルをリネーム / 別ディレクトリへ移動する Tauri コマンド。
 ///
 /// file-workspace-design.md §6.3 に準拠。

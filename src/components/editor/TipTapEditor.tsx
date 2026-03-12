@@ -57,6 +57,9 @@ import Image from '@tiptap/extension-image';
 import { MathInline, MathBlock } from '../../extensions/MathExtension';
 import { MermaidBlock } from '../../extensions/MermaidExtension';
 import { ImageDropPasteExtension } from '../../extensions/ImageDropPasteExtension';
+import { ImageAnnotationExtension } from '../../extensions/ImageAnnotationExtension';
+import type { ImageAnnotationEvent } from '../../extensions/ImageAnnotationExtension';
+import { ImageAnnotationModal } from '../ImageAnnotation';
 import { TEXT_TRANSFORM_COMMANDS } from '../../core/text-transform';
 import { BookmarkExtension } from '../../extensions/BookmarkExtension';
 import { WordCompleteExtension } from '../../extensions/WordCompleteExtension';
@@ -168,6 +171,12 @@ export function MarkdownEditor({
     coords: null,
   });
 
+  // 画像アノテーションの状態 (Phase 7.5)
+  const [annotationTarget, setAnnotationTarget] = useState<{
+    src: string;
+    filePath: string;
+  } | null>(null);
+
   // Wikilink オートコンプリートの状態
   const [wikilinkAutoState, setWikilinkAutoState] = useState<WikilinkAutoState>({
     active: false,
@@ -264,6 +273,7 @@ export function MarkdownEditor({
         allowBase64: true,
       }),
       ImageDropPasteExtension,
+      ImageAnnotationExtension,
       MathInline,
       MathBlock,
       MermaidBlock,
@@ -711,6 +721,30 @@ export function MarkdownEditor({
     settings.editor.typewriterVolume,
   ]);
 
+  // 画像アノテーションイベントリスナー (Phase 7.5)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<ImageAnnotationEvent>).detail;
+      const { src } = detail;
+
+      // data URI の場合はアノテーション非対応（外部URLも対象外）
+      if (src.startsWith('data:') || src.startsWith('http://') || src.startsWith('https://')) {
+        showToast('アノテーションはローカル画像ファイルのみ対応しています', 'warning');
+        return;
+      }
+
+      // filePath はタブの filePath から相対パスを解決して取得
+      // 画像の src がそのまま絶対パスとして使える前提
+      setAnnotationTarget({
+        src,
+        filePath: src,
+      });
+    };
+
+    window.addEventListener('image-annotation-start', handler);
+    return () => window.removeEventListener('image-annotation-start', handler);
+  }, [showToast]);
+
   // コードブロックにコピーボタンを自動付与 (テクニカルライター/開発者ペルソナ向け)
   useEffect(() => {
     if (!editor || mode !== 'wysiwyg') return;
@@ -966,6 +1000,20 @@ export function MarkdownEditor({
         <SourceEditor value={sourceText} onChange={handleSourceTextChange} readOnly={readOnly} />
       )}
       <EditorHandle setMarkdown={setMarkdown} getMarkdown={getMarkdown} />
+      {/* 画像アノテーションモーダル (Phase 7.5) */}
+      {annotationTarget && (
+        <ImageAnnotationModal
+          imageSrc={annotationTarget.src}
+          imagePath={annotationTarget.filePath}
+          onClose={() => setAnnotationTarget(null)}
+          onSaved={() => {
+            setAnnotationTarget(null);
+            showToast('アノテーション画像を保存しました', 'success');
+            // エディタの画像を再表示するためにリフレッシュ
+            editor?.commands.focus();
+          }}
+        />
+      )}
     </div>
   );
 }
