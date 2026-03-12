@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | 1 | `docs/01_Architecture/system-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-system-design.md` |
 | 2 | `docs/01_Architecture/tauri-ipc-interface.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-tauri-ipc-interface.md` |
-| 3 | `docs/01_Architecture/security-design.md` | pending | — | — |
+| 3 | `docs/01_Architecture/security-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-security-design.md` |
 | 4 | `docs/01_Architecture/performance-design.md` | pending | — | — |
 | 5 | `docs/01_Architecture/plugin-api-design.md` | pending | — | — |
 | 6 | `docs/02_Core_Editor/markdown-tiptap-conversion.md` | pending | — | — |
