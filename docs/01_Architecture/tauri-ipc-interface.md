@@ -30,17 +30,33 @@
 ## 共通型定義
 
 ```typescript
-// src/types/tauri-commands.ts
+// src/utils/error-translator.ts
 
-/** Tauri コマンドが返すエラーの共通フォーマット */
-export interface TauriError {
-  code: string;       // 例: "FILE_NOT_FOUND" | "PERMISSION_DENIED" | "IO_ERROR"
-  message: string;    // 人間向けエラーメッセージ（日本語）
-  detail?: string;    // デバッグ用の詳細情報（スタックトレース等）
+/** Rust 側の AppError の JSON 構造 */
+interface AppError {
+  kind:
+    | 'FileNotFound'
+    | 'PermissionDenied'
+    | 'DiskFull'
+    | 'FileLocked'
+    | 'InvalidPath'
+    | 'Unknown';
+  detail?: { path?: string; message?: string };
 }
 
-/** Result 型（成功/失敗）*/
-export type TauriResult<T> = T; // invoke が throw する場合は TauriError がスローされる
+/** Tauri コマンドのエラーをユーザー向けメッセージに変換する */
+export function translateError(error: unknown): string;
+```
+
+```typescript
+// src/lib/tauri-commands.ts
+
+/** 各 Tauri コマンドの型安全な invoke ラッパー */
+// error-handling-design.md に準拠し、Rust からのエラーを translateError で翻訳する。
+// 例:
+export async function readFile(path: string): Promise<string>;
+export async function writeFile(path: string, content: string): Promise<void>;
+// ... 他のコマンドも同様のラッパーを提供
 ```
 
 ---
@@ -112,26 +128,25 @@ await invoke<void>('watch_file', { path: '...', eventName: 'file-changed' });
 ### `list_workspace_files`
 
 ```typescript
-interface WorkspaceFile {
-  path: string;
+/** ファイルツリーノード（再帰的なツリー構造） */
+interface FileNode {
   name: string;
-  isDirectory: boolean;
-  modifiedAt: string;    // ISO 8601
-  size: number;          // バイト数（ファイルのみ）
+  path: string;
+  type: 'file' | 'directory';
+  children?: FileNode[];  // ディレクトリの場合のみ
 }
 
 interface ListWorkspaceFilesArgs {
   rootPath: string;
-  recursive: boolean;
-  extensions?: string[];  // ['md', 'markdown', 'html'] 等でフィルタ
+  extensions: string[];  // ['.md', '.markdown', '.html'] 等でフィルタ（ドット付き）
 }
 
-// Rust シグネチャ: pub async fn list_workspace_files(...) -> Result<Vec<WorkspaceFile>, String>
-const files = await invoke<WorkspaceFile[]>('list_workspace_files', {
+// Rust シグネチャ: pub async fn list_workspace_files(root_path: String, extensions: Vec<String>) -> Result<Vec<FileNode>, String>
+const files = await invoke<FileNode[]>('list_workspace_files', {
   rootPath: '/workspace',
-  recursive: true,
-  extensions: ['md', 'markdown'],
+  extensions: ['.md', '.markdown'],
 });
+// 注意: 再帰的にツリー構造を返す。隠しファイル・隠しフォルダはスキップされる。
 ```
 
 ### `watch_workspace`
@@ -256,7 +271,6 @@ const result = await invoke<IndexResult>('index_workspace_metadata', { rootPath:
 ```typescript
 interface ExecuteMetadataQueryArgs {
   sql: string;              // TypeScript 側でパースした SQL（sanitize 済み）
-  params: (string | number | null)[];
 }
 
 interface MetadataQueryResult {
@@ -264,10 +278,11 @@ interface MetadataQueryResult {
   rows: (string | number | null)[][];
 }
 
-// Rust シグネチャ: pub async fn execute_metadata_query(...) -> Result<MetadataQueryResult, String>
-const result = await invoke<MetadataQueryResult>('execute_metadata_query', { sql: '...', params: [] });
+// Rust シグネチャ: pub async fn execute_metadata_query(db: State<MetadataDb>, sql: String) -> Result<MetadataQueryResult, String>
+const result = await invoke<MetadataQueryResult>('execute_metadata_query', { sql: '...' });
 // 注意: SQL は TypeScript の parseQuery/astToSql で生成されたものに限定。
 //       ユーザー入力の生 SQL をそのまま渡さないこと（SQLi 対策）。
+//       Rust 側は State<MetadataDb> を自動注入するため、フロントエンドから db 引数は不要。
 ```
 
 ---
@@ -296,24 +311,30 @@ const index = await invoke<WikilinkIndex>('scan_wikilinks', { rootPath: '...' })
 
 ```typescript
 interface GraphNode {
-  id: string;         // ファイルパス
-  label: string;      // ファイル名（拡張子なし）
+  id: string;              // ファイルパス
+  name: string;            // ファイル名
+  title: string | null;    // frontmatter のタイトル
+  linkCount: number;       // リンク数（被リンク含む合計）
   tags: string[];
-  linkCount: number;
+  isActive: boolean;       // 常に false（アクティブ判定はフロントエンド側）
 }
 
 interface GraphEdge {
-  source: string;     // ファイルパス
-  target: string;     // ファイルパス
+  source: string;          // ファイルパス
+  target: string;          // ファイルパス（未解決の場合 "__unresolved__<name>"）
+  isUnresolved: boolean;   // 未解決リンクかどうか
 }
 
 interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  allTags: string[];       // タグ一覧（フィルタ UI 用）
 }
 
-// Rust シグネチャ: pub async fn get_graph_data(root_path: String) -> Result<GraphData, String>
-const graph = await invoke<GraphData>('get_graph_data', { rootPath: '...' });
+// Rust シグネチャ: pub async fn get_graph_data(db: State<MetadataDb>) -> Result<GraphData, String>
+const graph = await invoke<GraphData>('get_graph_data');
+// 注意: Rust 側は State<MetadataDb> を自動注入するため、フロントエンドから引数は不要。
+//       事前に init_metadata_db でデータベースを初期化しておく必要がある。
 ```
 
 ### `get_backlinks`
@@ -477,7 +498,7 @@ interface PdfOptions {
 }
 
 // Rust シグネチャ: pub async fn print_to_pdf(app: AppHandle, html_content: String, output_path: String, options: PdfOptions) -> Result<u64, String>
-const sizeBytes = await invoke<number>('print_to_pdf', {
+await invoke<number>('print_to_pdf', {
   htmlContent: '<html>...</html>',
   outputPath: '/path/to/output.pdf',
   options: {
@@ -490,7 +511,9 @@ const sizeBytes = await invoke<number>('print_to_pdf', {
     printHeaderFooter: false,
   },
 });
-// 戻り値: PDF ファイルのバイト数
+// 戻り値: u64 だが、Tauri 2.x にはヘッドレス PDF 生成 API が存在しないため、
+//         OS の印刷ダイアログ（「PDF として保存」）経由の方式を採用。
+//         実際のファイルサイズは不明なため常に 0 を返す。
 ```
 
 ### `try_acquire_file_lock`
@@ -575,52 +598,49 @@ const newWindowLabel = await invoke<string>('detach_tab_to_window', {
 
 ## 10. エラー型定義
 
-Rust 側のコマンドはエラーを `String` で返す。フロントエンドでは以下のパターンでコードとメッセージを分離する。
+Rust 側のコマンドは `AppError` 構造体（`src-tauri/src/models/error.rs`）を JSON シリアライズして返す。
+フロントエンドでは以下の 2 層でエラーを処理する。
+
+### エラー翻訳層: `src/utils/error-translator.ts`
 
 ```typescript
-// src/utils/tauri-error.ts
+// src/utils/error-translator.ts
 
-export class TauriCommandError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly detail?: string
-  ) {
-    super(message);
-    this.name = 'TauriCommandError';
-  }
+/** Rust 側の AppError の JSON 構造 */
+interface AppError {
+  kind:
+    | 'FileNotFound'
+    | 'PermissionDenied'
+    | 'DiskFull'
+    | 'FileLocked'
+    | 'InvalidPath'
+    | 'Unknown';
+  detail?: { path?: string; message?: string };
 }
 
-/**
- * Tauri コマンドエラー文字列を構造化エラーにパースする。
- * Rust 側が "ERROR_CODE: message\ndetail..." 形式で返すことを前提とする。
- */
-export function parseTauriError(rawError: unknown): TauriCommandError {
-  const raw = String(rawError);
-  const colonIndex = raw.indexOf(':');
-  if (colonIndex > 0) {
-    const code = raw.slice(0, colonIndex).trim();
-    const rest = raw.slice(colonIndex + 1).trim();
-    const [message, ...detailLines] = rest.split('\n');
-    return new TauriCommandError(code, message, detailLines.join('\n') || undefined);
-  }
-  return new TauriCommandError('UNKNOWN_ERROR', raw);
-}
+/** Tauri コマンドのエラーをユーザー向け日本語メッセージに変換する */
+export function translateError(error: unknown): string;
+```
+
+### コマンドラッパー層: `src/lib/tauri-commands.ts`
+
+```typescript
+// src/lib/tauri-commands.ts
 
 /**
- * invoke() のラッパー。エラーを TauriCommandError に変換する。
+ * 各 Tauri コマンドの型安全な invoke ラッパー。
+ * エラー発生時は translateError() で日本語メッセージに変換し、
+ * Error オブジェクトとして throw する。
+ *
+ * 使用例:
+ *   import { readFile, writeFile } from '@/lib/tauri-commands';
+ *   const content = await readFile('/path/to/file.md');
  */
-export async function tauriInvoke<T>(
-  command: string,
-  args?: Record<string, unknown>
-): Promise<T> {
-  try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return await invoke<T>(command, args);
-  } catch (err) {
-    throw parseTauriError(err);
-  }
-}
+export async function readFile(path: string): Promise<string>;
+export async function writeFile(path: string, content: string): Promise<void>;
+export async function fileExists(path: string): Promise<boolean>;
+export async function setTitleBarDirty(dirty: boolean, fileName?: string): Promise<void>;
+// ... 他のコマンドも同様
 ```
 
 ---
@@ -632,7 +652,7 @@ export async function tauriInvoke<T>(
 1. **このドキュメントに型定義を追記する**（TypeScript 型 + Rust シグネチャコメント）
 2. `src-tauri/src/commands/` に Rust 実装を追加する
 3. `src-tauri/src/lib.rs` の `invoke_handler` に登録する
-4. TypeScript 側で `tauriInvoke<T>()` を使って呼び出す
+4. TypeScript 側で `src/lib/tauri-commands.ts` にラッパー関数を追加し、`translateError()` でエラー変換する
 5. `testing-strategy-design.md` の Tauri コマンドテスト計画に追記する（必要であれば）
 
 ---
