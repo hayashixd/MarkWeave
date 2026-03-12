@@ -27,6 +27,7 @@
  */
 
 import { useEditor, EditorContent } from '@tiptap/react';
+import type { Transaction } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -95,6 +96,9 @@ export type EditorMode = 'wysiwyg' | 'source';
 const LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES = 3 * 1024 * 1024;
 /** performance-design.md §2: ノード数が閾値を超えたらソースモードに切替 */
 const LARGE_FILE_NODE_COUNT_THRESHOLD = 3000;
+/** 大規模ドキュメントでの連続更新時にシリアライズを間引く閾値 */
+const LARGE_DOC_SERIALIZE_DEBOUNCE_NODE_THRESHOLD = 1200;
+const LARGE_DOC_SERIALIZE_DEBOUNCE_MS = 120;
 
 export interface EditorProps {
   /** 初期 Markdown テキスト */
@@ -129,6 +133,7 @@ export function MarkdownEditor({
   const suppressNextUpdateRef = useRef(0);
   const incrementalSerializerRef = useRef(new IncrementalSerializer());
   const editorWrapperRef = useRef<HTMLDivElement>(null);
+  const serializeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // フロントマター変更時に参照するために ref に保持
   const frontMatterYamlRef = useRef(frontMatterYaml);
   frontMatterYamlRef.current = frontMatterYaml;
@@ -523,14 +528,7 @@ export function MarkdownEditor({
   useEffect(() => {
     if (!editor) return;
 
-    const handler = () => {
-      // IME 変換中はシリアライズしない (markdown-tiptap-conversion.md §9)
-      if (!ime.canProcess()) return;
-      if (suppressNextUpdateRef.current > 0) {
-        suppressNextUpdateRef.current -= 1;
-        return;
-      }
-
+    const emitMarkdown = () => {
       const json = editor.getJSON() as unknown as TipTapDoc;
       // インクリメンタルシリアライズ: 変更ブロックのみ再変換
       const markdown = incrementalSerializerRef.current.serialize(json);
@@ -540,9 +538,44 @@ export function MarkdownEditor({
       onContentChangeRef.current?.(fullMarkdown);
     };
 
+    const handler = ({ transaction }: { transaction: Transaction }) => {
+      // VirtualScrollExtension などの view 更新トランザクションでは
+      // ドキュメント内容が変わらないため、重いシリアライズ処理を実行しない。
+      if (!transaction.docChanged) return;
+
+      // IME 変換中はシリアライズしない (markdown-tiptap-conversion.md §9)
+      if (!ime.canProcess()) return;
+      if (suppressNextUpdateRef.current > 0) {
+        suppressNextUpdateRef.current -= 1;
+        return;
+      }
+
+      const shouldDebounce = editor.state.doc.childCount >= LARGE_DOC_SERIALIZE_DEBOUNCE_NODE_THRESHOLD;
+      if (!shouldDebounce) {
+        if (serializeTimerRef.current) {
+          clearTimeout(serializeTimerRef.current);
+          serializeTimerRef.current = null;
+        }
+        emitMarkdown();
+        return;
+      }
+
+      if (serializeTimerRef.current) {
+        clearTimeout(serializeTimerRef.current);
+      }
+      serializeTimerRef.current = setTimeout(() => {
+        serializeTimerRef.current = null;
+        emitMarkdown();
+      }, LARGE_DOC_SERIALIZE_DEBOUNCE_MS);
+    };
+
     editor.on('update', handler);
     return () => {
       editor.off('update', handler);
+      if (serializeTimerRef.current) {
+        clearTimeout(serializeTimerRef.current);
+        serializeTimerRef.current = null;
+      }
     };
   }, [editor, ime]);
 
@@ -928,7 +961,7 @@ export function MarkdownEditor({
         <div
           ref={editorWrapperRef}
           className={[
-            'flex-1 overflow-y-auto cursor-text relative',
+            'editor-scroll-container flex-1 overflow-y-auto cursor-text relative',
             focusMode ? 'focus-mode-enabled' : '',
             typewriterMode ? 'typewriter-mode-enabled' : '',
           ]

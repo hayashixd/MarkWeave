@@ -51,6 +51,34 @@ function getViewportRange(scrollContainer: Element | null): ViewportRange {
   };
 }
 
+function findScrollContainer(editorView: EditorView): HTMLElement | null {
+  const direct = editorView.dom.closest('.editor-scroll-container');
+  if (direct instanceof HTMLElement) {
+    return direct;
+  }
+
+  const parentMatch = editorView.dom.parentElement?.closest('.editor-scroll-container');
+  if (parentMatch instanceof HTMLElement) {
+    return parentMatch;
+  }
+
+  // フォールバック: 祖先を走査して実際にスクロール可能な要素を探す。
+  // レイアウト差異（SplitEditor など）で専用クラスが無い場合でも動作させる。
+  let current: HTMLElement | null = editorView.dom.parentElement;
+  while (current) {
+    const style = window.getComputedStyle(current);
+    const overflowY = style.overflowY;
+    const isScrollable = (overflowY === 'auto' || overflowY === 'scroll')
+      && current.scrollHeight > current.clientHeight;
+    if (isScrollable) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+
+  return null;
+}
+
 /**
  * ビューポート外のトップレベルノードに hidden デコレーションを付与する。
  */
@@ -170,10 +198,23 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
         },
 
         view(editorView: EditorView) {
-          // スクロールコンテナを特定（エディタの親の overflow-y-auto 要素）
-          const scrollContainer = editorView.dom.closest('.overflow-y-auto')
-            ?? editorView.dom.parentElement?.closest('.overflow-y-auto')
-            ?? null;
+          // スクロールコンテナを特定（TipTapEditor の専用ラッパー）
+          const scrollContainer = findScrollContainer(editorView);
+          let initialViewportRaf = 0;
+
+          // 初回描画時に実際のスクロールコンテナでビューポート計算を実行する。
+          // init() は window.innerHeight ベースのため、ここで補正しないと一部環境で
+          // ビューポート外判定が固定され、先頭付近しか描画されないことがある。
+          if (scrollContainer && editorView.state.doc.childCount >= threshold) {
+            initialViewportRaf = window.requestAnimationFrame(() => {
+              if (editorView.isDestroyed) return;
+              editorView.dispatch(
+                editorView.state.tr
+                  .setMeta('viewportChanged', true)
+                  .setMeta('scrollContainer', scrollContainer),
+              );
+            });
+          }
 
           // スクロールイベントで仮想スクロールを更新
           const handleScroll = throttle(() => {
@@ -210,6 +251,9 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
 
           return {
             destroy() {
+              if (initialViewportRaf) {
+                window.cancelAnimationFrame(initialViewportRaf);
+              }
               if (scrollContainer) {
                 scrollContainer.removeEventListener('scroll', handleScroll as EventListener);
                 scrollContainer.removeEventListener('scroll', handleScrollEnd as EventListener);
