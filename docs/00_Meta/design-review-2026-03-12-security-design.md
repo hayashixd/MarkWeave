@@ -3,8 +3,8 @@
 ## 概要
 
 - 設計書セクション数: 4
-- 確認済み実装: 12 項目
-- 未実装（要注意）: 5 項目
+- 確認済み実装: 15 項目
+- 未実装（要注意）: 2 項目
 - 保留（feature-list.md 管理済み）: 0 項目
 
 ---
@@ -45,12 +45,11 @@
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| `rawHtmlBlock` NodeView の存在 | ❌ 未実装 | `rg -n "rawHtmlBlock|raw-html-block" src`（ヒットなし） |
-| script 含有時バッジ表示 | ❌ 未実装 | `rg -n "script-badge|保存時は維持" src`（ヒットなし） |
+| `rawHtmlBlock` NodeView の存在 | ✅ 準拠 | `src/extensions/RawHtmlBlockExtension.tsx:23-57` |
+| script 含有時バッジ表示 | ✅ 準拠 | `src/extensions/RawHtmlBlockExtension.tsx:73-82` |
 | script 情報の保存（head の script src を保持） | ⚠️ 部分準拠 | `src/lib/html-to-tiptap.ts:141-146`, `src/lib/tiptap-to-html.ts:84-87` |
 
 #### 未実装・不一致の詳細
-- **`rawHtmlBlock` 分離表示**: 設計書で必須化されている NodeView 実装（script 検出・バッジ表示）が確認できない。
 - **保存時分離の対象差分**: 実装で保持しているのは `head` の `scriptLinks` であり、設計書が想定する「本文内 raw HTML ブロックの script 分離」とは一致しない。
 
 ---
@@ -95,7 +94,7 @@
 | KaTeX の `trust: false` | ✅ 準拠 | `src/extensions/MathExtension.tsx:50-54`, `src/extensions/MathExtension.tsx:186-190` |
 | Mermaid の sandbox iframe 経由レンダリング | ❌ 未実装 | `src/extensions/MermaidExtension.tsx:20-25`, `src/extensions/MermaidExtension.tsx:205-209`（主 WebView で直接 render） |
 | 外部リンクを `@tauri-apps/plugin-shell` で開く処理 | ❌ 未実装 | `rg -n "@tauri-apps/plugin-shell|open\(href|editor.on\('click'" src`（ヒットなし） |
-| AI API Rust 経由（`call_ai_api`） | ❌ 未実装 | `rg -n "call_ai_api|AiRequest|AiResponse" src src-tauri/src`（ヒットなし） |
+| AI API Rust 経由（`call_ai_api`） | ✅ 準拠 | `src-tauri/src/commands/ai_commands.rs:68-99`, `src/core/ai/ai-client.ts` |
 | アップデータエンドポイント設定 | ✅ 準拠 | `src-tauri/tauri.conf.json:29-33` |
 | アップデータ公開鍵設定 | ⚠️ 部分準拠 | `src-tauri/tauri.conf.json:30`（`pubkey` が空） |
 | プラグイン sandbox + 権限モデル | ✅ 準拠 | `src/plugins/plugin-bridge.ts:85-90`, `src/plugins/plugin-api.ts:22-35` |
@@ -104,7 +103,6 @@
 - **CSP `connect-src`**: 設計の `none` と実装値が異なる。
 - **Mermaid 実行分離**: 設計は sandbox iframe 経由だが、実装は主 WebView で `mermaid.render()` を直接実行。
 - **外部リンクの安全な遷移**: 設計書記載のリンクインターセプト実装が確認できない。
-- **AI API 経路制御**: `call_ai_api` コマンド/ラッパーが確認できない。
 - **アップデート鍵管理**: updater 設定はあるが公開鍵が未設定。
 
 ---
@@ -113,15 +111,13 @@
 
 | 判定 | 件数 |
 |---|---|
-| ✅ 準拠 | 8 |
+| ✅ 準拠 | 11 |
 | ⚠️ 部分準拠 | 4 |
-| ❌ 未実装 | 9 |
+| ❌ 未実装 | 6 |
 | 🔶 保留（管理済み） | 0 |
 
 ### 主要な未実装・不一致（❌ / ⚠️ のみ列挙）
 
-1. **`rawHtmlBlock` 分離表示要件** — script を含む本文 HTML ブロックの専用 NodeView 実装が確認できない。
-2. **ファイルシステム最小権限化** — capabilities にスコープ付き `allow` ルールが確認できない。
-3. **CSP `connect-src` 方針差分** — 設計の `none` と実装設定が不一致。
-4. **Mermaid sandbox 分離未適用** — 設計想定の iframe 分離ではなく主 WebView 実行。
-5. **AI API Rust 経由要件** — 設計に記載された `call_ai_api` 実装が確認できない。
+1. **ファイルシステム最小権限化** — capabilities にスコープ付き `allow` ルールが確認できない。
+2. **CSP `connect-src` 方針差分** — 設計の `none` と実装設定が不一致。
+3. **Mermaid sandbox 分離未適用** — 設計想定の iframe 分離ではなく主 WebView 実行。

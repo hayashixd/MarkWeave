@@ -4,6 +4,7 @@ mod fs;
 mod menu;
 mod models;
 
+use commands::ai_commands;
 use commands::db_commands;
 use commands::export_commands;
 use commands::fs_commands;
@@ -92,6 +93,7 @@ pub fn run() {
             image_commands::cache_remote_image,
             image_commands::purge_image_cache,
             search_commands::search_workspace,
+            ai_commands::call_ai_api,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
