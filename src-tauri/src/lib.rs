@@ -47,6 +47,8 @@ pub fn run() {
             fs_commands::list_workspace_files,
             fs_commands::list_markdown_files,
             fs_commands::rename_file,
+            fs_commands::write_file_bytes,
+            fs_commands::backup_file,
             fs_commands::move_to_trash,
             window_commands::set_title_dirty,
             window_commands::restart_app,

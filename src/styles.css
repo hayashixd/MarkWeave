@@ -3630,3 +3630,220 @@ select:focus-visible {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 1px var(--color-accent);
 }
+
+/* ===== 画像アノテーション（image-design.md §9） ===== */
+
+.annotation-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.annotation-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.annotation-modal__content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: 95vw;
+  max-height: 95vh;
+  background: var(--color-bg, #fff);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.annotation-modal__canvas-container {
+  position: relative;
+  overflow: auto;
+  flex: 1;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  padding: 16px;
+}
+
+.annotation-modal__canvas {
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.annotation-modal__canvas--main {
+  display: block;
+}
+
+.annotation-modal__canvas--overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 32px);
+  max-height: 70vh;
+}
+
+.annotation-modal__loading {
+  position: absolute;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.annotation-modal__text-input {
+  position: absolute;
+  background: transparent;
+  border: 1px dashed #ff0000;
+  color: #ff0000;
+  font: bold 16px sans-serif;
+  padding: 2px 4px;
+  outline: none;
+  min-width: 100px;
+  z-index: 10;
+}
+
+.annotation-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border, #e0e0e0);
+}
+
+.annotation-modal__btn {
+  padding: 6px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid var(--color-border, #ccc);
+  background: var(--color-bg-subtle, #f5f5f5);
+  color: var(--color-text, #333);
+}
+
+.annotation-modal__btn:hover {
+  background: var(--color-bg-hover, #e8e8e8);
+}
+
+.annotation-modal__btn--save {
+  background: var(--color-accent, #0066ff);
+  color: #fff;
+  border-color: var(--color-accent, #0066ff);
+}
+
+.annotation-modal__btn--save:hover {
+  opacity: 0.9;
+}
+
+.annotation-modal__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ツールバー */
+.annotation-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+  background: var(--color-bg-subtle, #f8f8f8);
+  flex-wrap: wrap;
+}
+
+.annotation-toolbar__tools {
+  display: flex;
+  gap: 2px;
+}
+
+.annotation-toolbar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: var(--color-text, #333);
+}
+
+.annotation-toolbar__btn:hover {
+  background: var(--color-bg-hover, #e8e8e8);
+}
+
+.annotation-toolbar__btn--active {
+  background: var(--color-accent, #0066ff);
+  color: #fff;
+  border-color: var(--color-accent, #0066ff);
+}
+
+.annotation-toolbar__btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.annotation-toolbar__separator {
+  width: 1px;
+  height: 24px;
+  background: var(--color-border, #ddd);
+  margin: 0 4px;
+}
+
+.annotation-toolbar__line-width {
+  display: flex;
+  align-items: center;
+}
+
+.annotation-toolbar__line-width input[type='range'] {
+  width: 80px;
+  height: 4px;
+  accent-color: var(--color-accent, #0066ff);
+}
+
+.annotation-toolbar__colors {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  position: relative;
+}
+
+.annotation-toolbar__color {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.annotation-toolbar__color--active {
+  border-color: var(--color-text, #333);
+  box-shadow: 0 0 0 1px var(--color-bg, #fff);
+}
+
+.annotation-toolbar__color--custom {
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+  font-size: 12px;
+  color: #fff;
+  text-shadow: 0 0 2px #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.annotation-toolbar__color-input {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
