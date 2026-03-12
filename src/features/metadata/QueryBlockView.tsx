@@ -5,6 +5,7 @@ import { parseQuery } from './query-parser';
 import { useMetadataStore } from './metadataStore';
 import { TableView } from './views/TableView';
 import { ListView } from './views/ListView';
+import { CalendarView } from './views/CalendarView';
 import type { QueryResultRow } from './types';
 import { ProgressBar } from '../../components/common/ProgressBar';
 
@@ -150,15 +151,11 @@ export function QueryBlockView({ node }: NodeViewProps) {
               <ListView rows={rows} fields={ast.select} onRowClick={openFile} />
             )}
             {ast.view === 'calendar' && (
-              <div
-                style={{
-                  padding: '12px',
-                  textAlign: 'center',
-                  color: 'var(--text-muted, #718096)',
-                }}
-              >
-                カレンダービューは Phase 8 で実装予定です
-              </div>
+              <CalendarView
+                rows={rows}
+                dateField={ast.select.includes('date') ? 'date' : ast.select.includes('created') ? 'created' : 'modified'}
+                onRowClick={openFile}
+              />
             )}
           </div>
         )}
