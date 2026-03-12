@@ -7,8 +7,8 @@
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager, State};
+use std::sync::Mutex;
+use tauri::{AppHandle, Emitter, State};
 
 /// 監視中の watcher を管理するレジストリ。
 /// ファイルパス → Watcher のマッピングを保持する。
