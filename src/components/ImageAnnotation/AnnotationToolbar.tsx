@@ -7,7 +7,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { AnnotationTool } from './types';
-import { COLOR_PRESETS, DEFAULT_COLOR } from './types';
+import { COLOR_PRESETS } from './types';
 
 interface AnnotationToolbarProps {
   activeTool: AnnotationTool;

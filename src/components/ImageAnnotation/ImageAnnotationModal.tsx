@@ -137,16 +137,6 @@ export function ImageAnnotationModal({
     if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
   }, []);
 
-  // オーバーレイの内容をメインキャンバスに合成
-  const commitOverlay = useCallback(() => {
-    const canvas = canvasRef.current;
-    const overlay = overlayCanvasRef.current;
-    if (!canvas || !overlay) return;
-    const ctx = canvas.getContext('2d');
-    if (ctx) ctx.drawImage(overlay, 0, 0);
-    clearOverlay();
-  }, [clearOverlay]);
-
   // マウスダウン
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const point = getCanvasPoint(e);

@@ -65,8 +65,7 @@ import { WordSprintWidget } from '../wordSprint/WordSprintWidget';
 import { calculateReadability, getReadabilityLabel } from '../../lib/readability-score';
 import { FloatingTocPanel } from '../Outline/FloatingTocPanel';
 import { useMenuListener } from '../../hooks/useMenuListener';
-import { useTranslation } from 'react-i18next';
-import i18next from 'i18next';
+import i18next, { useTranslation } from '../../i18n';
 import { useGitStore } from '../../store/gitStore';
 
 export function AppShell() {

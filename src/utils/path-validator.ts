@@ -5,7 +5,7 @@
  * TypeScript 側でも検証して多層防御とする。
  */
 
-import { resolve, normalize } from '@tauri-apps/api/path';
+import { resolve } from '@tauri-apps/api/path';
 
 /**
  * 指定されたパスが許可されたベースディレクトリ内に収まっているか検証する。
