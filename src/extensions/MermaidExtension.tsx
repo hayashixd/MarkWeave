@@ -11,23 +11,7 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import mermaid from 'mermaid';
-import { sanitizeMermaidSvg } from '../utils/dompurify-config';
-
-// Mermaid 初期化
-let mermaidInitialized = false;
-function ensureMermaidInit() {
-  if (!mermaidInitialized) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'strict',
-    });
-    mermaidInitialized = true;
-  }
-}
-
-let mermaidIdCounter = 0;
+import { renderMermaidInSandbox } from '../utils/mermaid-sandbox-renderer';
 
 export const MermaidBlock = Node.create({
   name: 'mermaidBlock',
@@ -95,12 +79,9 @@ function MermaidEditPopup({
       return;
     }
     const timer = setTimeout(() => {
-      ensureMermaidInit();
-      const id = `mermaid-popup-${++mermaidIdCounter}`;
-      mermaid
-        .render(id, localCode)
-        .then(({ svg }) => {
-          setPreviewSvg(sanitizeMermaidSvg(svg));
+      renderMermaidInSandbox(localCode)
+        .then((svg) => {
+          setPreviewSvg(svg);
           setPreviewError(null);
         })
         .catch((err) => {
@@ -199,13 +180,9 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
       return;
     }
 
-    ensureMermaidInit();
-    const id = `mermaid-${++mermaidIdCounter}`;
-
-    mermaid
-      .render(id, code)
-      .then(({ svg }) => {
-        setSvgHtml(sanitizeMermaidSvg(svg));
+    renderMermaidInSandbox(code)
+      .then((svg) => {
+        setSvgHtml(svg);
         setRenderError(null);
       })
       .catch((err) => {

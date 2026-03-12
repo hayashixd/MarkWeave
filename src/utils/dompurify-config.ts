@@ -36,8 +36,6 @@ export const DOMPURIFY_CONFIG: Config = {
     'svg', 'path', 'g', 'rect', 'text', 'circle', 'ellipse',
     'line', 'polyline', 'polygon', 'use', 'defs', 'marker',
     'linearGradient', 'stop', 'clipPath', 'mask',
-    // HTML プレビュー用
-    'style',
   ],
   ALLOWED_ATTR: [
     'href', 'src', 'alt', 'title', 'class', 'id',
@@ -60,7 +58,7 @@ export const DOMPURIFY_CONFIG: Config = {
     'aria-label', 'aria-hidden', 'role',
     'tabindex', 'contenteditable',
   ],
-  FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'button', 'iframe'],
+  FORBID_TAGS: ['script', 'style', 'object', 'embed', 'form', 'input', 'button', 'iframe'],
   FORCE_BODY: true,
   USE_PROFILES: { html: true, svg: true, mathMl: true },
 };
