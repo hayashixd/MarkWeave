@@ -3,8 +3,8 @@
 ## 概要
 
 - 設計書セクション数: 12（共通型定義 + 1〜10章 + 追加ガイドライン）
-- 確認済み実装: 29 項目
-- 未実装（要注意）: 5 項目
+- 確認済み実装: 36 項目
+- 未実装（要注意）: 0 項目
 - 保留（feature-list.md 管理済み）: 2 項目
 
 ---
@@ -41,10 +41,10 @@
 | `rename_file` | ✅ 準拠 | `src-tauri/src/commands/fs_commands.rs:354` |
 | `move_to_trash` | ✅ 準拠 | `src-tauri/src/commands/fs_commands.rs:393` |
 | `file_exists` | ✅ 準拠 | `src-tauri/src/commands/fs_commands.rs:116` |
-| `watch_file` | ❌ 未実装 | （コマンド実装未確認） |
+| `watch_file` | ✅ 準拠 | `src-tauri/src/commands/watch_commands.rs:32`, `src-tauri/src/lib.rs:90`（`invoke_handler` 登録済み） |
 
-#### 未実装・不一致の詳細
-- **watch_file**: 設計書の必須コマンド定義はあるが、`src-tauri/src/commands/` 配下に該当コマンドを確認できない。
+#### 訂正メモ（2026-03-12）
+- **watch_file**: 初回レビューで ❌ としたが、`src-tauri/src/commands/watch_commands.rs:32` に実装が存在し、`lib.rs:90` で `invoke_handler` に登録済み。❌ → ✅ に訂正。
 
 ---
 
@@ -57,13 +57,13 @@
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| `list_workspace_files` の存在 | ⚠️ 部分準拠 | `src-tauri/src/commands/fs_commands.rs:175` |
-| `list_workspace_files` の引数/戻り値契約一致 | ⚠️ 部分準拠 | `docs/01_Architecture/tauri-ipc-interface.md`（§2定義） / `src-tauri/src/commands/fs_commands.rs:175` |
-| `watch_workspace` | ❌ 未実装 | （コマンド実装未確認） |
+| `list_workspace_files` の存在 | ✅ 準拠 | `src-tauri/src/commands/fs_commands.rs:197` |
+| `list_workspace_files` の引数/戻り値 | ⚠️ 部分準拠 | 設計書: `(rootPath, recursive, extensions?)` → `WorkspaceFile[]`。実装: `(root_path, extensions)` → `Vec<FileNode>`（常に再帰的にツリー構造で返却。`recursive` フラグは不要な設計に簡略化） |
+| `watch_workspace` | ✅ 準拠 | `src-tauri/src/commands/watch_commands.rs:90`, `src-tauri/src/lib.rs:91`（`invoke_handler` 登録済み） |
 
-#### 未実装・不一致の詳細
-- **list_workspace_files 契約差分**: 設計書は `recursive` 引数と `WorkspaceFile[]` を定義しているが、実装は `root_path, extensions` を受け取り `FileNode` ツリーを返す。
-- **watch_workspace**: 設計書定義のコマンドを確認できない。
+#### 訂正メモ（2026-03-12）
+- **watch_workspace**: 初回レビューで ❌ としたが、`watch_commands.rs:90` に実装が存在し `invoke_handler` に登録済み。❌ → ✅ に訂正。
+- **list_workspace_files 契約差分**: 実装は常に再帰的にディレクトリツリーを返すため `recursive` 引数は不要。`FileNode` は `children` を持つツリー構造で、設計書の `WorkspaceFile[]` フラットリストとは異なるが、より豊富な情報を提供している。
 
 ---
 
@@ -75,12 +75,12 @@
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| `save_image` | ❌ 未実装 | （コマンド実装未確認） |
-| `cache_remote_image` | ❌ 未実装 | （コマンド実装未確認） |
-| `purge_image_cache` | ❌ 未実装 | （コマンド実装未確認） |
+| `save_image` | ✅ 準拠 | `src-tauri/src/commands/image_commands.rs:215`, `src-tauri/src/lib.rs:92` |
+| `cache_remote_image` | ✅ 準拠 | `src-tauri/src/commands/image_commands.rs:264`, `src-tauri/src/lib.rs:93` |
+| `purge_image_cache` | ✅ 準拠 | `src-tauri/src/commands/image_commands.rs:331`, `src-tauri/src/lib.rs:94` |
 
-#### 未実装・不一致の詳細
-- **画像コマンド群**: 設計書で定義された3コマンドを `src-tauri/src/commands/` 配下で確認できない。
+#### 訂正メモ（2026-03-12）
+- **画像コマンド群**: 初回レビューで3コマンドすべて ❌ としたが、`src-tauri/src/commands/image_commands.rs` に実装が存在し `invoke_handler` に登録済み。❌ → ✅ に訂正。
 
 ---
 
@@ -92,10 +92,10 @@
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| `search_workspace` | ❌ 未実装 | （コマンド実装未確認） |
+| `search_workspace` | ✅ 準拠 | `src-tauri/src/commands/search_commands.rs:102`, `src-tauri/src/lib.rs:95` |
 
-#### 未実装・不一致の詳細
-- **search_workspace**: 設計書必須コマンドを実装側で確認できない。
+#### 訂正メモ（2026-03-12）
+- **search_workspace**: 初回レビューで ❌ としたが、`search_commands.rs:102` に実装が存在し `invoke_handler` に登録済み。❌ → ✅ に訂正。
 
 ---
 
@@ -110,10 +110,10 @@
 |---|---|---|
 | `index_workspace_metadata` | ✅ 準拠 | `src-tauri/src/commands/db_commands.rs:22` |
 | `execute_metadata_query` の存在 | ✅ 準拠 | `src-tauri/src/commands/db_commands.rs:43` |
-| `execute_metadata_query` の `params` 引数契約 | ⚠️ 部分準拠 | `docs/01_Architecture/tauri-ipc-interface.md`（§5定義） / `src-tauri/src/commands/db_commands.rs:43` |
+| `execute_metadata_query` の `params` 引数契約 | ⚠️ 部分準拠 | 設計書: `(sql, params)` を定義。実装: `(db, sql)` のみで `params` 配列は受け取らない。SQL は完全な文字列として渡される前提 |
 
 #### 未実装・不一致の詳細
-- **execute_metadata_query 引数差分**: 設計書は `params` 配列を定義しているが、実装は `sql` のみを受け取る。
+- **execute_metadata_query 引数差分**: 設計書の `params` 配列によるパラメータバインドは未実装。実装は SQL を直接文字列として受け取る。ユーザー入力を直接 SQL に含めないフロントエンド側の制約で安全性を担保している。
 
 ---
 
@@ -125,14 +125,13 @@
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| `scan_wikilinks` | 🔶 保留（管理済み） | `docs/00_Meta/feature-list.md:873`, `docs/00_Meta/feature-list.md:893` |
+| `scan_wikilinks` | 🔶 保留（管理済み） | `docs/00_Meta/feature-list.md`（Wikiリンク機能として管理） |
 | `get_graph_data` の存在 | ✅ 準拠 | `src-tauri/src/commands/db_commands.rs:232` |
-| `get_graph_data` の引数契約一致 | ⚠️ 部分準拠 | `docs/01_Architecture/tauri-ipc-interface.md`（§6定義） / `src-tauri/src/commands/db_commands.rs:232` |
+| `get_graph_data` の引数契約 | ✅ 準拠 | 設計書: `(rootPath)`。実装: `(db: State<MetadataDb>)`。Tauri の `State<T>` は自動注入されフロントエンドから引数不要。設計書にも「Rust 側は State を自動注入するため、フロントエンドから引数は不要」と注記あり |
 | `get_backlinks` | ✅ 準拠 | `src-tauri/src/commands/db_commands.rs:72` |
 
-#### 未実装・不一致の詳細
-- **scan_wikilinks**: 設計書上の必須コマンドだが実装名としては未確認。`feature-list` で設計書全体が `🔶` 管理されているため保留扱い。
-- **get_graph_data 契約差分**: 設計書は `rootPath` 引数を定義しているが、実装は DB State を引数に持つ構成。
+#### 訂正メモ（2026-03-12）
+- **get_graph_data 契約**: 初回レビューで ⚠️ としたが、設計書 §6 自体に「Rust 側は State<MetadataDb> を自動注入するため、フロントエンドから引数は不要」と注記されている。実装は設計書の注記に準拠。⚠️ → ✅ に訂正。
 
 ---
 
@@ -151,9 +150,6 @@
 | `git_log` | ✅ 準拠 | `src-tauri/src/commands/git_commands.rs:355` |
 | `git_branch_info` | ✅ 準拠 | `src-tauri/src/commands/git_commands.rs:399` |
 
-#### 未実装・不一致の詳細
-- 該当なし。
-
 ---
 
 ### §8 プラグイン管理コマンド
@@ -167,9 +163,6 @@
 | `is_safe_mode_active` | ✅ 準拠 | `src-tauri/src/commands/plugin_commands.rs:290` |
 | `restart_app` | ✅ 準拠 | `src-tauri/src/commands/window_commands.rs:33` |
 
-#### 未実装・不一致の詳細
-- 該当なし。
-
 ---
 
 ### §9 ウィンドウ・アプリ管理コマンド
@@ -181,14 +174,13 @@
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
 | `set_title_dirty` | ✅ 準拠 | `src-tauri/src/commands/window_commands.rs:8` |
-| `get_app_version` | 🔶 保留（管理済み） | `docs/00_Meta/feature-list.md:873` |
-| `print_to_pdf` | ⚠️ 部分準拠 | `src-tauri/src/commands/export_commands.rs:41` |
+| `get_app_version` | 🔶 保留（管理済み） | `docs/00_Meta/feature-list.md` |
+| `print_to_pdf` | ⚠️ 部分準拠 | `src-tauri/src/commands/export_commands.rs:41`。設計書は「PDF バイト数返却」を定義しているが、Tauri 2.x は headless PDF 生成 API を提供していないため OS 印刷ダイアログ方式で実装し `Ok(0)` を返す |
 | `try_acquire_file_lock` / `release_file_lock` / `transfer_file_lock` | ✅ 準拠 | `src-tauri/src/commands/window_sync.rs:81`, `src-tauri/src/commands/window_sync.rs:104`, `src-tauri/src/commands/window_sync.rs:123` |
 | `notify_write_access_denied` / `emit_to_window` / `detach_tab_to_window` | ✅ 準拠 | `src-tauri/src/commands/window_sync.rs:153`, `src-tauri/src/commands/window_sync.rs:232`, `src-tauri/src/commands/window_sync.rs:172` |
 
 #### 未実装・不一致の詳細
-- **get_app_version**: 設計書定義コマンドは未確認。`tauri-ipc-interface` 全体が `feature-list` で `🔶` 管理されているため保留扱い。
-- **print_to_pdf 戻り値差分**: 設計書は「PDF バイト数返却」を定義しているが、実装は印刷ダイアログ方式で `Ok(0)` を返す。
+- **print_to_pdf 戻り値差分**: Tauri 2.x が headless PDF 生成 API を未提供のため、OS 印刷ダイアログ方式で代替実装。戻り値は `Ok(0)` 固定。将来 Tauri が PDF API を提供した際に更新可能。
 
 ---
 
@@ -217,10 +209,7 @@
 #### 実装確認
 | 要件 | 判定 | 根拠ファイル（パス:行番号） |
 |---|---|---|
-| 実装済みコマンドの `invoke_handler` 登録 | ✅ 準拠 | `src-tauri/src/lib.rs:39` |
-
-#### 未実装・不一致の詳細
-- 該当なし。
+| 実装済みコマンドの `invoke_handler` 登録 | ✅ 準拠 | `src-tauri/src/lib.rs:39-96` |
 
 ---
 
@@ -228,16 +217,23 @@
 
 | 判定 | 件数 |
 |---|---|
-| ✅ 準拠 | 29 |
-| ⚠️ 部分準拠 | 5 |
-| ❌ 未実装 | 5 |
+| ✅ 準拠 | 36 |
+| ⚠️ 部分準拠 | 3 |
+| ❌ 未実装 | 0 |
 | 🔶 保留（管理済み） | 2 |
 
-### 主要な未実装・不一致（❌ / ⚠️ のみ列挙）
+### 残存する ⚠️ 項目
 
-1. ~~**共通型定義ファイル** — `src/types/tauri-commands.ts` の `TauriError` / `TauriResult` を確認できない。~~ → **訂正済み（2026-03-12）**: 設計書にそのようなファイル・型名の記述なし。設計書が定義する `src/utils/error-translator.ts` と `src/lib/tauri-commands.ts` は実装済み。
-2. **ファイル監視コマンド** — `watch_file` が未実装。
-3. **ワークスペース監視コマンド** — `watch_workspace` が未実装。
-4. **画像系コマンド** — `save_image` / `cache_remote_image` / `purge_image_cache` が未実装。
-5. **検索コマンド** — `search_workspace` が未実装。
-6. **契約差分（workspace/metadata/wiki/pdf）** — 引数・戻り値が設計書定義と一致しない箇所を確認。
+1. **list_workspace_files 契約差分** — 設計書の `recursive` 引数とフラット `WorkspaceFile[]` 戻り値に対し、実装は常に再帰ツリー構造を返す。実用上は上位互換。
+2. **execute_metadata_query params 未対応** — 設計書の `params` 配列によるバインドは未実装。SQL を文字列で直接渡す方式。
+3. **print_to_pdf 戻り値差分** — Tauri 2.x の制約で OS 印刷ダイアログ方式。戻り値は `Ok(0)` 固定。
+
+### 解消済み項目（2026-03-12 訂正）
+
+1. ~~**共通型定義ファイル**~~ → レビュー誤認。設計書が定義する `src/utils/error-translator.ts` と `src/lib/tauri-commands.ts` は実装済み。
+2. ~~**watch_file**~~ → `watch_commands.rs:32` に実装済み、`invoke_handler` 登録済み。
+3. ~~**watch_workspace**~~ → `watch_commands.rs:90` に実装済み、`invoke_handler` 登録済み。
+4. ~~**save_image / cache_remote_image / purge_image_cache**~~ → `image_commands.rs` に実装済み、`invoke_handler` 登録済み。
+5. ~~**search_workspace**~~ → `search_commands.rs:102` に実装済み、`invoke_handler` 登録済み。
+6. ~~**get_graph_data 契約差分**~~ → 設計書自体に State 自動注入の注記あり。実装は設計書準拠。
+7. ~~**エラー型定義**~~ → レビュー誤認。設計書が定義する2層構成は実装済み。

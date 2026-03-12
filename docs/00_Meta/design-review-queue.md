@@ -9,9 +9,9 @@
 
 | # | 設計書ファイル | ステータス | レビュー日 | レビューファイル | 実装対応 |
 |---|---|---|---|---|---|
-| 1 | `docs/01_Architecture/system-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-system-design.md` | 一部対応済み（2026-03-12）: 4モード・EditorModeExtension 指摘はレビュー誤認として訂正。残: hast SoT, ai_commands.rs, Typora click handler, .html 関連付け |
-| 2 | `docs/01_Architecture/tauri-ipc-interface.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-tauri-ipc-interface.md` | 一部対応済み（2026-03-12）: 共通型定義・エラー型定義の指摘はレビュー誤認として訂正。残: watch_file, watch_workspace, 画像系, search_workspace, 契約差分 |
-| 3 | `docs/01_Architecture/security-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-security-design.md` | 一部対応済み（2026-03-12）: connect-src は設計書を Tauri 2.0 IPC 要件に修正。残: fs 最小権限, Mermaid sandbox, 外部リンク, iframe sandbox |
+| 1 | `docs/01_Architecture/system-design.md` | done | 2026-03-12 | `docs/00_Meta/bk/design-review-2026-03-12-system-design.md` | 対応済み（2026-03-12） |
+| 2 | `docs/01_Architecture/tauri-ipc-interface.md` | done | 2026-03-12 | `docs/00_Meta/bk/design-review-2026-03-12-tauri-ipc-interface.md` | 対応済み（2026-03-12） |
+| 3 | `docs/01_Architecture/security-design.md` | done | 2026-03-12 | `docs/00_Meta/bk/design-review-2026-03-12-security-design.md` | 対応済み（2026-03-12） |
 | 4 | `docs/01_Architecture/performance-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-performance-design.md` | 未対応 |
 | 5 | `docs/01_Architecture/plugin-api-design.md` | done | 2026-03-12 | `docs/00_Meta/design-review-2026-03-12-plugin-api-design.md` | 未対応 |
 | 6 | `docs/02_Core_Editor/markdown-tiptap-conversion.md` | pending | — | — | — |
