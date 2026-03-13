@@ -3,6 +3,7 @@ import { z } from "zod";
 import { execa } from "execa";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { registerRoundtripTools } from "./roundtrip.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -119,6 +120,8 @@ function parseCargoTestOutput(stdout: string, stderr: string): TestResult {
 }
 
 export function registerTools(server: McpServer): void {
+  registerRoundtripTools(server);
+
   server.tool(
     "run_tests",
     "Run project tests (unit/rust/all) and return structured results",
