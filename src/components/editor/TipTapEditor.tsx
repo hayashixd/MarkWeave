@@ -39,7 +39,7 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCellWithStyle, TableHeaderWithStyle } from '../../extensions/TableCellWithStyle';
 import { TableDragExtension } from '../../extensions/TableDragExtension';
 import { common, createLowlight } from 'lowlight';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIMEComposition } from './useIMEComposition';
 import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
 import { SafeInputRulesExtension } from '../../extensions/SafeInputRulesExtension';
@@ -123,8 +123,8 @@ export function MarkdownEditor({
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
 
   // YAML Front Matter を本文から分離して管理
-  const { yaml: initYaml } = parseFrontMatter(initialContent);
-  const [frontMatterYaml, setFrontMatterYaml] = useState(initYaml);
+  // 遅延初期化: parseFrontMatter は初回レンダリング時のみ実行する
+  const [frontMatterYaml, setFrontMatterYaml] = useState(() => parseFrontMatter(initialContent).yaml);
   // Front Matter なしの本文を initialContent として使う
   const [sourceText, setSourceText] = useState(initialContent);
   const onContentChangeRef = useRef(onContentChange);
@@ -141,10 +141,13 @@ export function MarkdownEditor({
   const frontMatterYamlRef = useRef(frontMatterYaml);
   frontMatterYamlRef.current = frontMatterYaml;
 
-  // 集中モード系の設定を取得
-  const { settings, updateSettings } = useSettingsStore();
-  const focusMode = settings.editor.focusMode;
-  const typewriterMode = settings.editor.typewriterMode;
+  // 集中モード系の設定を取得（細粒度セレクターで必要なフィールドのみ購読）
+  const focusMode = useSettingsStore((s) => s.settings.editor.focusMode);
+  const typewriterMode = useSettingsStore((s) => s.settings.editor.typewriterMode);
+  const slashCommandsEnabled = useSettingsStore((s) => s.settings.slashCommands?.enabled !== false);
+  const editorFontSize = useSettingsStore((s) => s.settings.appearance.editorFontSize);
+  const editorLineHeight = useSettingsStore((s) => s.settings.appearance.editorLineHeight);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
 
   // Git ガター差分インジケーター用（Phase 7.5）
   const workspaceRootForGit = useWorkspaceStore((s) => s.root);
@@ -194,11 +197,11 @@ export function MarkdownEditor({
   });
 
   // ワークスペースのファイル一覧をオートコンプリート候補として使う
-  const { tree } = useWorkspaceStore();
-  const { recentFiles } = useRecentFilesStore();
+  const tree = useWorkspaceStore((s) => s.tree);
+  const recentFiles = useRecentFilesStore((s) => s.recentFiles);
 
-  // ファイル一覧をフラット化
-  const workspaceFiles = (() => {
+  // ファイル一覧をフラット化（tree 変更時のみ再計算）
+  const workspaceFiles = useMemo(() => {
     const files: { name: string; path: string }[] = [];
     const walk = (nodes: typeof tree) => {
       for (const node of nodes) {
@@ -211,21 +214,26 @@ export function MarkdownEditor({
     };
     walk(tree);
     return files;
-  })();
+  }, [tree]);
 
-  // LRU ソート: 最近開いたファイルを先頭に
-  const recentPathSet = new Map<string, number>(
-    recentFiles.map((r, i): [string, number] => [r.path, i]),
-  );
-  const wikilinkCandidates = [...workspaceFiles].sort((a, b) => {
-    const ai: number = recentPathSet.get(a.path) ?? Infinity;
-    const bi: number = recentPathSet.get(b.path) ?? Infinity;
-    return ai - bi;
-  });
+  // LRU ソート: 最近開いたファイルを先頭に（依存値変更時のみ再計算）
+  const wikilinkCandidates = useMemo(() => {
+    const recentPathSet = new Map<string, number>(
+      recentFiles.map((r, i): [string, number] => [r.path, i]),
+    );
+    return [...workspaceFiles].sort((a, b) => {
+      const ai: number = recentPathSet.get(a.path) ?? Infinity;
+      const bi: number = recentPathSet.get(b.path) ?? Infinity;
+      return ai - bi;
+    });
+  }, [workspaceFiles, recentFiles]);
 
-  // Wikilink 解決状態チェック用: 拡張子なしファイル名の Set
-  const resolvedFileNames = new Set(
-    workspaceFiles.map((f) => f.name.replace(/\.(md|html|txt)$/i, '').toLowerCase()),
+  // Wikilink 解決状態チェック用: 拡張子なしファイル名の Set（依存値変更時のみ再計算）
+  const resolvedFileNames = useMemo(
+    () => new Set(
+      workspaceFiles.map((f) => f.name.replace(/\.(md|html|txt)$/i, '').toLowerCase()),
+    ),
+    [workspaceFiles],
   );
 
   // テーブルコンテキストメニューの状態
@@ -289,7 +297,7 @@ export function MarkdownEditor({
       WordCompleteExtension,
       TyporaFocusExtension,
       FocusModeExtension.configure({ enabled: focusMode }),
-      ...(settings.slashCommands?.enabled !== false
+      ...(slashCommandsEnabled
         ? [SlashCommandsExtension.configure({ onStateChange: setSlashState })]
         : []),
       VirtualScrollExtension.configure({ nodeThreshold: 500 }),
@@ -665,20 +673,22 @@ export function MarkdownEditor({
       // Ctrl+Shift+F: フォーカスモードのトグル (zen-mode-design.md に準拠)
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
-        updateSettings({ editor: { focusMode: !settings.editor.focusMode } });
+        const current = useSettingsStore.getState().settings.editor.focusMode;
+        updateSettings({ editor: { focusMode: !current } });
         return;
       }
 
       // Ctrl+Shift+T: タイプライターモードのトグル
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
         e.preventDefault();
-        updateSettings({ editor: { typewriterMode: !settings.editor.typewriterMode } });
+        const current = useSettingsStore.getState().settings.editor.typewriterMode;
+        updateSettings({ editor: { typewriterMode: !current } });
         return;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [settings.editor.focusMode, settings.editor.typewriterMode, updateSettings]);
+  }, [updateSettings]);
 
   // Ctrl+/ でソースモード切替
   // keyboard-shortcuts.md §1-5, §4-2 に準拠
@@ -769,8 +779,11 @@ export function MarkdownEditor({
   }, [editor, mode, toggleMode]);
 
   // タイプライター打鍵音フィードバック (Phase 7)
+  const typewriterSound = useSettingsStore((s) => s.settings.editor.typewriterSound);
+  const typewriterStyle = useSettingsStore((s) => s.settings.editor.typewriterStyle);
+  const typewriterVolume = useSettingsStore((s) => s.settings.editor.typewriterVolume);
   useEffect(() => {
-    if (!settings.editor.typewriterSound) return;
+    if (!typewriterSound) return;
     const handler = (e: KeyboardEvent) => {
       // IME 入力中・修飾キー単体・機能キーでは発音しない
       if (e.isComposing || e.keyCode === 229) return;
@@ -779,15 +792,11 @@ export function MarkdownEditor({
       const isPrintable =
         e.key.length === 1 || e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Delete';
       if (!isPrintable) return;
-      typewriterPlayer.playKey(settings.editor.typewriterStyle, settings.editor.typewriterVolume);
+      typewriterPlayer.playKey(typewriterStyle, typewriterVolume);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [
-    settings.editor.typewriterSound,
-    settings.editor.typewriterStyle,
-    settings.editor.typewriterVolume,
-  ]);
+  }, [typewriterSound, typewriterStyle, typewriterVolume]);
 
   // 画像アノテーションイベントリスナー (Phase 7.5)
   useEffect(() => {
@@ -818,36 +827,50 @@ export function MarkdownEditor({
     if (!editor || mode !== 'wysiwyg') return;
     const editorDom = editor.view.dom;
 
-    const addCopyButtons = () => {
-      const preElements = editorDom.querySelectorAll('pre');
-      preElements.forEach((pre) => {
-        if (pre.querySelector('.code-copy-btn')) return;
-        const btn = document.createElement('button');
-        btn.className = 'code-copy-btn';
-        btn.textContent = 'Copy';
-        btn.title = 'コードをコピー';
-        btn.contentEditable = 'false';
-        btn.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const code = pre.querySelector('code');
-          if (code) {
-            void navigator.clipboard.writeText(code.textContent ?? '');
-            btn.textContent = '✓ Copied';
-            btn.classList.add('code-copy-btn--copied');
-            setTimeout(() => {
-              btn.textContent = 'Copy';
-              btn.classList.remove('code-copy-btn--copied');
-            }, 1500);
-          }
-        });
-        pre.style.position = 'relative';
-        pre.appendChild(btn);
+    /** 単一の <pre> 要素にコピーボタンを追加する */
+    const addCopyButton = (pre: HTMLElement) => {
+      if (pre.querySelector('.code-copy-btn')) return;
+      const btn = document.createElement('button');
+      btn.className = 'code-copy-btn';
+      btn.textContent = 'Copy';
+      btn.title = 'コードをコピー';
+      btn.contentEditable = 'false';
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const code = pre.querySelector('code');
+        if (code) {
+          void navigator.clipboard.writeText(code.textContent ?? '');
+          btn.textContent = '✓ Copied';
+          btn.classList.add('code-copy-btn--copied');
+          setTimeout(() => {
+            btn.textContent = 'Copy';
+            btn.classList.remove('code-copy-btn--copied');
+          }, 1500);
+        }
       });
+      pre.style.position = 'relative';
+      pre.appendChild(btn);
     };
 
-    addCopyButtons();
-    const observer = new MutationObserver(addCopyButtons);
+    // 初回: 既存の全 <pre> にボタンを追加
+    editorDom.querySelectorAll('pre').forEach((pre) => addCopyButton(pre as HTMLElement));
+
+    // MutationObserver: 追加されたノードのみを走査（全 <pre> の再走査を回避）
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const addedNode of mutation.addedNodes) {
+          if (!(addedNode instanceof HTMLElement)) continue;
+          if (addedNode.tagName === 'PRE') {
+            addCopyButton(addedNode);
+          } else {
+            // 追加されたサブツリー内の <pre> を検索
+            const pres = addedNode.querySelectorAll?.('pre');
+            pres?.forEach((pre) => addCopyButton(pre as HTMLElement));
+          }
+        }
+      }
+    });
     observer.observe(editorDom, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [editor, mode]);
@@ -1010,7 +1033,7 @@ export function MarkdownEditor({
           <GitGutterIndicator
             repoPath={workspaceRootForGit}
             filePath={activeTabFilePath}
-            lineHeight={Math.round(settings.appearance.editorFontSize * settings.appearance.editorLineHeight)}
+            lineHeight={Math.round(editorFontSize * editorLineHeight)}
             editorContainerRef={editorWrapperRef}
           />
           {/* YAML Front Matter パネル (Phase 7) */}
@@ -1117,10 +1140,10 @@ function EditorToolbar({
   /** AIコピーボタン用: 現在の Markdown を取得する関数 */
   getMarkdown?: () => string;
 }) {
-  const { settings, updateSettings } = useSettingsStore();
-  const focusMode = settings.editor.focusMode;
-  const typewriterMode = settings.editor.typewriterMode;
-  const zenMode = settings.editor.zenMode;
+  const focusMode = useSettingsStore((s) => s.settings.editor.focusMode);
+  const typewriterMode = useSettingsStore((s) => s.settings.editor.typewriterMode);
+  const zenMode = useSettingsStore((s) => s.settings.editor.zenMode);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
 
   if (!editor) return null;
 

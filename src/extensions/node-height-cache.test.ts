@@ -3,7 +3,6 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  makeNodeId,
   getEstimatedHeight,
   updateHeightCache,
   invalidateHeightCache,
@@ -11,24 +10,40 @@ import {
 } from './node-height-cache';
 
 // ProseMirrorNode のモック
-function mockNode(typeName: string, textContent: string) {
+function mockNode(typeName: string, textContent: string, childCount = 0) {
   return {
     type: { name: typeName },
     textContent,
+    childCount,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- minimal mock for ProseMirrorNode
   } as any;
 }
 
+/**
+ * invalidateHeightCache を繰り返し呼んでキャッシュを空にするヘルパー。
+ * コンテンツベースキャッシュでは invalidateHeightCache() は
+ * サイズ上限超過時のみ削除するため、テスト用に複数回呼ぶ。
+ */
+function forceFlushCache() {
+  // MAX_CACHE_SIZE (2000) を超えるまでダミーエントリを追加
+  for (let i = 0; i < 2100; i++) {
+    const node = mockNode('paragraph', `flush-${i}`);
+    const mockDom = { getBoundingClientRect: () => ({ height: 1 }) } as HTMLElement;
+    updateHeightCache(node, 0, mockDom);
+  }
+  invalidateHeightCache();
+  // 残ったエントリもクリア
+  for (let i = 0; i < 2100; i++) {
+    const node = mockNode('paragraph', `flush2-${i}`);
+    const mockDom = { getBoundingClientRect: () => ({ height: 1 }) } as HTMLElement;
+    updateHeightCache(node, 0, mockDom);
+  }
+  invalidateHeightCache();
+}
+
 describe('node-height-cache', () => {
   beforeEach(() => {
-    invalidateHeightCache();
-  });
-
-  describe('makeNodeId', () => {
-    it('typeName:offset 形式の ID を生成する', () => {
-      const node = mockNode('paragraph', 'hello');
-      expect(makeNodeId(node, 42)).toBe('paragraph:42');
-    });
+    forceFlushCache();
   });
 
   describe('getEstimatedHeight', () => {
@@ -71,34 +86,40 @@ describe('node-height-cache', () => {
       const height = getEstimatedHeight(node, 0);
       expect(height).toBe(28);
     });
+
+    it('同一内容のノードはオフセットが異なってもキャッシュヒットする', () => {
+      const node1 = mockNode('paragraph', 'same content');
+      const mockDom = { getBoundingClientRect: () => ({ height: 75 }) } as HTMLElement;
+      updateHeightCache(node1, 10, mockDom);
+
+      // 異なるオフセットでも同一内容ならキャッシュヒット
+      const node2 = mockNode('paragraph', 'same content');
+      expect(getEstimatedHeight(node2, 999)).toBe(75);
+    });
   });
 
-  describe('updateHeightCache / invalidateHeightCache', () => {
+  describe('updateHeightCache', () => {
     it('キャッシュに実測値を保存し、次回取得時に返す', () => {
-      const node = mockNode('paragraph', 'text');
+      const node = mockNode('paragraph', 'cached text');
       const mockDom = {
         getBoundingClientRect: () => ({ height: 75 }),
       } as HTMLElement;
 
       updateHeightCache(node, 10, mockDom);
-      expect(_getHeightCacheSize()).toBe(1);
       expect(getEstimatedHeight(node, 10)).toBe(75);
     });
+  });
 
-    it('invalidateHeightCache でキャッシュが全クリアされる', () => {
-      const node = mockNode('paragraph', 'text');
-      const mockDom = {
-        getBoundingClientRect: () => ({ height: 75 }),
-      } as HTMLElement;
+  describe('invalidateHeightCache', () => {
+    it('キャッシュサイズが上限以下なら invalidate しても削除されない', () => {
+      // キャッシュに少数のエントリだけ追加
+      const node = mockNode('paragraph', 'unique-test-keep-me');
+      const mockDom = { getBoundingClientRect: () => ({ height: 50 }) } as HTMLElement;
+      updateHeightCache(node, 0, mockDom);
 
-      updateHeightCache(node, 10, mockDom);
-      expect(_getHeightCacheSize()).toBe(1);
-
+      // invalidate 前後でキャッシュにこのエントリが残っている
       invalidateHeightCache();
-      expect(_getHeightCacheSize()).toBe(0);
-
-      // クリア後はデフォルト値に戻る
-      expect(getEstimatedHeight(node, 10)).toBe(28);
+      expect(getEstimatedHeight(node, 0)).toBe(50); // キャッシュヒットする
     });
   });
 });
