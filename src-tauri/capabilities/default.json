@@ -48,7 +48,6 @@
     "core:window:allow-show",
     "core:webview:allow-create-webview-window",
     "core:event:default",
-    "shell:allow-open",
-    "updater:default"
+    "shell:allow-open"
   ]
 }
