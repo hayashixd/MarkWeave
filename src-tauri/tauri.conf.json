@@ -25,14 +25,7 @@
       "csp": "default-src 'self'; script-src 'self'; connect-src ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self' blob:"
     }
   },
-  "plugins": {
-    "updater": {
-      "pubkey": "TODO_GENERATE_WITH_TAURI_SIGNER: npx tauri signer generate -w ~/.tauri/markweave.key",
-      "endpoints": [
-        "https://github.com/hayashixd/MarkWeave/releases/latest/download/latest.json"
-      ]
-    }
-  },
+  "plugins": {},
   "bundle": {
     "active": true,
     "targets": "all",
