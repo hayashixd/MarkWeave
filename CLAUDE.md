@@ -202,3 +202,54 @@ TipTapEditor の `initialContent` → エディタ → `onContentChange` → ス
 ### ⚠️ 禁止事項
 - ショートカットキーのみで操作可能な機能を作らない（必ずメニューからもアクセス可能にする）
 - `menu-inventory.md` を更新せずにメニュー項目を追加しない
+
+---
+
+## テスト自動化ルール
+
+### コード変更後の必須手順
+- markdown-to-tiptap.ts または tiptap-to-markdown.ts を変更した場合:
+  `npm run test:roundtrip` を実行し、全テストが通ることを確認する
+- src-tauri/ 以下を変更した場合:
+  `cd src-tauri && cargo test` を実行する
+- コンポーネント変更でUIに影響する場合:
+  `npm run test` を実行する
+
+### テスト追加基準
+- 新しいMarkdown記法のサポートを追加したら roundtrip テストケースを追加する
+- Rust コマンドを追加したら対応するユニットテストを src-tauri/src/ 内に書く
+
+### MCPツールの使い方（Claude Code用）
+- テスト実行: run_tests ツールを使う
+- 変換品質確認: roundtrip_check ツールに Markdown 文字列を渡す
+- 回帰確認: run_roundtrip_regression ツールを使う
+
+---
+
+## マニュアル生成ルール
+- UIの操作手順を変更したら該当するシナリオファイルを更新する
+- `npm run manual:capture` で撮影し直す
+- 撮影後に generate_manual ツールでHTML/Markdownを再生成する
+
+---
+
+## マニュアル自動更新ルール
+
+### 機能追加・変更時の必須手順
+UIに影響する変更をした場合、コード修正と同じセッションで以下を実施すること：
+1. 該当するシナリオYAMLが存在するか確認する
+   （存在しない場合は新規作成する）
+2. selectorが現在のDOMと一致しているか確認する
+3. npm run manual:capture で再撮影する
+4. HTML版を再生成する
+
+### シナリオYAMLが存在しない場合の作成手順
+1. feature-list.md で該当機能の概要を確認する
+2. 実際にPlaywrightで要素のselectorを確認する
+3. docs/manual-scenarios/{機能名}.yaml を生成する
+4. 撮影・HTML生成まで完了させる
+
+### 対象外（マニュアル更新不要）
+- Rust内部ロジックのみの変更
+- テストコードの変更
+- スタイル（CSS）の微調整
