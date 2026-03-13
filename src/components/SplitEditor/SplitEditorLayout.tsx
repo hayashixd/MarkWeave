@@ -13,6 +13,7 @@ import { useCallback, useState } from 'react';
 import { usePaneStore } from '../../store/paneStore';
 import { useTabStore } from '../../store/tabStore';
 import type { TabState } from '../../store/tabStore';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { PaneTabBar, PANE_TAB_DRAG_TYPE } from './PaneTabBar';
 import { Splitter } from './Splitter';
 import { useScrollSync } from './useScrollSync';
@@ -70,7 +71,8 @@ export function SplitEditorLayout({
   const setActivePaneId = usePaneStore((s) => s.setActivePaneId);
   const moveTabToPane = usePaneStore((s) => s.moveTabToPane);
   // content/savedContent の変更では再レンダリングしない（パフォーマンス最適化）
-  const allTabs = useTabStore((s) => s.tabs, tabsShallowEqual);
+  // Zustand v5: useStoreWithEqualityFn でカスタム等価関数を使用
+  const allTabs = useStoreWithEqualityFn(useTabStore, (s) => s.tabs, tabsShallowEqual);
   const [dropTargetPaneId, setDropTargetPaneId] = useState<string | null>(null);
 
   // 同一ファイル分割時のスクロール同期
