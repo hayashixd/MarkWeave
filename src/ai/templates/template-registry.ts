@@ -74,6 +74,15 @@ export function registerTemplate(template: AiTemplate): void {
 }
 
 /**
+ * テンプレートをレジストリから削除する。
+ *
+ * @param id - 削除するテンプレートのID
+ */
+export function unregisterTemplate(id: string): void {
+  registry.delete(id);
+}
+
+/**
  * IDでテンプレートを取得する。
  *
  * @param id - テンプレートID
@@ -81,6 +90,16 @@ export function registerTemplate(template: AiTemplate): void {
  */
 export function getTemplate(id: string): AiTemplate | undefined {
   return registry.get(id);
+}
+
+/**
+ * テンプレートがカスタム（ユーザー定義）かどうかを判定する。
+ *
+ * @param id - テンプレートID
+ * @returns カスタムテンプレートの場合 true
+ */
+export function isCustomTemplate(id: string): boolean {
+  return id.startsWith('custom-');
 }
 
 /**
