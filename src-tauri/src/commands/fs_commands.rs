@@ -437,3 +437,259 @@ pub async fn move_to_trash(path: String) -> Result<(), String> {
     log::info!("move_to_trash: success");
     Ok(())
 }
+
+// =============================================================================
+// テスト
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    // -------------------------------------------------------------------------
+    // collect_file_tree
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_collect_file_tree_returns_files_matching_extension() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("a.md"), "").unwrap();
+        fs::write(dir.path().join("b.txt"), "").unwrap();
+        fs::write(dir.path().join("c.md"), "").unwrap();
+
+        let result = collect_file_tree(dir.path(), &[".md".to_string()]).unwrap();
+        let names: Vec<&str> = result.iter().map(|n| n.name.as_str()).collect();
+        assert!(names.contains(&"a.md"), "a.md should be included");
+        assert!(names.contains(&"c.md"), "c.md should be included");
+        assert!(!names.contains(&"b.txt"), "b.txt should be excluded");
+    }
+
+    #[test]
+    fn test_collect_file_tree_empty_extensions_returns_all_files() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("a.md"), "").unwrap();
+        fs::write(dir.path().join("b.rs"), "").unwrap();
+
+        let result = collect_file_tree(dir.path(), &[]).unwrap();
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_collect_file_tree_skips_hidden_files() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join(".hidden.md"), "").unwrap();
+        fs::write(dir.path().join("visible.md"), "").unwrap();
+
+        let result = collect_file_tree(dir.path(), &[".md".to_string()]).unwrap();
+        let names: Vec<&str> = result.iter().map(|n| n.name.as_str()).collect();
+        assert!(!names.contains(&".hidden.md"), ".hidden.md should be skipped");
+        assert!(names.contains(&"visible.md"));
+    }
+
+    #[test]
+    fn test_collect_file_tree_recurses_into_subdirectory() {
+        let dir = tempdir().unwrap();
+        let sub = dir.path().join("subdir");
+        fs::create_dir(&sub).unwrap();
+        fs::write(sub.join("deep.md"), "").unwrap();
+
+        let result = collect_file_tree(dir.path(), &[".md".to_string()]).unwrap();
+        // subdir 自体がディレクトリノードとして含まれる
+        let dir_node = result.iter().find(|n| n.node_type == "directory");
+        assert!(dir_node.is_some(), "subdirectory node should exist");
+        let children = dir_node.unwrap().children.as_ref().unwrap();
+        assert!(children.iter().any(|n| n.name == "deep.md"));
+    }
+
+    #[test]
+    fn test_collect_file_tree_skips_hidden_directories() {
+        let dir = tempdir().unwrap();
+        let hidden_dir = dir.path().join(".git");
+        fs::create_dir(&hidden_dir).unwrap();
+        fs::write(hidden_dir.join("config"), "").unwrap();
+
+        let result = collect_file_tree(dir.path(), &[]).unwrap();
+        assert!(
+            result.iter().all(|n| !n.name.starts_with('.')),
+            "hidden directories should be skipped"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // collect_md_files
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_collect_md_files_returns_only_md() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("note.md"), "").unwrap();
+        fs::write(dir.path().join("readme.txt"), "").unwrap();
+        fs::write(dir.path().join("doc.html"), "").unwrap();
+
+        let mut files = Vec::new();
+        collect_md_files(dir.path(), &mut files).unwrap();
+
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("note.md"));
+    }
+
+    #[test]
+    fn test_collect_md_files_recurses() {
+        let dir = tempdir().unwrap();
+        let sub = dir.path().join("docs");
+        fs::create_dir(&sub).unwrap();
+        fs::write(sub.join("deep.md"), "").unwrap();
+        fs::write(dir.path().join("root.md"), "").unwrap();
+
+        let mut files = Vec::new();
+        collect_md_files(dir.path(), &mut files).unwrap();
+
+        assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_collect_md_files_skips_hidden() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join(".hidden.md"), "").unwrap();
+        fs::write(dir.path().join("visible.md"), "").unwrap();
+
+        let mut files = Vec::new();
+        collect_md_files(dir.path(), &mut files).unwrap();
+
+        assert_eq!(files.len(), 1);
+        assert!(files[0].ends_with("visible.md"));
+    }
+
+    // -------------------------------------------------------------------------
+    // rename_file (async → tokio runtime で実行)
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_rename_file_success() {
+        let dir = tempdir().unwrap();
+        let src = dir.path().join("old.md");
+        let dst = dir.path().join("new.md");
+        fs::write(&src, "content").unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(rename_file(
+            src.to_string_lossy().to_string(),
+            dst.to_string_lossy().to_string(),
+        ));
+
+        assert!(result.is_ok());
+        assert!(dst.exists());
+        assert!(!src.exists());
+    }
+
+    #[test]
+    fn test_rename_file_not_found_returns_error() {
+        let dir = tempdir().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(rename_file(
+            dir.path().join("nonexistent.md").to_string_lossy().to_string(),
+            dir.path().join("new.md").to_string_lossy().to_string(),
+        ));
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("ファイルが見つかりません"));
+    }
+
+    #[test]
+    fn test_rename_file_same_path_is_noop() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("same.md");
+        fs::write(&path, "data").unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(rename_file(
+            path.to_string_lossy().to_string(),
+            path.to_string_lossy().to_string(),
+        ));
+
+        assert!(result.is_ok());
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_rename_file_destination_exists_returns_error() {
+        let dir = tempdir().unwrap();
+        let src = dir.path().join("src.md");
+        let dst = dir.path().join("dst.md");
+        fs::write(&src, "src").unwrap();
+        fs::write(&dst, "dst").unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(rename_file(
+            src.to_string_lossy().to_string(),
+            dst.to_string_lossy().to_string(),
+        ));
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("既に存在します"));
+    }
+
+    // -------------------------------------------------------------------------
+    // move_to_trash
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_move_to_trash_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("delete_me.md");
+        fs::write(&path, "bye").unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(move_to_trash(path.to_string_lossy().to_string()));
+
+        assert!(result.is_ok());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn test_move_to_trash_not_found_returns_error() {
+        let dir = tempdir().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(move_to_trash(
+            dir.path().join("ghost.md").to_string_lossy().to_string(),
+        ));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_move_to_trash_directory() {
+        let dir = tempdir().unwrap();
+        let sub = dir.path().join("subdir_to_delete");
+        fs::create_dir(&sub).unwrap();
+        fs::write(sub.join("file.md"), "").unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(move_to_trash(sub.to_string_lossy().to_string()));
+
+        assert!(result.is_ok());
+        assert!(!sub.exists());
+    }
+}

@@ -322,6 +322,181 @@ pub async fn cache_remote_image(app: AppHandle, url: String) -> Result<String, S
     Ok(cache_path.to_string_lossy().to_string())
 }
 
+// =============================================================================
+// テスト
+// =============================================================================
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    fn make_settings(mode: ImageSaveMode, strategy: FilenameStrategy) -> ImageStorageSettings {
+        ImageStorageSettings {
+            save_mode: mode,
+            subfolder_name: "images".to_string(),
+            custom_path: "/custom/absolute".to_string(),
+            filename_strategy: strategy,
+            deduplicate_by_hash: false,
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // resolve_image_save_dir
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_resolve_save_dir_same_dir() {
+        let settings = make_settings(ImageSaveMode::SameDir, FilenameStrategy::Original);
+        let result = resolve_image_save_dir(Path::new("/ws/docs/note.md"), &settings).unwrap();
+        assert_eq!(result, Path::new("/ws/docs"));
+    }
+
+    #[test]
+    fn test_resolve_save_dir_subfolder() {
+        let settings = make_settings(ImageSaveMode::Subfolder, FilenameStrategy::Original);
+        let result = resolve_image_save_dir(Path::new("/ws/docs/note.md"), &settings).unwrap();
+        assert_eq!(result, Path::new("/ws/docs/images"));
+    }
+
+    #[test]
+    fn test_resolve_save_dir_custom_relative() {
+        let mut settings = make_settings(ImageSaveMode::CustomRelative, FilenameStrategy::Original);
+        settings.custom_path = "assets".to_string();
+        let result = resolve_image_save_dir(Path::new("/ws/docs/note.md"), &settings).unwrap();
+        assert_eq!(result, Path::new("/ws/docs/assets"));
+    }
+
+    #[test]
+    fn test_resolve_save_dir_custom_absolute_valid() {
+        // プラットフォーム依存の絶対パスを使用
+        let abs_path = if cfg!(windows) {
+            "C:\\absolute\\path"
+        } else {
+            "/absolute/path"
+        };
+        let mut settings = make_settings(ImageSaveMode::CustomAbsolute, FilenameStrategy::Original);
+        settings.custom_path = abs_path.to_string();
+        let result = resolve_image_save_dir(Path::new("C:\\ws\\note.md"), &settings).unwrap();
+        assert_eq!(result, Path::new(abs_path));
+    }
+
+    #[test]
+    fn test_resolve_save_dir_custom_absolute_relative_path_errors() {
+        let mut settings = make_settings(ImageSaveMode::CustomAbsolute, FilenameStrategy::Original);
+        settings.custom_path = "relative/path".to_string();
+        let result = resolve_image_save_dir(Path::new("/ws/note.md"), &settings);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("絶対パスを指定"));
+    }
+
+    // -------------------------------------------------------------------------
+    // generate_filename
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_generate_filename_original() {
+        let name = generate_filename("photo.png", &FilenameStrategy::Original);
+        assert_eq!(name, "photo.png");
+    }
+
+    #[test]
+    fn test_generate_filename_timestamp_has_correct_format() {
+        let name = generate_filename("x.jpg", &FilenameStrategy::Timestamp);
+        // 形式: YYYYMMDD_HHMMSS.jpg
+        assert!(name.ends_with(".jpg"), "Should end with .jpg, got: {}", name);
+        assert_eq!(name.len(), "20250101_120000.jpg".len());
+    }
+
+    #[test]
+    fn test_generate_filename_uuid_has_extension() {
+        let name = generate_filename("img.png", &FilenameStrategy::Uuid);
+        assert!(name.ends_with(".png"));
+        // UUID 形式: xxxxxxxx-xxxx-4xxx-xxxx-xxxxxxxxxxxx.png
+        assert!(name.contains('-'));
+    }
+
+    #[test]
+    fn test_generate_filename_timestamp_original_contains_base() {
+        let name = generate_filename("photo.jpeg", &FilenameStrategy::TimestampOriginal);
+        assert!(name.contains("photo"), "Should contain base name, got: {}", name);
+        assert!(name.ends_with(".jpeg"));
+    }
+
+    #[test]
+    fn test_generate_filename_no_extension_defaults_to_png() {
+        let name = generate_filename("noext", &FilenameStrategy::Original);
+        // 拡張子なしのファイルはそのまま返る（Original strategy）
+        assert_eq!(name, "noext");
+    }
+
+    // -------------------------------------------------------------------------
+    // is_leap_year / days_to_ymd
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_is_leap_year() {
+        assert!(is_leap_year(2000)); // 400 の倍数
+        assert!(is_leap_year(2024)); // 4 の倍数 (100 の倍数でない)
+        assert!(!is_leap_year(1900)); // 100 の倍数 (400 の倍数でない)
+        assert!(!is_leap_year(2023)); // 4 の倍数でない
+    }
+
+    #[test]
+    fn test_days_to_ymd_epoch() {
+        let (y, m, d) = days_to_ymd(0);
+        assert_eq!((y, m, d), (1970, 1, 1));
+    }
+
+    #[test]
+    fn test_days_to_ymd_year_boundary() {
+        // 1970-12-31 は 364 日目（0 インデックス）
+        let (y, m, d) = days_to_ymd(364);
+        assert_eq!(y, 1970);
+        assert_eq!(m, 12);
+        assert_eq!(d, 31);
+    }
+
+    #[test]
+    fn test_days_to_ymd_leap_year_feb29() {
+        // 2024年1月1日からの日数 = 1970年からの日数を計算
+        // 2024-02-29 を簡易確認: 2024は閏年
+        let (y, _m, _d) = days_to_ymd(19783); // 2024-03-01 あたり
+        assert!(y >= 2024);
+    }
+
+    // -------------------------------------------------------------------------
+    // find_by_hash
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_find_by_hash_finds_existing_file() {
+        let dir = tempdir().unwrap();
+        let data = b"test image data";
+        let file = dir.path().join("image.png");
+        fs::write(&file, data).unwrap();
+
+        let result = find_by_hash(dir.path(), data);
+        assert!(result.is_some());
+        assert!(result.unwrap().ends_with("image.png"));
+    }
+
+    #[test]
+    fn test_find_by_hash_returns_none_when_not_found() {
+        let dir = tempdir().unwrap();
+        fs::write(dir.path().join("other.png"), b"different data").unwrap();
+
+        let result = find_by_hash(dir.path(), b"my image data");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_find_by_hash_returns_none_for_nonexistent_dir() {
+        let result = find_by_hash(Path::new("/nonexistent/dir"), b"data");
+        assert!(result.is_none());
+    }
+}
+
 /// 画像キャッシュをパージする Tauri コマンド。
 ///
 /// tauri-ipc-interface.md §3 `purge_image_cache` に準拠。

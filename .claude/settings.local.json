@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd C:/work/claude_test_1/mcp-dev-tools && npm run build)",
+      "Bash(claude mcp:*)",
+      "Bash(cd C:/work/claude_test_1 && node ./mcp-dev-tools/dist/server.js)",
+      "Bash(cd C:/work/claude_test_1 && npm run test 2>&1)",
+      "Bash(cd C:/work/claude_test_1/src-tauri && cargo test 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && npm run test:roundtrip 2>&1)",
+      "Bash(find src/lib -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -name \"*.test.ts\" ! -name \"*.test.tsx\" ! -name \"*.d.ts\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src/core -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -name \"*.test.ts\" ! -name \"*.test.tsx\" ! -name \"*.d.ts\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src/store -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -name \"*.test.ts\" ! -name \"*.test.tsx\" ! -name \"*.d.ts\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src/hooks -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -name \"*.test.ts\" ! -name \"*.test.tsx\" ! -name \"*.d.ts\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src/file -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -name \"*.test.ts\" ! -name \"*.test.tsx\" ! -name \"*.d.ts\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src/plugins -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -name \"*.test.ts\" ! -name \"*.test.tsx\" ! -name \"*.d.ts\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src/extensions -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) ! -name \"*.test.ts\" ! -name \"*.test.tsx\" ! -name \"*.d.ts\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src-tauri/src/commands -type f -name \"*.rs\" -exec wc -l {} + | sort -rn)",
+      "Bash(find src-tauri/src -type f -name \"*.rs\" ! -path \"*/commands/*\" -exec wc -l {} + | sort -rn)",
+      "Bash(cd C:/work/claude_test_1 && npm run test -- --run src/lib/link-updater.test.ts 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && npm run test -- --run src/store/workspaceStore.test.ts 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && npm run test -- --run src/store/gitStore.test.ts 2>&1)",
+      "Bash(cd C:/work/claude_test_1/src-tauri && cargo test commands::fs_commands::tests 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && npm run test -- --run src/store/recentFilesStore.test.ts 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && npm run test -- --run src/store/crash-recovery.test.ts 2>&1)",
+      "Bash(cd C:/work/claude_test_1/src-tauri && cargo test commands::image_commands::tests 2>&1 | tail -30)",
+      "Bash(cd C:/work/claude_test_1/src-tauri && cargo test commands::image_commands::tests 2>&1 | tail -20)",
+      "Bash(cd C:/work/claude_test_1 && npm run test -- --run src/store/session.test.ts 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && npm run manual:capture 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && pnpm install 2>&1 | tail -5)",
+      "Bash(cd C:/work/claude_test_1 && pnpm approve-builds 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && echo \"sharp\" | pnpm approve-builds --force 2>&1; pnpm rebuild sharp 2>&1 | tail -10)",
+      "Bash(cd C:/work/claude_test_1 && node -e \"require\\('sharp'\\)\" 2>&1)",
+      "Bash(cd C:/work/claude_test_1 && npx playwright test e2e/manual-capture/bold-text.spec.ts --headed 2>&1 | head -30)",
+      "Bash(cd C:/work/claude_test_1 && npx playwright install chromium 2>&1 | tail -5)",
+      "Bash(cd C:/work/claude_test_1 && node docs/generate-manual.js)",
+      "Bash(cd C:/work/claude_test_1 && node docs/generate-manual.cjs)"
+    ]
+  }
+}
