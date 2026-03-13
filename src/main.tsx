@@ -6,6 +6,8 @@ import "./styles.css";
 import { themeManager } from "./themes/theme-manager";
 import { useSettingsStore } from "./store/settingsStore";
 import { useSnippetStore } from "./store/snippetStore";
+import { registerBuiltInTemplates } from "./ai/templates/built-in";
+import { useCustomAiTemplateStore } from "./store/customAiTemplateStore";
 
 // パフォーマンス計測: 起動時間 (performance-design.md §8.1)
 const appStartTime = performance.now();
@@ -19,6 +21,10 @@ async function initializeApp() {
 
   // スニペットを読み込む
   await useSnippetStore.getState().loadSnippets();
+
+  // AI テンプレートを初期化（組み込み登録 + カスタム読み込み）
+  registerBuiltInTemplates();
+  await useCustomAiTemplateStore.getState().loadCustomAiTemplates();
 }
 
 initializeApp();
