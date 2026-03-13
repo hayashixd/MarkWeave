@@ -30,6 +30,8 @@ import { EditorErrorBoundary } from '../ErrorBoundary/EditorErrorBoundary';
 import { ToastContainer } from '../toast/ToastContainer';
 import { useTabStore } from '../../store/tabStore';
 import type { FileEncoding, LineEnding } from '../../store/tabStore';
+import { useShallow } from 'zustand/shallow';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 import { useSettingsStore } from '../../store/settingsStore';
 import { useTitleBar } from '../../hooks/useTitleBar';
 import { useCloseGuard } from '../../hooks/useCloseGuard';
@@ -103,13 +105,13 @@ export function AppShell() {
   const getTab = useTabStore((s) => s.getTab);
 
   // タブ ID リストのみ購読（content 変更では再レンダリングしない）
-  const tabIds = useTabStore(
-    (s) => s.tabs.map((t) => t.id),
-    (prev, next) => prev.length === next.length && prev.every((id, i) => id === next[i]),
-  );
+  // Zustand v5: useShallow で配列の浅い比較を行う
+  const tabIds = useTabStore(useShallow((s) => s.tabs.map((t) => t.id)));
 
   // アクティブタブ: content/savedContent 以外のフィールドが変わったときのみ再レンダリング
-  const activeTab = useTabStore(
+  // Zustand v5: useStoreWithEqualityFn でカスタム等価関数を使用
+  const activeTab = useStoreWithEqualityFn(
+    useTabStore,
     (s) => {
       if (!s.activeTabId) return undefined;
       return s.tabs.find((t) => t.id === s.activeTabId);
