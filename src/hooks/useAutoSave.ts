@@ -30,15 +30,16 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
   const pendingSaveRef = useRef(false);
   const isSavingRef = useRef(false);
 
-  const { settings } = useSettingsStore();
-  const { getTab, markSaved } = useTabStore();
+  const autoSaveDelay = useSettingsStore((s) => s.autoSaveDelay);
+  const getTab = useTabStore((s) => s.getTab);
+  const markSaved = useTabStore((s) => s.markSaved);
   const show = useToastStore((s) => s.show);
   const workspaceRoot = useWorkspaceStore((s) => s.root);
   const updateIndex = useMetadataStore((s) => s.updateIndex);
 
   // デバウンス保存のスケジュール
   const scheduleSave = useCallback(() => {
-    if (settings.file.autoSaveDelay <= 0) return;
+    if (autoSaveDelay <= 0) return;
 
     const tab = getTab(tabId);
     if (!tab || !tab.isDirty || !tab.filePath) return;
@@ -57,7 +58,7 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
     const contentLength = tab.content.length;
     const delay = contentLength < 100_000 ? 500
       : contentLength < 1_000_000 ? 1000
-      : Math.min(settings.file.autoSaveDelay, 2000);
+      : Math.min(autoSaveDelay, 2000);
 
     timerRef.current = setTimeout(() => {
       const currentTab = getTab(tabId);
@@ -88,7 +89,7 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
           isSavingRef.current = false;
         });
     }, delay);
-  }, [tabId, settings.file.autoSaveDelay, getTab, markSaved, writeFn, isComposing, show, workspaceRoot, updateIndex]);
+  }, [tabId, autoSaveDelay, getTab, markSaved, writeFn, isComposing, show, workspaceRoot, updateIndex]);
 
   // 即時保存（Ctrl+S 用）
   const saveNow = useCallback(async () => {

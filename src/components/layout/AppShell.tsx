@@ -83,12 +83,15 @@ export function AppShell() {
   // フローティング TOC パネルの表示状態
   const [floatingTocOpen, setFloatingTocOpen] = useState(false);
 
-  // Zen Mode / 設定
-  const { settings, updateSettings } = useSettingsStore();
-  const zenMode = settings.editor.zenMode;
+  // Zen Mode / 設定（細粒度セレクターで必要なフィールドのみ購読）
+  const zenMode = useSettingsStore((s) => s.settings.editor.zenMode);
+  const settings = useSettingsStore((s) => s.settings);
+  const updateSettings = useSettingsStore((s) => s.updateSettings);
 
-  // 最近使ったファイル
-  const { recentFiles, loadRecentFiles, addRecentFile } = useRecentFilesStore();
+  // 最近使ったファイル（細粒度セレクター）
+  const recentFiles = useRecentFilesStore((s) => s.recentFiles);
+  const loadRecentFiles = useRecentFilesStore((s) => s.loadRecentFiles);
+  const addRecentFile = useRecentFilesStore((s) => s.addRecentFile);
   useEffect(() => {
     loadRecentFiles();
   }, [loadRecentFiles]);

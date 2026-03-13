@@ -5,26 +5,60 @@
  * ProseMirror ノードの高さを推定・キャッシュし、
  * ビューポート外ノードのプレースホルダー高さ決定に使用する。
  *
- * nodeId はポジションベース ("typeName:offset") で生成。
- * ドキュメント変更時にキャッシュを全クリアする。
+ * キャッシュキーはコンテンツベースのフィンガープリント
+ * ("typeName:textLength:childCount:textHash") を使用する。
+ * これにより、ドキュメント内のオフセットが変わっても
+ * 同一内容のノードはキャッシュヒットする。
+ *
+ * docChanged 時の全クリアは行わず、LRU 的にサイズ上限で古いエントリを除去する。
  */
 
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
-/** nodeId = "${typeName}:${offset}" の形式 */
-export function makeNodeId(node: ProseMirrorNode, offset: number): string {
-  return `${node.type.name}:${offset}`;
+/** キャッシュの最大エントリ数 */
+const MAX_CACHE_SIZE = 2000;
+
+/**
+ * ノードのコンテンツに基づくフィンガープリントを生成する。
+ * テキスト内容の簡易ハッシュ + 構造情報でキーを構成する。
+ */
+function makeContentFingerprint(node: ProseMirrorNode): string {
+  const text = node.textContent;
+  const hash = simpleHash(text);
+  return `${node.type.name}:${text.length}:${node.childCount}:${hash}`;
 }
 
-// ノード高さキャッシュ（nodeId → 実測高さ px）
+/**
+ * 簡易ハッシュ関数（FNV-1a ベース）。
+ * 暗号学的安全性は不要、高速かつ低衝突が目的。
+ */
+function simpleHash(str: string): number {
+  let hash = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) | 0; // FNV prime, keep 32-bit
+  }
+  return hash >>> 0; // unsigned
+}
+
+// ノード高さキャッシュ（contentFingerprint → 実測高さ px）
 const heightCache = new Map<string, number>();
 
 /**
- * ドキュメント変更時にキャッシュを全クリアする。
- * virtualScrollPlugin の apply() から呼び出すこと。
+ * ドキュメント変更時に呼ばれる。
+ * 全クリアではなく、キャッシュサイズが上限を超えた場合のみ縮小する。
+ * コンテンツベースのフィンガープリントにより、変更されていないノードは
+ * キャッシュヒットし続ける。
  */
 export function invalidateHeightCache(): void {
-  heightCache.clear();
+  // キャッシュが上限を超えた場合、古いエントリの半分を削除
+  if (heightCache.size > MAX_CACHE_SIZE) {
+    const entries = Array.from(heightCache.keys());
+    const deleteCount = Math.floor(entries.length / 2);
+    for (let i = 0; i < deleteCount; i++) {
+      heightCache.delete(entries[i]!);
+    }
+  }
 }
 
 // CJK テキスト（日本語・中国語）は英語より行高が高い
@@ -52,12 +86,15 @@ const DEFAULT_HEIGHTS: Record<string, number> = {
 /**
  * ノードの推定高さを返す。
  * キャッシュにヒットすれば実測値、なければテキスト量ベースの推定値を返す。
+ *
+ * @param node ProseMirror ノード
+ * @param _offset オフセット（後方互換のために残すが、キャッシュキーには使用しない）
  */
-export function getEstimatedHeight(node: ProseMirrorNode, offset: number): number {
-  const nodeId = makeNodeId(node, offset);
+export function getEstimatedHeight(node: ProseMirrorNode, _offset: number): number {
+  const fingerprint = makeContentFingerprint(node);
 
   // キャッシュヒット: 実測値を返す
-  const cached = heightCache.get(nodeId);
+  const cached = heightCache.get(fingerprint);
   if (cached !== undefined) return cached;
 
   // キャッシュミス: ノードタイプのデフォルト値 + テキスト量に比例した推定
@@ -79,11 +116,11 @@ export function getEstimatedHeight(node: ProseMirrorNode, offset: number): numbe
  */
 export function updateHeightCache(
   node: ProseMirrorNode,
-  offset: number,
+  _offset: number,
   dom: HTMLElement,
 ): void {
-  const nodeId = makeNodeId(node, offset);
-  heightCache.set(nodeId, dom.getBoundingClientRect().height);
+  const fingerprint = makeContentFingerprint(node);
+  heightCache.set(fingerprint, dom.getBoundingClientRect().height);
 }
 
 /** テスト用: キャッシュの内容を取得 */
