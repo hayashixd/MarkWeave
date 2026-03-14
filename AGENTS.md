@@ -603,6 +603,16 @@ Phase N の「タスク名」を実装しました。
 
 ---
 
+## 📘 マニュアル作業ルール（参照必須）
+
+マニュアル関連作業（手順変更・スクリーンショット更新・公開情報更新）では、
+`docs/manual/manual-authoring-rules.md` を必ず参照し、同ファイルの手順・禁止事項に従うこと。
+
+- ルール本体: `docs/manual/manual-authoring-rules.md`
+- 管理トップ: `docs/manual/README.md`
+
+---
+
 ## 📐 設計書の読み方
 
 | ファイル | 役割 |
