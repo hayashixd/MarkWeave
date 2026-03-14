@@ -33,7 +33,20 @@
       "Bash(cd C:/work/claude_test_1 && npx playwright test e2e/manual-capture/bold-text.spec.ts --headed 2>&1 | head -30)",
       "Bash(cd C:/work/claude_test_1 && npx playwright install chromium 2>&1 | tail -5)",
       "Bash(cd C:/work/claude_test_1 && node docs/generate-manual.js)",
-      "Bash(cd C:/work/claude_test_1 && node docs/generate-manual.cjs)"
+      "Bash(cd C:/work/claude_test_1 && node docs/generate-manual.cjs)",
+      "Bash(cat /c/work/claude_test_1/package.json | python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('scripts',{}\\), indent=2\\)\\)\")",
+      "Bash(npx vitest:*)",
+      "Bash(node --version && node -e \"\nconst { unified } = await import\\('./node_modules/unified/index.js'\\);\n// check if remark parse is expensive during setup vs runtime\nconst t0 = performance.now\\(\\);\nconst { default: remarkParse } = await import\\('./node_modules/remark-parse/index.js'\\);\nconst { default: remarkGfm } = await import\\('./node_modules/remark-gfm/index.js'\\);\nconst { default: remarkMath } = await import\\('./node_modules/remark-math/index.js'\\);\nconsole.log\\('import time:', performance.now\\(\\) - t0, 'ms'\\);\n\nconst p = unified\\(\\).use\\(remarkParse\\).use\\(remarkGfm\\).use\\(remarkMath\\);\nconst t1 = performance.now\\(\\);\nconsole.log\\('setup time:', performance.now\\(\\) - t1, 'ms'\\);\n\" 2>&1 || true)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(node -e \"\n// Check if @tiptap/pm/model is available in node context\nimport\\('/c/work/claude_test_1/node_modules/@tiptap/pm/model/index.js'\\).then\\(m => {\n  console.log\\('Schema:', typeof m.Schema\\);\n  const schema = new m.Schema\\({\n    nodes: {\n      doc: { content: 'paragraph+' },\n      paragraph: { group: 'block', content: 'text*', toDOM: \\(\\) => ['p', 0] },\n      text: {},\n    },\n    marks: {},\n  }\\);\n  const doc = schema.node\\('doc', null, [\n    schema.node\\('paragraph', null, [schema.text\\('hello world'\\)]\\),\n  ]\\);\n  console.log\\('doc.childCount:', doc.childCount\\);\n  console.log\\('textContent:', doc.firstChild.textContent\\);\n}\\).catch\\(e => console.error\\(e.message\\)\\);\n\" 2>&1)",
+      "Bash(node -e \"\nimport\\('/c/work/claude_test_1/node_modules/@tiptap/pm/view/index.js'\\).then\\(m => {\n  console.log\\('Decoration:', typeof m.Decoration\\);\n  console.log\\('DecorationSet:', typeof m.DecorationSet\\);\n}\\).catch\\(e => console.error\\(e.message\\)\\);\n\" 2>&1)",
+      "mcp__test-automation__run_tests",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git stash:*)",
+      "Bash(where gh:*)",
+      "Bash(git remote:*)"
     ]
   }
 }
