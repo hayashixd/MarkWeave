@@ -32,12 +32,47 @@ export interface TipTapDoc {
   content: TipTapNode[];
 }
 
-const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+/**
+ * プラグイン組み合わせ別にパーサーを事前生成する。
+ * 毎回 unified() を組み立てるとプラグイン初期化コストが発生するため
+ * モジュール読み込み時に1度だけ生成してキャッシュする。
+ */
+const PARSER_GFM = unified().use(remarkParse).use(remarkGfm);
+const PARSER_FULL = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+
+/**
+ * Markdown に含まれる構文の概要を素早く検出する。
+ * 正規表現の1パスで判定することで、重いプラグインのスキップ判断に使う。
+ *
+ * hasMath: $$...$$（ブロック数式）または $x（インライン数式、空白で始まらない）
+ *   - "$10.00" のような価格表記を誤検出しないよう、$ の直後が数字のみの場合は除外する。
+ *     完全な除外は困難なため、false positive は PARSER_FULL を使うことで安全側に倒す。
+ */
+function detectMarkdownFeatures(markdown: string): { hasMath: boolean } {
+  // \$\$ = ブロック数式、\$(?!\d) = インライン数式（$0.99 などの価格を緩やかに除外）
+  const hasMath = /\$\$|\$(?!\d)/.test(markdown);
+  return { hasMath };
+}
+
+/**
+ * パースキャッシュ（1エントリ LRU）。
+ * モード切替（WYSIWYG → ソース → WYSIWYG）で同一コンテンツを2回パースする
+ * ケースを高速化する。200KB 超の大規模ファイルはメモリ負荷を避けてキャッシュしない。
+ */
+const PARSE_CACHE_MAX_BYTES = 200 * 1024; // 200KB
+let parseCache: { input: string; doc: TipTapDoc } | null = null;
 
 /**
  * Markdown テキストを TipTap JSON に変換する
  */
 export function markdownToTipTap(markdown: string): TipTapDoc {
+  // キャッシュヒット確認（小〜中規模ファイルのみ）
+  if (parseCache && parseCache.input === markdown) {
+    return parseCache.doc;
+  }
+
+  const { hasMath } = detectMarkdownFeatures(markdown);
+  const parser = hasMath ? PARSER_FULL : PARSER_GFM;
   const tree = parser.parse(markdown) as Root;
   const content = tree.children.flatMap(convertBlockNode);
 
@@ -46,7 +81,14 @@ export function markdownToTipTap(markdown: string): TipTapDoc {
     content.push({ type: 'paragraph' });
   }
 
-  return { type: 'doc', content };
+  const doc: TipTapDoc = { type: 'doc', content };
+
+  // 小〜中規模ファイルのみキャッシュ（メモリ節約）
+  if (markdown.length <= PARSE_CACHE_MAX_BYTES) {
+    parseCache = { input: markdown, doc };
+  }
+
+  return doc;
 }
 
 function convertBlockNode(node: RootContent): TipTapNode[] {
