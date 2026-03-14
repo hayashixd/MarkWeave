@@ -48,5 +48,6 @@
       "Bash(where gh:*)",
       "Bash(git remote:*)"
     ]
-  }
+  },
+  "mcpToolSearch": true
 }
