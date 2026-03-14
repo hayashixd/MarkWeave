@@ -150,6 +150,14 @@ pnpm format
 
 ---
 
+## マニュアル作成ルール
+
+マニュアル関連作業（操作手順変更・スクリーンショット更新・公式サイト掲載内容更新）を行う場合は、
+必ず `docs/manual/manual-authoring-rules.md` を参照してください。
+
+- ルール本体: `docs/manual/manual-authoring-rules.md`
+- マニュアル管理トップ: `docs/manual/README.md`
+
 ## アーキテクチャ概要
 
 ### コア原則

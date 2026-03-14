@@ -800,10 +800,8 @@ describe('スクロールイベント予算 — 16ms フレーム予算に対す
 
     // Component 1: doc.forEach + getEstimatedHeight のみ
     const iterCost = measureMedianMs(() => {
-      let accumulated = 0;
       doc.forEach((node, offset) => {
         getEstimatedHeight(node, offset);
-        accumulated += 28;
       });
     });
 
