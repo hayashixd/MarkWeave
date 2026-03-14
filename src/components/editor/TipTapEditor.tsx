@@ -604,7 +604,31 @@ export function MarkdownEditor({
         return;
       }
 
-      const shouldDebounce = editor.state.doc.childCount >= LARGE_DOC_SERIALIZE_DEBOUNCE_NODE_THRESHOLD;
+      // Bug 2 修正: ペースト等でドキュメントが閾値を超えた場合、ソースモードに自動切替。
+      // applyContent（ファイルロード時）と同等のチェックをユーザー操作にも適用し、
+      // 大規模コンテンツが WYSIWYG でレンダリングされてフリーズするのを防ぐ。
+      const blockCount = editor.state.doc.childCount;
+      const nodeCount = editor.state.doc.nodeSize;
+      if (
+        modeRef.current === 'wysiwyg' &&
+        (blockCount >= LARGE_FILE_BLOCK_COUNT_THRESHOLD || nodeCount >= LARGE_FILE_NODE_COUNT_THRESHOLD)
+      ) {
+        if (serializeTimerRef.current) {
+          clearTimeout(serializeTimerRef.current);
+          serializeTimerRef.current = null;
+        }
+        // まずコンテンツをストアに保存してからモード切替（データロスト防止）
+        emitMarkdown();
+        setSourceText(lastEmittedContentRef.current ?? '');
+        setMode('source');
+        showToast(
+          'warning',
+          `ノード数が多いため（blocks: ${blockCount}）、ソースモードで表示しています。`,
+        );
+        return;
+      }
+
+      const shouldDebounce = blockCount >= LARGE_DOC_SERIALIZE_DEBOUNCE_NODE_THRESHOLD;
       if (!shouldDebounce) {
         if (serializeTimerRef.current) {
           clearTimeout(serializeTimerRef.current);
@@ -626,11 +650,18 @@ export function MarkdownEditor({
     editor.on('update', handler);
     return () => {
       editor.off('update', handler);
+      // Bug 1 修正: clearTimeout のみではデバウンス中のコンテンツがストアに書き込まれず、
+      // タブ切替後に戻ったときコンテンツが消える。
+      // アンマウント前にペンディング中のシリアライズをフラッシュして確実に保存する。
       if (serializeTimerRef.current) {
         clearTimeout(serializeTimerRef.current);
         serializeTimerRef.current = null;
+        if (!editor.isDestroyed) {
+          emitMarkdown();
+        }
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, ime]);
 
   // タイプライターモード: カーソル行を常に画面中央に保つ
