@@ -25,8 +25,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        // tauri-plugin-updater is disabled until signing keys are generated
-        // .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // 2つ目の起動試行時に呼ばれる
             // argv = ["app_path", "/path/to/file.md", ...]
