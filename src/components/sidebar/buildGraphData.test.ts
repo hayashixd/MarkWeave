@@ -10,6 +10,10 @@ function makeTab(overrides: Partial<TabState>): TabState {
     content: '',
     savedContent: '',
     isDirty: false,
+    encoding: 'UTF-8' as const,
+    lineEnding: 'LF' as const,
+    fileType: 'markdown' as const,
+    isReadOnly: false,
     ...overrides,
   };
 }

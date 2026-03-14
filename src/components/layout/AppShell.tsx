@@ -171,16 +171,21 @@ export function AppShell() {
   const activePane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const effectiveActiveTabId = activePane?.activeTabId ?? activeTabId;
   useEffect(() => {
+    // tabStore の activeTabId は store から直接読む（deps に含めると、ユーザーがタブを
+    // クリックして tabStore を更新したときもこの effect が発火し、pane の古い値で
+    // tabStore を上書きしてしまう双方向 ping-pong ループが発生するため）。
+    const currentActiveTabId = useTabStore.getState().activeTabId;
+
     // 新規タブ追加直後は paneStore への反映前に一時的な不整合が起きるため、
     // activePane がそのタブをまだ保持していない場合は tabStore の巻き戻しを行わない。
-    if (activeTabId && activePane && !activePane.tabs.includes(activeTabId)) {
+    if (currentActiveTabId && activePane && !activePane.tabs.includes(currentActiveTabId)) {
       return;
     }
 
-    if (effectiveActiveTabId && effectiveActiveTabId !== activeTabId) {
+    if (effectiveActiveTabId && effectiveActiveTabId !== currentActiveTabId) {
       useTabStore.getState().setActiveTab(effectiveActiveTabId);
     }
-  }, [effectiveActiveTabId, activeTabId, activePane]);
+  }, [effectiveActiveTabId, activePane]);
 
   // tabStore の activeTabId が変更された場合、ペインのアクティブタブも同期
   useEffect(() => {

@@ -535,6 +535,11 @@ export function MarkdownEditor({
 
       applyExternalMarkdownToEditor(body || '');
 
+      // suppressNextUpdateRef により setContent 起点の update イベントが抑止されるため、
+      // emitMarkdown が呼ばれず lastEmittedContentRef が更新されない。
+      // ここで明示的に設定し、次回 effect 実行時の同一内容再注入を防ぐ。
+      lastEmittedContentRef.current = initialContent;
+
       // performance-design.md §2: ノード数による大規模ファイル判定
       // パース後にノード数をチェックし、閾値超過時はソースモードへ切替
       // nodeSize: ProseMirror ポジション空間サイズ（文字数に近い値）

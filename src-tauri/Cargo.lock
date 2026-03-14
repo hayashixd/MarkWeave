@@ -2324,6 +2324,7 @@ dependencies = [
 name = "markweave"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "dirs 5.0.1",
  "git2",
  "log",

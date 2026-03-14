@@ -8,16 +8,16 @@ describe('snippet-commands', () => {
       name: 'Greeting',
       content: 'Hello, World!',
       keywords: 'greet hello',
-      createdAt: '2026-01-01',
-      updatedAt: '2026-01-01',
+      createdAt: 1735689600000,
+      updatedAt: 1735689600000,
     },
     {
       id: 'sn2',
       name: 'Long Snippet',
       content: 'This is a very long snippet content that exceeds the forty character truncation limit absolutely.',
       keywords: 'long test',
-      createdAt: '2026-01-01',
-      updatedAt: '2026-01-01',
+      createdAt: 1735689600000,
+      updatedAt: 1735689600000,
     },
   ];
 

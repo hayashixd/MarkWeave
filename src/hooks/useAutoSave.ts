@@ -30,7 +30,7 @@ export function useAutoSave({ tabId, isComposing, writeFn }: AutoSaveOptions) {
   const pendingSaveRef = useRef(false);
   const isSavingRef = useRef(false);
 
-  const autoSaveDelay = useSettingsStore((s) => s.autoSaveDelay);
+  const autoSaveDelay = useSettingsStore((s) => s.settings.file.autoSaveDelay);
   const getTab = useTabStore((s) => s.getTab);
   const markSaved = useTabStore((s) => s.markSaved);
   const show = useToastStore((s) => s.show);
