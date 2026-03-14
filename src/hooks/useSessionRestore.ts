@@ -82,6 +82,14 @@ export function useSessionRestore() {
     if (restoredRef.current) return;
     restoredRef.current = true;
 
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+      // 非Tauri環境（ブラウザ・テスト）では空タブで開始（トースト不要）
+      if (tabs.length === 0) {
+        addTab({ filePath: null, fileName: 'Untitled', content: '', savedContent: '' });
+      }
+      return;
+    }
+
     (async () => {
       try {
         const session = await loadSession();

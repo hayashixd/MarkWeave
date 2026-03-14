@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // マークダウンファイルの編集マニュアル HTML生成スクリプト
+// 出力先: doc-public/manuals/user-manual.html
 const fs = require('fs');
 const path = require('path');
 
 const screenshotBase = path.join(__dirname, 'manual-screenshots');
-const outputPath = path.join(__dirname, 'manual-markdown-editing.html');
+const outputPath = path.join(__dirname, '..', 'doc-public', 'manuals', 'user-manual.html');
 
 function loadImage(relPath) {
   const fullPath = path.join(screenshotBase, relPath);
@@ -58,7 +59,7 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>マークダウンファイルの編集 - ユーザーマニュアル</title>
+<title>ユーザーマニュアル - MarkWeave</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -111,6 +112,8 @@ const html = `<!DOCTYPE html>
     margin: 28px 0 12px;
   }
   p { margin-bottom: 12px; }
+  ul, ol { padding-left: 24px; margin-bottom: 12px; }
+  li { margin-bottom: 6px; }
   figure {
     margin: 20px 0;
     text-align: center;
@@ -208,6 +211,9 @@ const html = `<!DOCTYPE html>
     font-size: 0.9rem;
   }
   .shortcut-table tr:hover td { background: #f8f9fa; }
+  .faq-item { margin-bottom: 20px; }
+  .faq-item dt { font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
+  .faq-item dd { padding-left: 16px; color: #495057; }
   footer {
     text-align: center;
     padding: 24px;
@@ -219,30 +225,77 @@ const html = `<!DOCTYPE html>
 <body>
 
 <header>
-  <h1>マークダウンファイルの編集</h1>
-  <p>Typora風 WYSIWYG Markdownエディタ ユーザーマニュアル</p>
+  <h1>ユーザーマニュアル</h1>
+  <p>MarkWeave — 公式公開版</p>
 </header>
 
 <div class="toc">
   <h2>目次</h2>
   <ol>
-    <li><a href="#overview">エディタ概要</a></li>
+    <li><a href="#intro">はじめに</a></li>
+    <li><a href="#quickstart">クイックスタート</a></li>
+    <li><a href="#editor-overview">エディタ概要</a></li>
     <li><a href="#headings">見出しの入力</a></li>
     <li><a href="#bold">太字</a></li>
     <li><a href="#text-formatting">テキスト書式設定</a></li>
     <li><a href="#lists">リストの作成</a></li>
     <li><a href="#source-mode">ソースモード切替</a></li>
+    <li><a href="#advanced">主要機能の使い方</a></li>
+    <li><a href="#workspace">ファイル / ワークスペース管理</a></li>
     <li><a href="#shortcuts">キーボードショートカット一覧</a></li>
+    <li><a href="#faq">FAQ</a></li>
+    <li><a href="#support">サポート情報</a></li>
   </ol>
 </div>
 
 <main>
 
-  <!-- 1. エディタ概要 -->
-  <section id="overview">
-    <h2>1. エディタ概要</h2>
+  <!-- 1. はじめに -->
+  <section id="intro">
+    <h2>1. はじめに</h2>
+    <h3>1.1 このアプリでできること</h3>
+    <ul>
+      <li>Typora ライクな WYSIWYG で Markdown を直感的に編集</li>
+      <li>Markdown / HTML の相互変換</li>
+      <li>テーブル・数式・Mermaid などのリッチ要素編集</li>
+      <li>AI コピー / AI テンプレートによる AI 活用支援</li>
+    </ul>
+    <h3>1.2 対応環境</h3>
+    <ul>
+      <li>Windows / macOS / Linux（デスクトップアプリ）</li>
+    </ul>
+  </section>
+
+  <!-- 2. クイックスタート -->
+  <section id="quickstart">
+    <h2>2. クイックスタート</h2>
+
+    <h3>2.1 ファイルを開く</h3>
+    <ol class="steps">
+      <li>メニューまたはショートカット（<kbd>Ctrl</kbd>+<kbd>O</kbd>）で「ファイルを開く」を実行</li>
+      <li>編集対象の <code>.md</code> または <code>.html</code> ファイルを選択</li>
+      <li>エディタに内容が表示されたら編集開始</li>
+    </ol>
+
+    <h3>2.2 保存する</h3>
+    <ul>
+      <li>上書き保存: <kbd>Ctrl</kbd>+<kbd>S</kbd></li>
+      <li>名前を付けて保存: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></li>
+    </ul>
+
+    <h3>2.3 表示モードを切り替える</h3>
+    <ul>
+      <li><strong>WYSIWYG モード</strong>: 直感的な編集</li>
+      <li><strong>ソースモード</strong>: Markdown / HTML ソースを直接編集（<kbd>Ctrl</kbd>+<kbd>/</kbd>）</li>
+      <li><strong>スプリットモード</strong>: 編集結果を並行確認</li>
+    </ul>
+  </section>
+
+  <!-- 3. エディタ概要 -->
+  <section id="editor-overview">
+    <h2>3. エディタ概要</h2>
     <p>
-      このエディタはTypora風のWYSIWYG（What You See Is What You Get）Markdownエディタです。
+      MarkWeave はWYSIWYG（What You See Is What You Get）型のMarkdownエディタです。
       Markdownの記法をそのまま入力すると、リアルタイムで書式が適用されます。
     </p>
     <p>
@@ -252,9 +305,9 @@ const html = `<!DOCTYPE html>
     ${imgTag(imgs.toolbarOverview, 'ツールバー概要', '書式ツールバー — よく使う書式ボタンが並んでいます')}
   </section>
 
-  <!-- 2. 見出しの入力 -->
+  <!-- 4. 見出しの入力 -->
   <section id="headings">
-    <h2>2. 見出しの入力</h2>
+    <h2>4. 見出しの入力</h2>
     <p>Markdownの見出し記法（<code>#</code>）を入力すると、自動的に見出しに変換されます。</p>
 
     <h3>H1 見出し（大見出し）</h3>
@@ -286,9 +339,9 @@ const html = `<!DOCTYPE html>
     </div>
   </section>
 
-  <!-- 3. 太字 -->
+  <!-- 5. 太字 -->
   <section id="bold">
-    <h2>3. 太字</h2>
+    <h2>5. 太字</h2>
     <p>テキストを太字にするには2つの方法があります。</p>
 
     <h3>方法1: キーボードショートカット</h3>
@@ -303,9 +356,9 @@ const html = `<!DOCTYPE html>
     ${imgTag(imgs.boldResult, '太字の結果', '太字テキスト — **text** の記法で自動変換されます')}
   </section>
 
-  <!-- 4. テキスト書式設定 -->
+  <!-- 6. テキスト書式設定 -->
   <section id="text-formatting">
-    <h2>4. テキスト書式設定</h2>
+    <h2>6. テキスト書式設定</h2>
 
     <h3>斜体（イタリック）</h3>
     <p>テキストを斜体にするには:</p>
@@ -332,9 +385,9 @@ const html = `<!DOCTYPE html>
     </div>
   </section>
 
-  <!-- 5. リストの作成 -->
+  <!-- 7. リストの作成 -->
   <section id="lists">
-    <h2>5. リストの作成</h2>
+    <h2>7. リストの作成</h2>
 
     <h3>箇条書きリスト</h3>
     <p>行頭に <code>- </code>（ハイフンとスペース）を入力すると箇条書きリストになります。</p>
@@ -352,7 +405,7 @@ const html = `<!DOCTYPE html>
 
     <h3>タスクリスト</h3>
     <p>チェックボックス付きのタスクリストを作成できます。</p>
-    <ul style="list-style: disc; padding-left: 20px; margin-bottom: 12px;">
+    <ul>
       <li><code>- [ ] </code>: 未完了のタスク</li>
       <li><code>- [x] </code>: 完了済みのタスク</li>
     </ul>
@@ -363,9 +416,9 @@ const html = `<!DOCTYPE html>
     ${imgTag(imgs.listToolbar, 'リストボタン', 'ツールバーのリストボタン')}
   </section>
 
-  <!-- 6. ソースモード切替 -->
+  <!-- 8. ソースモード切替 -->
   <section id="source-mode">
-    <h2>6. ソースモード切替</h2>
+    <h2>8. ソースモード切替</h2>
     <p>
       WYSIWYGモードとソースモード（Markdown生テキスト編集モード）を切り替えることができます。
       ソースモードではMarkdownの生テキストを直接編集できます。
@@ -392,9 +445,52 @@ const html = `<!DOCTYPE html>
     </div>
   </section>
 
-  <!-- 7. キーボードショートカット一覧 -->
+  <!-- 9. 主要機能の使い方 -->
+  <section id="advanced">
+    <h2>9. 主要機能の使い方</h2>
+
+    <h3>9.1 見出し・リスト・引用・コード</h3>
+    <ul>
+      <li>ツールバーまたはショートカットでブロック形式を変更</li>
+      <li>リストは箇条書き・番号付き・タスクリストに対応</li>
+      <li>コードブロックは言語指定とシンタックスハイライトに対応</li>
+    </ul>
+
+    <h3>9.2 テーブル編集（Excel ライク）</h3>
+    <ul>
+      <li><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> でセル移動</li>
+      <li>行・列の追加 / 削除</li>
+      <li>行・列のドラッグ並び替え</li>
+      <li>列幅リサイズ</li>
+    </ul>
+
+    <h3>9.3 画像・数式・Mermaid</h3>
+    <ul>
+      <li>画像のドラッグ&amp;ドロップ / クリップボード貼り付け</li>
+      <li>数式（インライン / ブロック）</li>
+      <li>Mermaid 記法の図表レンダリング</li>
+    </ul>
+
+    <h3>9.4 AI 機能</h3>
+    <ul>
+      <li><strong>AIコピー</strong>: ドキュメントを AI 入力向けに最適化してコピー</li>
+      <li><strong>AIテンプレート</strong>: 用途別テンプレートからプロンプト作成</li>
+    </ul>
+  </section>
+
+  <!-- 10. ファイル / ワークスペース管理 -->
+  <section id="workspace">
+    <h2>10. ファイル / ワークスペース管理</h2>
+    <ul>
+      <li>フォルダをワークスペースとして開く</li>
+      <li>ファイルツリーで作成 / 削除 / リネーム</li>
+      <li>外部変更があったファイルの通知</li>
+    </ul>
+  </section>
+
+  <!-- 11. キーボードショートカット一覧 -->
   <section id="shortcuts">
-    <h2>7. キーボードショートカット一覧</h2>
+    <h2>11. キーボードショートカット一覧</h2>
     <table class="shortcut-table">
       <thead>
         <tr>
@@ -404,89 +500,67 @@ const html = `<!DOCTYPE html>
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>太字</td>
-          <td><kbd>Ctrl</kbd> + <kbd>B</kbd></td>
-          <td><code>**text**</code></td>
-        </tr>
-        <tr>
-          <td>斜体</td>
-          <td><kbd>Ctrl</kbd> + <kbd>I</kbd></td>
-          <td><code>*text*</code></td>
-        </tr>
-        <tr>
-          <td>取り消し線</td>
-          <td>—</td>
-          <td><code>~~text~~</code></td>
-        </tr>
-        <tr>
-          <td>インラインコード</td>
-          <td>—</td>
-          <td><code>&#96;code&#96;</code></td>
-        </tr>
-        <tr>
-          <td>H1 見出し</td>
-          <td>—</td>
-          <td><code># </code>（行頭）</td>
-        </tr>
-        <tr>
-          <td>H2 見出し</td>
-          <td>—</td>
-          <td><code>## </code>（行頭）</td>
-        </tr>
-        <tr>
-          <td>H3 見出し</td>
-          <td>—</td>
-          <td><code>### </code>（行頭）</td>
-        </tr>
-        <tr>
-          <td>箇条書きリスト</td>
-          <td>—</td>
-          <td><code>- </code>（行頭）</td>
-        </tr>
-        <tr>
-          <td>番号付きリスト</td>
-          <td>—</td>
-          <td><code>1. </code>（行頭）</td>
-        </tr>
-        <tr>
-          <td>タスクリスト</td>
-          <td>—</td>
-          <td><code>- [ ] </code>（行頭）</td>
-        </tr>
-        <tr>
-          <td>ソースモード切替</td>
-          <td><kbd>Ctrl</kbd> + <kbd>/</kbd></td>
-          <td>—</td>
-        </tr>
-        <tr>
-          <td>元に戻す</td>
-          <td><kbd>Ctrl</kbd> + <kbd>Z</kbd></td>
-          <td>—</td>
-        </tr>
-        <tr>
-          <td>やり直し</td>
-          <td><kbd>Ctrl</kbd> + <kbd>Y</kbd></td>
-          <td>—</td>
-        </tr>
-        <tr>
-          <td>全選択</td>
-          <td><kbd>Ctrl</kbd> + <kbd>A</kbd></td>
-          <td>—</td>
-        </tr>
-        <tr>
-          <td>保存</td>
-          <td><kbd>Ctrl</kbd> + <kbd>S</kbd></td>
-          <td>—</td>
-        </tr>
+        <tr><td>ファイルを開く</td><td><kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>—</td></tr>
+        <tr><td>保存</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>—</td></tr>
+        <tr><td>名前を付けて保存</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>—</td></tr>
+        <tr><td>検索</td><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>—</td></tr>
+        <tr><td>検索・置換</td><td><kbd>Ctrl</kbd>+<kbd>H</kbd></td><td>—</td></tr>
+        <tr><td>クイックオープン</td><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>—</td></tr>
+        <tr><td>行番号ジャンプ</td><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>—</td></tr>
+        <tr><td>太字</td><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td><code>**text**</code></td></tr>
+        <tr><td>斜体</td><td><kbd>Ctrl</kbd>+<kbd>I</kbd></td><td><code>*text*</code></td></tr>
+        <tr><td>取り消し線</td><td>—</td><td><code>~~text~~</code></td></tr>
+        <tr><td>インラインコード</td><td>—</td><td><code>&#96;code&#96;</code></td></tr>
+        <tr><td>H1 見出し</td><td>—</td><td><code># </code>（行頭）</td></tr>
+        <tr><td>H2 見出し</td><td>—</td><td><code>## </code>（行頭）</td></tr>
+        <tr><td>H3 見出し</td><td>—</td><td><code>### </code>（行頭）</td></tr>
+        <tr><td>箇条書きリスト</td><td>—</td><td><code>- </code>（行頭）</td></tr>
+        <tr><td>番号付きリスト</td><td>—</td><td><code>1. </code>（行頭）</td></tr>
+        <tr><td>タスクリスト</td><td>—</td><td><code>- [ ] </code>（行頭）</td></tr>
+        <tr><td>ソースモード切替</td><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td>—</td></tr>
+        <tr><td>元に戻す</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>—</td></tr>
+        <tr><td>やり直し</td><td><kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>—</td></tr>
+        <tr><td>全選択</td><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>—</td></tr>
       </tbody>
     </table>
+  </section>
+
+  <!-- 12. FAQ -->
+  <section id="faq">
+    <h2>12. FAQ</h2>
+    <dl>
+      <div class="faq-item">
+        <dt>Q1. Markdown 記法を知らなくても使えますか？</dt>
+        <dd>はい。WYSIWYG モードでは、記法を強く意識せずに編集できます。</dd>
+      </div>
+      <div class="faq-item">
+        <dt>Q2. オフラインでも使えますか？</dt>
+        <dd>はい。ローカルファイル中心で動作するため、オフライン利用が可能です。</dd>
+      </div>
+      <div class="faq-item">
+        <dt>Q3. 既存の Markdown / HTML ファイルは開けますか？</dt>
+        <dd>はい。既存ファイルをそのまま開いて編集できます。</dd>
+      </div>
+      <div class="faq-item">
+        <dt>Q4. 大きいファイルは扱えますか？</dt>
+        <dd>はい。大容量ファイル向けの最適化（表示モード切替など）を実装しています。</dd>
+      </div>
+    </dl>
+  </section>
+
+  <!-- 13. サポート情報 -->
+  <section id="support">
+    <h2>13. サポート情報</h2>
+    <ul>
+      <li>最新情報: 公式サイトのリリース / ロードマップ</li>
+      <li>フィードバック: Issue / お問い合わせ窓口</li>
+    </ul>
   </section>
 
 </main>
 
 <footer>
-  <p>Typora-Inspired WYSIWYG Markdown Editor &mdash; ユーザーマニュアル &mdash; 自動生成</p>
+  <p>MarkWeave &mdash; ユーザーマニュアル &mdash; 自動生成</p>
 </footer>
 
 </body>

@@ -47,4 +47,4 @@
 
 - マニュアル管理トップ: [README.md](./README.md)
 - 既存の生成スクリプト: [../generate-manual.cjs](../generate-manual.cjs)
-- 既存マニュアル HTML: [../manual-markdown-editing.html](../manual-markdown-editing.html)
+- 生成マニュアル HTML: [../../doc-public/manuals/user-manual.html](../../doc-public/manuals/user-manual.html)

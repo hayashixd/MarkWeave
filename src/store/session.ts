@@ -91,6 +91,7 @@ export async function loadWindowState(): Promise<WindowState | null> {
  * ファイルが実際に存在するか確認してから復元する。
  */
 export async function loadSession(): Promise<SessionState | null> {
+  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return null;
   const store = await load(STORE_FILE, { defaults: {}, autoSave: false });
   const openFiles = await store.get<FileSession[]>('openFiles');
   if (!openFiles || openFiles.length === 0) return null;
