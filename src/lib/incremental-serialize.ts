@@ -15,13 +15,6 @@
 import type { TipTapDoc, TipTapNode } from './markdown-to-tiptap';
 import { serializeBlockNode } from './tiptap-to-markdown';
 
-interface BlockCacheEntry {
-  /** ブロックノードのフィンガープリント（比較用） */
-  fingerprint: string;
-  /** シリアライズ済み Markdown */
-  markdown: string;
-}
-
 /**
  * FNV-1a ベースの簡易ハッシュ。
  * JSON.stringify 全体の文字列比較より高速。
