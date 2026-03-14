@@ -54,6 +54,7 @@ mod ids {
     pub const HELP_SHORTCUTS: &str = "help_shortcuts";
     pub const HELP_VERSION: &str = "help_version";
     pub const HELP_FEEDBACK: &str = "help_feedback";
+    pub const HELP_CHECK_UPDATES: &str = "help_check_updates";
 }
 
 /// ネイティブメニューバーを構築してアプリに設定する
@@ -305,6 +306,8 @@ pub fn build_menu(app: &AppHandle<Wry>) -> Result<(), Box<dyn std::error::Error>
                     .build(),
             ),
         )?)
+        .item(&MenuItemBuilder::with_id(ids::HELP_CHECK_UPDATES, "アップデートを確認...").build(app)?)
+        .separator()
         .item(&MenuItemBuilder::with_id(ids::HELP_FEEDBACK, "フィードバックを送る...").build(app)?)
         .build()?;
 

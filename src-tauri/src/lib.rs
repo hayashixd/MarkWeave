@@ -3,6 +3,7 @@ mod db;
 mod fs;
 mod menu;
 mod models;
+mod updater;
 
 use commands::ai_commands;
 use commands::db_commands;
@@ -26,6 +27,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updater::PendingUpdate(std::sync::Mutex::new(None)))
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // 2つ目の起動試行時に呼ばれる
             // argv = ["app_path", "/path/to/file.md", ...]
@@ -94,6 +96,8 @@ pub fn run() {
             image_commands::purge_image_cache,
             search_commands::search_workspace,
             ai_commands::call_ai_api,
+            updater::check_for_updates,
+            updater::install_update,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -131,6 +135,12 @@ pub fn run() {
                 log::error!("Failed to build native menu: {}", e);
             }
             menu::native_menu::setup_menu_event_handler(&handle);
+
+            // 起動時バックグラウンドアップデートチェック (distribution-design.md §5.1)
+            let update_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                updater::background_check(update_handle).await;
+            });
 
             // 初回起動時のコマンドライン引数からファイルパスを処理
             let args: Vec<String> = std::env::args().collect();

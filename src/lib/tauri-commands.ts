@@ -165,6 +165,24 @@ export async function detachTabToWindow(params: {
   }
 }
 
+/** アップデートチェックを実行する。アップデートが見つかれば true を返す。 */
+export async function checkForUpdates(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('check_for_updates');
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
+/** ダウンロード＋インストールを実行する。 */
+export async function installUpdate(): Promise<void> {
+  try {
+    await invoke<void>('install_update');
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
 /**
  * Rust 側の AppError を日本語のユーザー向けメッセージに変換する。
  *

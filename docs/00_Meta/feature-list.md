@@ -565,10 +565,10 @@ Excelライクなテーブル操作。**全タスク実装完了。**
 
 | 機能名 | 概要 | 使い方 | 実装 |
 |--------|------|--------|------|
-| GitHub Actions リリース | `.github/workflows/release.yml` | CI/CD | ❌ |
-| 更新署名鍵 | `tauri signer generate` | ビルド時 | ❌ |
-| tauri-plugin-updater | アプリ内自動アップデート | 起動時にバックグラウンドチェック | ❌ |
-| トースト→ダウンロード→再起動 | アップデート UX フロー | ユーザーに通知表示 | ❌ |
+| GitHub Actions リリース | `.github/workflows/release.yml` | CI/CD | ✅ |
+| 更新署名鍵 | `tauri signer generate` | ビルド時 | ✅ |
+| tauri-plugin-updater | アプリ内自動アップデート | 起動時にバックグラウンドチェック | ✅ |
+| トースト→ダウンロード→再起動 | アップデート UX フロー | ユーザーに通知表示 | ✅ |
 | GitHub Releases 自動アップロード | リリースアセットの自動公開 | CI/CD | ❌ |
 | バージョン一括更新スクリプト | `scripts/bump-version.mjs` | `node scripts/bump-version.mjs` | ❌ |
 | コード署名 | macOS Notarization・Windows Authenticode | 公開前に実施 | ❌ |

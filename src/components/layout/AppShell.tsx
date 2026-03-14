@@ -43,7 +43,8 @@ import { useAutoSave } from '../../hooks/useAutoSave';
 import { useWindowState } from '../../hooks/useWindowState';
 import { useDropListener } from '../../hooks/useDropListener';
 import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
-import { writeFile } from '../../lib/tauri-commands';
+import { writeFile, checkForUpdates, installUpdate } from '../../lib/tauri-commands';
+import { useToastStore } from '../../store/toastStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ExportDialog } from '../Export/ExportDialog';
 import { PdfExportDialog } from '../Export/PdfExportDialog';
@@ -688,6 +689,57 @@ export function AppShell() {
     return () => window.removeEventListener('create-daily-note', handler);
   }, [createDailyNote]);
 
+  // アップデート通知イベントリスナー (distribution-design.md §5, §6)
+  const showToast = useToastStore((s) => s.show);
+  useEffect(() => {
+    let unlistenAvailable: (() => void) | undefined;
+    let unlistenInstalled: (() => void) | undefined;
+
+    async function setupUpdaterListeners() {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+
+        unlistenAvailable = await listen<{ version: string; body: string }>('update-available', (event) => {
+          const { version } = event.payload;
+          showToast('info', `新しいバージョン v${version} が利用可能です`, {
+            label: '今すぐ更新',
+            onClick: async () => {
+              showToast('info', 'アップデートをダウンロード中...');
+              try {
+                await installUpdate();
+              } catch (err) {
+                showToast('error', `アップデートに失敗しました: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            },
+          });
+        });
+
+        unlistenInstalled = await listen('update-installed', () => {
+          showToast('success', 'アップデートの準備ができました。再起動するとインストールが完了します。', {
+            label: '今すぐ再起動',
+            onClick: async () => {
+              try {
+                const { invoke } = await import('@tauri-apps/api/core');
+                await invoke('restart_app');
+              } catch {
+                // フォールバック: location.reload は使わない（Tauri 環境のみ）
+              }
+            },
+          });
+        });
+      } catch {
+        // Tauri 外（テスト・ブラウザ開発）ではスキップ
+      }
+    }
+
+    setupUpdaterListeners();
+
+    return () => {
+      unlistenAvailable?.();
+      unlistenInstalled?.();
+    };
+  }, [showToast]);
+
   // Tauri ネイティブメニューのイベントリスナー (app-shell-design.md §2)
   useMenuListener({
     file_new: handleNewTab,
@@ -777,6 +829,17 @@ export function AppShell() {
     },
     help_feedback: () => {
       window.dispatchEvent(new CustomEvent('show-feedback-dialog'));
+    },
+    help_check_updates: () => {
+      checkForUpdates()
+        .then((found) => {
+          if (!found) {
+            showToast('info', 'すでに最新バージョンを使用しています');
+          }
+        })
+        .catch((err: unknown) => {
+          showToast('error', `アップデートの確認に失敗しました: ${err instanceof Error ? err.message : String(err)}`);
+        });
     },
   });
 
