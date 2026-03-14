@@ -38,7 +38,7 @@ test.describe("マニュアル撮影: エクスポート", () => {
     // フロントエンドからのトリガー方法を試みる
     // カスタムイベントでエクスポートダイアログを開く
     await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent("menu-action", { detail: { action: "export-html" } }));
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "file_export_html" }));
     });
     await page.waitForTimeout(800);
 
@@ -90,5 +90,68 @@ test.describe("マニュアル撮影: エクスポート", () => {
     }
 
     await captureStep(page, "export-overview", OUTPUT_DIR);
+
+    // ── Step 2: PDF エクスポートダイアログ ──
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "file_export_pdf" }));
+    });
+    await page.waitForTimeout(800);
+
+    const pdfDialog = page.locator("[role='dialog'], [aria-label*='PDF'], [aria-label*='エクスポート']").first();
+    const pdfVisible = await pdfDialog.isVisible().catch(() => false);
+
+    if (pdfVisible) {
+      const pdfBox = await pdfDialog.boundingBox();
+      if (pdfBox) {
+        await captureWithAnnotation(
+          page,
+          "export-dialog-pdf",
+          [
+            {
+              rect: { x: pdfBox.x, y: pdfBox.y, width: pdfBox.width, height: pdfBox.height },
+              label: "PDF エクスポートダイアログ",
+              color: "red",
+            },
+          ],
+          OUTPUT_DIR
+        );
+      }
+      await page.keyboard.press("Escape");
+    } else {
+      await captureStep(page, "export-dialog-pdf", OUTPUT_DIR);
+    }
+    await page.waitForTimeout(300);
+
+    // ── Step 3: Pandoc エクスポートダイアログ（Word/LaTeX/EPUB） ──
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "file_export_word" }));
+    });
+    await page.waitForTimeout(800);
+
+    const pandocDialog = page.locator("[role='dialog'], [aria-label*='Pandoc'], [aria-label*='Word'], [aria-label*='エクスポート']").first();
+    const pandocVisible = await pandocDialog.isVisible().catch(() => false);
+
+    if (pandocVisible) {
+      const pandocBox = await pandocDialog.boundingBox();
+      if (pandocBox) {
+        await captureWithAnnotation(
+          page,
+          "export-dialog-pandoc",
+          [
+            {
+              rect: { x: pandocBox.x, y: pandocBox.y, width: pandocBox.width, height: pandocBox.height },
+              label: "Pandoc エクスポートダイアログ（Word / LaTeX / EPUB）",
+              color: "orange",
+            },
+          ],
+          OUTPUT_DIR
+        );
+      }
+      await page.keyboard.press("Escape");
+    } else {
+      await captureStep(page, "export-dialog-pandoc", OUTPUT_DIR);
+    }
+
+    await captureStep(page, "export-all-overview", OUTPUT_DIR);
   });
 });

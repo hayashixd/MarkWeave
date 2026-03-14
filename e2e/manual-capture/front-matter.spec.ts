@@ -94,7 +94,7 @@ test.describe("マニュアル撮影: YAML Front Matter・その他機能", () =
 
     // ── Step 4: 文書統計ダイアログ ──
     await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent("menu-action", { detail: { action: "word-count" } }));
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "edit_text_stats" }));
     });
     await page.waitForTimeout(500);
 

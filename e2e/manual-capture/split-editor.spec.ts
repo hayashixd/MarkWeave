@@ -35,7 +35,7 @@ test.describe("マニュアル撮影: 分割エディタ・フォーカスモー
     // ── Step 1: 分割エディタを開く ──
     // メニューイベントを試みる
     await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent("menu-action", { detail: { action: "split-editor-horizontal" } }));
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "view_split_pane" }));
     });
     await page.waitForTimeout(600);
 
@@ -85,27 +85,27 @@ test.describe("マニュアル撮影: 分割エディタ・フォーカスモー
 
     // ── Step 2: フォーカスモード ──
     await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent("menu-action", { detail: { action: "focus-mode" } }));
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "view_focus_mode" }));
     });
     await page.waitForTimeout(500);
     await captureStep(page, "focus-mode", OUTPUT_DIR);
 
     // フォーカスモードを解除
     await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent("menu-action", { detail: { action: "focus-mode" } }));
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "view_focus_mode" }));
     });
     await page.waitForTimeout(300);
 
     // ── Step 3: タイプライターモード ──
     await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent("menu-action", { detail: { action: "typewriter-mode" } }));
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "view_typewriter_mode" }));
     });
     await page.waitForTimeout(500);
     await captureStep(page, "typewriter-mode", OUTPUT_DIR);
 
     // タイプライターモードを解除
     await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent("menu-action", { detail: { action: "typewriter-mode" } }));
+      window.dispatchEvent(new CustomEvent("tauri-menu-action", { detail: "view_typewriter_mode" }));
     });
 
     await captureStep(page, "split-overview", OUTPUT_DIR);

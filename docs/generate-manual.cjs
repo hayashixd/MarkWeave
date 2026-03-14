@@ -79,6 +79,23 @@ const imgs = {
   beforeExport: loadImage('export/01_before-export.png'),
   exportDialogHtml: loadImage('export/02_export-dialog-html.png'),
   exportOverview: loadImage('export/03_export-overview.png'),
+  exportDialogPdf: loadImage('export/05_export-dialog-pdf.png'),
+  exportDialogPandoc: loadImage('export/06_export-dialog-pandoc.png'),
+  // ai-copy
+  aiCopyButtonToolbar: loadImage('ai-copy/01_ai-copy-button-toolbar.png'),
+  aiCopyOptionsDropdown: loadImage('ai-copy/02_ai-copy-options-dropdown.png'),
+  aiCopyReportPopover: loadImage('ai-copy/03_ai-copy-report-popover.png'),
+  aiCopyCopiedState: loadImage('ai-copy/04_ai-copy-copied-state.png'),
+  aiCopyOverview: loadImage('ai-copy/05_ai-copy-overview.png'),
+  // ai-template
+  aiTemplatePanelOpen: loadImage('ai-template/01_ai-template-panel-open.png'),
+  aiTemplateCategoryFilter: loadImage('ai-template/02_ai-template-category-filter.png'),
+  aiTemplatePreview: loadImage('ai-template/03_ai-template-preview.png'),
+  aiTemplatePlaceholderDialog: loadImage('ai-template/04_ai-template-placeholder-dialog.png'),
+  aiTemplateSearch: loadImage('ai-template/05_ai-template-search.png'),
+  aiTemplateNewButton: loadImage('ai-template/06_ai-template-new-button.png'),
+  aiTemplateCustomEditor: loadImage('ai-template/07_ai-template-custom-editor.png'),
+  aiTemplateOverview: loadImage('ai-template/08_ai-template-overview.png'),
   // math-mermaid
   inlineMath: loadImage('math-mermaid/01_inline-math.png'),
   blockMath: loadImage('math-mermaid/02_block-math.png'),
@@ -327,6 +344,8 @@ const html = `<!DOCTYPE html>
     <li><a href="#export">エクスポート</a></li>
     <li><a href="#settings">設定</a></li>
     <li><a href="#front-matter">YAML Front Matter・リンク・統計</a></li>
+    <li><a href="#ai-copy">AI コピー機能</a></li>
+    <li><a href="#ai-template">AI テンプレートパネル</a></li>
     <li><a href="#shortcuts">キーボードショートカット一覧</a></li>
     <li><a href="#faq">FAQ</a></li>
   </ol>
@@ -850,10 +869,12 @@ graph TD
     </ul>
 
     <h3>PDF エクスポート</h3>
-    <p>メニューバーの「ファイル」→「エクスポート」→「PDF」を選択します。</p>
+    <p>メニューバーの「ファイル」→「エクスポート」→「PDF」を選択します。用紙サイズ・余白・テーマを設定して保存できます。</p>
+    ${imgTag(imgs.exportDialogPdf, 'PDF エクスポートダイアログ', 'PDF エクスポートの設定ダイアログ（用紙サイズ・余白・テーマ）')}
 
     <h3>Pandoc エクスポート（Word / LaTeX / EPUB）</h3>
     <p>Pandoc がインストールされている場合、「ファイル」→「エクスポート」→「Pandoc」から Word・LaTeX・EPUB 形式への変換が可能です。</p>
+    ${imgTag(imgs.exportDialogPandoc, 'Pandoc エクスポートダイアログ', 'Pandoc エクスポートダイアログ（Word / LaTeX / EPUB）')}
 
     <div class="tip">
       <strong>ヒント:</strong> HTML エクスポートではローカル画像が Base64 埋め込みされるため、スタンドアロンで表示できます。
@@ -912,9 +933,112 @@ graph TD
     </div>
   </section>
 
+  <!-- 22. AI コピー機能 -->
+  <section id="ai-copy">
+    <h2>22. AI コピー機能</h2>
+    <p>
+      ツールバー右端の <strong>✨ AI コピー</strong> ボタンを使うと、現在のドキュメントを AI（Claude・ChatGPT など）に貼り付けやすい形式に最適化してクリップボードにコピーできます。
+    </p>
+    ${imgTag(imgs.aiCopyButtonToolbar, 'AI コピーボタン', 'ツールバー右端の「✨ AI コピー」ボタン')}
+
+    <h3>22.1 基本的な使い方</h3>
+    <ol class="steps">
+      <li>WYSIWYG モードでドキュメントを開きます</li>
+      <li>ツールバー右端の <strong>✨ AI コピー</strong> ボタンをクリックします</li>
+      <li>Markdown が最適化されてクリップボードにコピーされます（ボタンが「コピー済み ✓」に変わります）</li>
+      <li>AI チャット画面にそのまま貼り付けます</li>
+    </ol>
+    ${imgTag(imgs.aiCopyCopiedState, 'コピー完了状態', 'コピー完了後のボタン表示（コピー済み ✓）')}
+
+    <h3>22.2 最適化オプション</h3>
+    <p>ボタン右の <strong>▼</strong> をクリックするとオプションメニューが表示されます。</p>
+    ${imgTag(imgs.aiCopyOptionsDropdown, '最適化オプション', 'AI コピーの最適化オプションドロップダウン')}
+    <ul>
+      <li><strong>最適化してコピー</strong>: すぐにコピー（デフォルト）</li>
+      <li><strong>最適化プレビューを表示してからコピー</strong>: 変更内容を確認してからコピー</li>
+    </ul>
+    <p>オプションセクションでは各最適化処理のオン/オフを個別に設定できます。</p>
+    <ul>
+      <li>見出し階層の修正</li>
+      <li>コードブロックへの言語タグ付与</li>
+      <li>リスト記号の統一</li>
+      <li>過剰な空白行の削除</li>
+      <li>リンクへの URL 注記追加</li>
+      <li>コードフェンスの統一</li>
+    </ul>
+
+    <h3>22.3 最適化レポート</h3>
+    <p>「最適化プレビューを表示してからコピー」を選ぶと、コピー後に変更内容のレポートが表示されます。</p>
+    ${imgTag(imgs.aiCopyReportPopover, '最適化レポート', 'AIコピー後に表示される最適化レポートのポップオーバー')}
+
+    <div class="tip">
+      <strong>ヒント:</strong> AI コピーボタンは WYSIWYG モード時のみ表示されます。ソースモードでは非表示になります。
+    </div>
+  </section>
+
+  <!-- 23. AI テンプレートパネル -->
+  <section id="ai-template">
+    <h2>23. AI テンプレートパネル</h2>
+    <p>
+      AI テンプレートパネルを使うと、ブログ記事・議事録・要約・コードレビューなど、用途別のテンプレートをエディタに素早く挿入できます。
+    </p>
+    ${imgTag(imgs.aiTemplatePanelOpen, 'AI テンプレートパネル', 'サイドバーの AI テンプレートパネル')}
+
+    <h3>23.1 パネルを開く</h3>
+    <ol class="steps">
+      <li>メニューバーの「表示」→「AI テンプレート」を選択します</li>
+      <li>サイドバーが開き AI テンプレートパネルが表示されます</li>
+    </ol>
+
+    <h3>23.2 カテゴリフィルタ</h3>
+    <p>パネル上部のカテゴリタブでテンプレートを絞り込めます。</p>
+    ${imgTag(imgs.aiTemplateCategoryFilter, 'カテゴリフィルタ', 'テンプレートのカテゴリ選択タブ')}
+    <ul>
+      <li><strong>すべて</strong>: 全テンプレートを表示</li>
+      <li><strong>ブログ</strong>: ブログ記事構成・紹介文など</li>
+      <li><strong>コード</strong>: コードレビュー・説明文など</li>
+      <li><strong>要約</strong>: 文章の要約・箇条書き化など</li>
+      <li><strong>推論</strong>: Chain-of-Thought など</li>
+      <li><strong>議事録</strong>: 会議メモのテンプレート</li>
+      <li><strong>翻訳</strong>: 翻訳プロンプト</li>
+    </ul>
+
+    <h3>23.3 テンプレートを選択・プレビュー</h3>
+    <p>テンプレート名をクリックすると右ペインにプレビューが表示されます。</p>
+    ${imgTag(imgs.aiTemplatePreview, 'テンプレートプレビュー', 'テンプレート選択後のプレビュー表示')}
+
+    <h3>23.4 キーワード検索</h3>
+    <p>パネル上部の検索ボックスにキーワードを入力してテンプレートを絞り込めます。</p>
+    ${imgTag(imgs.aiTemplateSearch, 'キーワード検索', 'テンプレートのキーワード検索')}
+
+    <h3>23.5 テンプレートを挿入する</h3>
+    <ol class="steps">
+      <li>テンプレートを選択してプレビューを表示します</li>
+      <li>「挿入」ボタンをクリックします</li>
+      <li>プレースホルダー入力ダイアログが表示されます</li>
+      <li>各フィールドに値を入力して「OK」をクリックします</li>
+      <li>完成した Markdown がエディタに挿入されます</li>
+    </ol>
+    ${imgTag(imgs.aiTemplatePlaceholderDialog, 'プレースホルダー入力', 'テンプレートのプレースホルダー入力ダイアログ')}
+
+    <h3>23.6 カスタムテンプレートの作成</h3>
+    <p>パネル右上の <strong>+</strong> ボタンからオリジナルテンプレートを作成できます。</p>
+    ${imgTag(imgs.aiTemplateNewButton, '新規テンプレートボタン', '新規テンプレート作成ボタン（+ ボタン）')}
+    ${imgTag(imgs.aiTemplateCustomEditor, 'カスタムテンプレートエディタ', 'カスタムテンプレート作成エディタ')}
+    <ul>
+      <li>テンプレート名・カテゴリ・本文を入力します</li>
+      <li>本文中の <code>{{変数名}}</code> がプレースホルダーになります</li>
+      <li>保存するとテンプレート一覧に追加されます</li>
+    </ul>
+
+    <div class="tip">
+      <strong>ヒント:</strong> スラッシュコマンドから <code>/aiテンプレート</code> と入力してもパネルを開けます。
+    </div>
+  </section>
+
   <!-- 22. キーボードショートカット一覧 -->
   <section id="shortcuts">
-    <h2>22. キーボードショートカット一覧</h2>
+    <h2>24. キーボードショートカット一覧</h2>
     <table class="shortcut-table">
       <thead>
         <tr>
@@ -968,7 +1092,7 @@ graph TD
 
   <!-- 23. FAQ -->
   <section id="faq">
-    <h2>23. FAQ</h2>
+    <h2>25. FAQ</h2>
     <dl>
       <div class="faq-item">
         <dt>Q1. Markdown 記法を知らなくても使えますか？</dt>
