@@ -17,6 +17,7 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { useTabStore } from '../../store/tabStore';
 import type { TabState } from '../../store/tabStore';
+import { useStoreWithEqualityFn } from 'zustand/traditional';
 
 interface TabBarProps {
   onCloseTab?: (tabId: string, isDirty: boolean) => void;
@@ -24,8 +25,26 @@ interface TabBarProps {
   onDetachTab?: (tabId: string) => void;
 }
 
+/** content/savedContent を除いたフィールドのみで比較（キーストロークごとの再レンダリングを防止） */
+function tabsShallowEqual(prev: TabState[], next: TabState[]): boolean {
+  if (prev.length !== next.length) return false;
+  for (let i = 0; i < prev.length; i++) {
+    const a = prev[i]!;
+    const b = next[i]!;
+    if (
+      a.id !== b.id ||
+      a.fileName !== b.fileName ||
+      a.isDirty !== b.isDirty ||
+      a.isReadOnly !== b.isReadOnly
+    ) return false;
+  }
+  return true;
+}
+
 export function TabBar({ onCloseTab, onNewTab, onDetachTab }: TabBarProps) {
-  const { tabs, activeTabId, setActiveTab } = useTabStore();
+  const tabs = useStoreWithEqualityFn(useTabStore, (s) => s.tabs, tabsShallowEqual);
+  const activeTabId = useTabStore((s) => s.activeTabId);
+  const setActiveTab = useTabStore((s) => s.setActiveTab);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tab: TabState } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 

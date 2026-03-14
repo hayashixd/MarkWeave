@@ -57,6 +57,8 @@ export function PaneTabBar({
     (tabId: string) => {
       setPaneActiveTab(paneId, tabId);
       setActivePaneId(paneId);
+      // tabStore.activeTabId を即時同期して handleContentChange が正しいタブに書き込むようにする
+      useTabStore.getState().setActiveTab(tabId);
     },
     [paneId, setPaneActiveTab, setActivePaneId],
   );

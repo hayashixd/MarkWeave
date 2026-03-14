@@ -143,6 +143,9 @@ export function MarkdownEditor({
   // フロントマター変更時に参照するために ref に保持
   const frontMatterYamlRef = useRef(frontMatterYaml);
   frontMatterYamlRef.current = frontMatterYaml;
+  // mode を ref でも保持して initialContent effect 内で最新値を読む（deps から除外するため）
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   // 集中モード系の設定を取得（細粒度セレクターで必要なフィールドのみ購読）
   const focusMode = useSettingsStore((s) => s.settings.editor.focusMode);
@@ -502,7 +505,7 @@ export function MarkdownEditor({
     }
 
     const contentSizeBytes = new TextEncoder().encode(initialContent).length;
-    if (contentSizeBytes >= LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES && mode === 'wysiwyg') {
+    if (contentSizeBytes >= LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES && modeRef.current === 'wysiwyg') {
       lastEmittedContentRef.current = initialContent;
       setSourceText(initialContent);
       setMode('source');
@@ -513,7 +516,7 @@ export function MarkdownEditor({
       return;
     }
 
-    if (mode === 'source') {
+    if (modeRef.current === 'source') {
       lastEmittedContentRef.current = initialContent;
       setSourceText(initialContent);
       return;
@@ -568,7 +571,8 @@ export function MarkdownEditor({
         pendingContentLoadRef.current = 0;
       }
     };
-  }, [applyExternalMarkdownToEditor, editor, initialContent, mode, showToast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applyExternalMarkdownToEditor, editor, initialContent, showToast]);
 
   // コンテンツ変更の監視
   useEffect(() => {
