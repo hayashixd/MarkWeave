@@ -45,9 +45,11 @@ test.describe("マニュアル撮影: テーブル編集", () => {
       );
       // テーブルを検索して選択
       await page.keyboard.type("table");
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(400);
       await page.keyboard.press("Enter");
-      await page.waitForTimeout(500);
+      // テーブル挿入の完了を待つ
+      await editor.locator("table").waitFor({ timeout: 3000 }).catch(() => {});
+      await page.waitForTimeout(300);
     } else {
       // スラッシュメニューが出ない場合: Markdownで直接テーブルを作成
       await page.keyboard.press("Escape");

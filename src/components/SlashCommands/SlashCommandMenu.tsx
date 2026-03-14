@@ -57,14 +57,16 @@ export function SlashCommandMenu({ editor, slashState, onClose }: SlashCommandMe
   // コマンド実行
   const executeCommand = useCallback(
     (cmd: SlashCommandDef) => {
-      // /クエリ を削除
       const { from } = slashState;
       const to = editor.state.selection.from;
-      editor.view.dispatch(editor.state.tr.delete(from, to));
 
-      // コマンドを実行
-      cmd.action(editor);
+      // メニューを先に閉じてプラグイン状態の干渉を防ぐ
       onClose();
+
+      // /クエリ を削除してからコマンドを実行
+      // deleteRange で1トランザクション処理し、その後コマンドを実行する
+      editor.chain().focus().deleteRange({ from, to }).run();
+      cmd.action(editor);
     },
     [editor, slashState, onClose],
   );

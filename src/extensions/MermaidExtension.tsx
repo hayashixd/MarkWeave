@@ -163,6 +163,7 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
   const [localCode, setLocalCode] = useState(node.attrs.code as string);
   const [svgHtml, setSvgHtml] = useState<string>('');
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [renderReady, setRenderReady] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const code = node.attrs.code as string;
@@ -173,21 +174,28 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
 
   // Mermaid レンダリング
   useEffect(() => {
-    if (editing) return;
+    if (editing) {
+      setRenderReady(false);
+      return;
+    }
     if (!code.trim()) {
       setSvgHtml('');
       setRenderError(null);
+      setRenderReady(false);
       return;
     }
 
+    setRenderReady(false);
     renderMermaidInSandbox(code)
       .then((svg) => {
         setSvgHtml(svg);
         setRenderError(null);
+        setRenderReady(true);
       })
       .catch((err) => {
         setSvgHtml('');
         setRenderError(err instanceof Error ? err.message : String(err));
+        setRenderReady(false);
       });
   }, [code, editing]);
 
@@ -246,7 +254,11 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
   );
 
   return (
-    <NodeViewWrapper className="mermaid-block-wrapper" data-mermaid-block="">
+    <NodeViewWrapper
+      className="mermaid-block-wrapper"
+      data-mermaid-block=""
+      data-mermaid-rendered={renderReady ? 'true' : undefined}
+    >
       {editing ? (
         <div className="mermaid-block-editor">
           <div className="mermaid-block-editor__label">```mermaid</div>

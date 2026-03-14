@@ -30,10 +30,13 @@ test.describe("マニュアル撮影: コードブロック・引用・水平線
     await page.keyboard.press("Control+/");
     await page.waitForTimeout(600);
 
-    const sourceEditor = page.locator(".cm-editor, .cm-content");
+    const sourceEditor = page.locator(".cm-editor");
     const sourceActive = await sourceEditor.first().isVisible().catch(() => false);
 
     if (sourceActive) {
+      // CodeMirror がフォーカスを持つまで待機してからクリックでフォーカス確定
+      await sourceEditor.first().click();
+      await page.waitForTimeout(300);
       // ソースモードで末尾に移動してコードブロックを追加
       await page.keyboard.press("Control+End");
       await page.waitForTimeout(200);
@@ -51,11 +54,11 @@ test.describe("マニュアル撮影: コードブロック・引用・水平線
       await page.waitForTimeout(100);
       await page.keyboard.press("Enter");
       await page.keyboard.type("```");
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(300);
 
       // WYSIWYGに戻す
       await page.keyboard.press("Control+/");
-      await page.waitForTimeout(600);
+      await page.waitForTimeout(800);
     }
     await page.waitForTimeout(500);
 

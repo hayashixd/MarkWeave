@@ -84,8 +84,21 @@ export function useMenuListener(actions: MenuActions) {
 
     setup();
 
+    // Tauri 外環境（Playwright テスト・ブラウザ開発）向けフォールバック:
+    // window.dispatchEvent(new CustomEvent('tauri-menu-action', { detail: 'menu_id' }))
+    // でメニューアクションをトリガーできる
+    const handleWebEvent = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail as keyof MenuActions;
+      const handler = actionsRef.current[id];
+      if (handler) {
+        handler();
+      }
+    };
+    window.addEventListener('tauri-menu-action', handleWebEvent);
+
     return () => {
       unlisten?.();
+      window.removeEventListener('tauri-menu-action', handleWebEvent);
     };
   }, []);
 }

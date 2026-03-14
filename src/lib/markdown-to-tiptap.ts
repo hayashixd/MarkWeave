@@ -160,7 +160,7 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
         {
           type: 'codeBlock',
           attrs: { language: node.lang ?? null },
-          content: node.value ? [{ type: 'text', text: node.value }] : undefined,
+          content: node.value ? [{ type: 'text', text: node.value }] : [],
         },
       ];
     }

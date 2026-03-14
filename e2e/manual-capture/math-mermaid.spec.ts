@@ -70,10 +70,13 @@ test.describe("マニュアル撮影: 数式・Mermaid図表", () => {
     await page.keyboard.press("Control+/");
     await page.waitForTimeout(600);
 
-    const srcEditor3 = page.locator(".cm-editor, .cm-content");
+    const srcEditor3 = page.locator(".cm-editor");
     const src3Active = await srcEditor3.first().isVisible().catch(() => false);
 
     if (src3Active) {
+      // CodeMirror にフォーカスを確定してから入力
+      await srcEditor3.first().click();
+      await page.waitForTimeout(300);
       await page.keyboard.press("Control+End");
       await page.waitForTimeout(100);
       await page.keyboard.press("Enter");
@@ -100,9 +103,14 @@ test.describe("マニュアル撮影: 数式・Mermaid図表", () => {
       await page.keyboard.press("Control+/");
       await page.waitForTimeout(800);
     }
-    await page.waitForTimeout(1200);
 
-    const mermaidDiagram = editor.locator(".mermaid, [class*='mermaid'], svg").first();
+    // Mermaid の非同期レンダリング完了を待つ（data-mermaid-rendered 属性が付くまで）
+    await page.locator("[data-mermaid-rendered='true']").waitFor({ timeout: 5000 }).catch(() => {
+      // タイムアウトしてもスクリーンショットは撮影する
+    });
+    await page.waitForTimeout(500);
+
+    const mermaidDiagram = editor.locator(".mermaid-block-wrapper svg, [data-mermaid-rendered='true'] svg").first();
     const diagramVisible = await mermaidDiagram.isVisible().catch(() => false);
 
     if (diagramVisible) {
