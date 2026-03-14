@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lintMarkdown, type LintResult } from './markdown-lint';
+import { lintMarkdown } from './markdown-lint';
 
 describe('markdown-lint', () => {
   // =========================================================================

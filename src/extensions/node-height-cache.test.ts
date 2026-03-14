@@ -6,7 +6,6 @@ import {
   getEstimatedHeight,
   updateHeightCache,
   invalidateHeightCache,
-  _getHeightCacheSize,
 } from './node-height-cache';
 
 // ProseMirrorNode のモック
