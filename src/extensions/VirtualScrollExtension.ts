@@ -8,8 +8,20 @@
  * 500 ノード以上のドキュメントでのみ有効化する（閾値は TipTapEditor 側で制御）。
  *
  * CLAUDE.md 制約:
- * - 入力レイテンシ < 16ms を維持するため、スクロールイベントは 100ms スロットル
+ * - 入力レイテンシ < 16ms を維持するため、スクロールイベントは適応スロットル
  * - IME 入力中のトランザクションは通常通り処理（仮想スクロールはデコレーションのみ）
+ *
+ * ## インクリメンタル更新戦略
+ *
+ * スクロール時はビューポート境界を通過するノード（通常 1〜5 個）のみを
+ * DecorationSet.remove().add() で差分更新する。
+ * これにより O(N log N) の全再構築を回避し O(K log N) に削減する。
+ *
+ * | イベント          | 処理                     | コスト         |
+ * |-------------------|--------------------------|----------------|
+ * | docChanged        | 全再構築（必須）           | O(N log N)     |
+ * | viewportChanged   | インクリメンタル差分更新   | O(K log N)     |
+ * | recalculateHeights| 高さ配列再構築 + 全再構築  | O(N log N)     |
  */
 
 import { Extension } from '@tiptap/core';
@@ -23,9 +35,6 @@ const pluginKey = new PluginKey('virtualScroll');
 
 /** ビューポート外に追加で描画するマージン（px） */
 const VIEWPORT_MARGIN_PX = 500;
-
-/** スクロールイベントのスロットル間隔（ms） */
-const SCROLL_THROTTLE_MS = 100;
 
 /** スクロール終了後の高さ再計測デバウンス（ms） */
 const SCROLL_END_DEBOUNCE_MS = 200;
@@ -45,8 +54,53 @@ interface ViewportRange {
 }
 
 /**
+ * ノードごとの累積高さエントリ。インクリメンタル差分更新で参照する。
+ */
+interface HeightAccumEntry {
+  offset: number;
+  nodeSize: number;
+  top: number;    // このノードの上端（累積高さ）
+  height: number; // このノードの推定高さ
+}
+
+/**
+ * プラグイン内部状態。DecorationSet に加えて差分更新に必要な情報を保持する。
+ */
+interface VirtualScrollPluginState {
+  decoSet: DecorationSet;
+  /** offset → Decoration マップ（差分更新時の remove 用） */
+  hiddenDecoMap: Map<number, Decoration>;
+  /** ノードごとの累積高さ（スクロール差分更新のバイナリサーチ基盤） */
+  heightAccum: HeightAccumEntry[] | null;
+  /** 最後に計算したビューポート範囲 */
+  viewport: ViewportRange;
+}
+
+const EMPTY_PLUGIN_STATE: VirtualScrollPluginState = {
+  decoSet: DecorationSet.empty,
+  hiddenDecoMap: new Map(),
+  heightAccum: null,
+  viewport: { top: 0, bottom: 0 },
+};
+
+/**
+ * スクロールイベントのスロットル間隔をノード数に応じて決定する。
+ * 大規模ドキュメントほど 1 回のビルドコストが高いため、頻度を抑える。
+ *
+ * | ノード数   | スロットル | 備考                        |
+ * |-----------|-----------|----------------------------|
+ * | < 1000    | 100ms     | インクリメンタル更新で十分速い |
+ * | 1000〜1999 | 150ms     | 差分更新でも念のため間引く     |
+ * | ≥ 2000    | 300ms     | docChanged は高コストなので保守的に |
+ */
+function getScrollThrottleMs(nodeCount: number): number {
+  if (nodeCount >= 2000) return 300;
+  if (nodeCount >= 1000) return 150;
+  return 100;
+}
+
+/**
  * スクロールコンテナからビューポート範囲を取得する。
- * エディタのラッパー div（overflow-y-auto）を scrollContainer として使用。
  */
 function getViewportRange(scrollContainer: Element | null): ViewportRange {
   if (!scrollContainer) {
@@ -61,7 +115,6 @@ function getViewportRange(scrollContainer: Element | null): ViewportRange {
 }
 
 function findScrollContainer(editorView: EditorView): HTMLElement | null {
-  // editorView.dom がドキュメントに接続されていない場合は検出不可
   if (!editorView.dom.isConnected) {
     return null;
   }
@@ -76,8 +129,6 @@ function findScrollContainer(editorView: EditorView): HTMLElement | null {
     return parentMatch;
   }
 
-  // フォールバック: 祖先を走査して実際にスクロール可能な要素を探す。
-  // レイアウト差異（SplitEditor など）で専用クラスが無い場合でも動作させる。
   let current: HTMLElement | null = editorView.dom.parentElement;
   while (current) {
     const style = window.getComputedStyle(current);
@@ -92,65 +143,182 @@ function findScrollContainer(editorView: EditorView): HTMLElement | null {
 }
 
 /**
- * ビューポート外のトップレベルノードに hidden デコレーションを付与する。
+ * hidden デコレーションを生成する（ノードオブジェクト不要）。
  */
-function buildDecorations(
+function createHiddenDecoration(offset: number, nodeSize: number, height: number): Decoration {
+  return Decoration.node(offset, offset + nodeSize, {
+    class: 'virtual-scroll-hidden',
+    style: `height: ${height}px; min-height: ${height}px; overflow: hidden; contain: strict;`,
+    'data-virtually-hidden': 'true',
+    'data-estimated-height': String(height),
+  });
+}
+
+/**
+ * 全ノードを走査してプラグイン状態を完全再構築する（docChanged 時）。
+ * O(N log N) — DecorationSet.create の B-tree 構築コストを含む。
+ */
+function buildFullState(
   state: EditorState,
   viewport: ViewportRange,
-  docChanged: boolean,
-): DecorationSet {
-  if (docChanged) {
+  clearHeightCache: boolean,
+): VirtualScrollPluginState {
+  if (clearHeightCache) {
     invalidateHeightCache();
   }
 
+  const heightAccum: HeightAccumEntry[] = [];
   const decorations: Decoration[] = [];
+  const hiddenDecoMap = new Map<number, Decoration>();
   let accumulatedHeight = 0;
 
   state.doc.forEach((node, offset) => {
-    const nodeHeight = getEstimatedHeight(node, offset);
-    const nodeTop = accumulatedHeight;
-    const nodeBottom = nodeTop + nodeHeight;
+    const height = getEstimatedHeight(node, offset);
+    const top = accumulatedHeight;
+    const bottom = top + height;
 
-    if (nodeBottom < viewport.top || nodeTop > viewport.bottom) {
-      // ビューポート外: hidden デコレーションを付与
-      decorations.push(
-        Decoration.node(offset, offset + node.nodeSize, {
-          class: 'virtual-scroll-hidden',
-          style: `height: ${nodeHeight}px; min-height: ${nodeHeight}px; overflow: hidden; contain: strict;`,
-          'data-virtually-hidden': 'true',
-          'data-estimated-height': String(nodeHeight),
-        }),
-      );
+    heightAccum.push({ offset, nodeSize: node.nodeSize, top, height });
+
+    if (bottom < viewport.top || top > viewport.bottom) {
+      const deco = createHiddenDecoration(offset, node.nodeSize, height);
+      decorations.push(deco);
+      hiddenDecoMap.set(offset, deco);
     }
 
-    accumulatedHeight += nodeHeight;
+    accumulatedHeight += height;
   });
 
-  return DecorationSet.create(state.doc, decorations);
+  return {
+    decoSet: DecorationSet.create(state.doc, decorations),
+    hiddenDecoMap,
+    heightAccum,
+    viewport,
+  };
 }
 
-/** シンプルなスロットル関数 */
-function throttle<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
+/**
+ * スクロール（viewportChanged）時のインクリメンタル差分更新。
+ *
+ * 既存の heightAccum を再利用し、ビューポート境界を通過したノードのみを
+ * remove()/add() で更新する。
+ * O(N) の走査 + O(K log N) の DecorationSet 操作（K = 境界通過ノード数）。
+ *
+ * 典型的なスクロールでは K = 1〜5 なので実質 O(log N)。
+ */
+function applyIncrementalViewportUpdate(
+  prevState: VirtualScrollPluginState,
+  doc: EditorState['doc'],
+  viewport: ViewportRange,
+): VirtualScrollPluginState {
+  // heightAccum が無い（初期化直後等）場合はフォールバック
+  if (!prevState.heightAccum) {
+    return buildFullState({ doc } as EditorState, viewport, false);
+  }
+
+  const toRemove: Decoration[] = [];
+  const toAdd: Decoration[] = [];
+  const newHiddenDecoMap = new Map(prevState.hiddenDecoMap);
+
+  for (const { offset, nodeSize, top, height } of prevState.heightAccum) {
+    const bottom = top + height;
+    const shouldHide = bottom < viewport.top || top > viewport.bottom;
+    const wasHidden = prevState.hiddenDecoMap.has(offset);
+
+    if (shouldHide && !wasHidden) {
+      // 新たに非表示になるノード → デコレーションを追加
+      const deco = createHiddenDecoration(offset, nodeSize, height);
+      toAdd.push(deco);
+      newHiddenDecoMap.set(offset, deco);
+    } else if (!shouldHide && wasHidden) {
+      // 新たに表示されるノード → デコレーションを削除
+      toRemove.push(prevState.hiddenDecoMap.get(offset)!);
+      newHiddenDecoMap.delete(offset);
+    }
+  }
+
+  // 変化なし → 同一オブジェクトを返して ProseMirror の差分検出を最適化
+  if (toRemove.length === 0 && toAdd.length === 0) {
+    return { ...prevState, viewport };
+  }
+
+  const newDecoSet = prevState.decoSet.remove(toRemove).add(doc, toAdd);
+  return {
+    decoSet: newDecoSet,
+    hiddenDecoMap: newHiddenDecoMap,
+    heightAccum: prevState.heightAccum,
+    viewport,
+  };
+}
+
+/**
+ * 高さキャッシュ更新後（recalculateHeights）に heightAccum を再構築して
+ * デコレーションを再計算する。
+ * スクロール停止後 200ms で 1 度だけ呼ばれるため O(N log N) でも許容できる。
+ */
+function rebuildHeightsAndApply(
+  state: EditorState,
+  viewport: ViewportRange,
+): VirtualScrollPluginState {
+  const heightAccum: HeightAccumEntry[] = [];
+  const decorations: Decoration[] = [];
+  const hiddenDecoMap = new Map<number, Decoration>();
+  let accumulatedHeight = 0;
+
+  state.doc.forEach((node, offset) => {
+    const height = getEstimatedHeight(node, offset);
+    const top = accumulatedHeight;
+    const bottom = top + height;
+
+    heightAccum.push({ offset, nodeSize: node.nodeSize, top, height });
+
+    if (bottom < viewport.top || top > viewport.bottom) {
+      const deco = createHiddenDecoration(offset, node.nodeSize, height);
+      decorations.push(deco);
+      hiddenDecoMap.set(offset, deco);
+    }
+
+    accumulatedHeight += height;
+  });
+
+  return {
+    decoSet: DecorationSet.create(state.doc, decorations),
+    hiddenDecoMap,
+    heightAccum,
+    viewport,
+  };
+}
+
+/**
+ * ノード数に応じた適応スロットル関数を生成する。
+ * getNodeCount() を呼び出してリアルタイムのノード数に基づきスロットル間隔を決定する。
+ */
+function makeAdaptiveThrottle(
+  fn: () => void,
+  getNodeCount: () => number,
+): () => void {
   let lastCall = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  return ((...args: unknown[]) => {
+
+  return () => {
+    const ms = getScrollThrottleMs(getNodeCount());
     const now = Date.now();
     const remaining = ms - (now - lastCall);
+
     if (remaining <= 0) {
       if (timer) {
         clearTimeout(timer);
         timer = null;
       }
       lastCall = now;
-      fn(...args);
+      fn();
     } else if (!timer) {
       timer = setTimeout(() => {
         lastCall = Date.now();
         timer = null;
-        fn(...args);
+        fn();
       }, remaining);
     }
-  }) as T;
+  };
 }
 
 export interface VirtualScrollOptions {
@@ -179,48 +347,54 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
         key: pluginKey,
 
         state: {
-          init(_: unknown, state: EditorState): DecorationSet {
-            // 初期化時: ノード数が閾値未満なら空のデコレーション
+          init(_: unknown, state: EditorState): VirtualScrollPluginState {
             if (state.doc.childCount < threshold) {
-              return DecorationSet.empty;
+              return { ...EMPTY_PLUGIN_STATE };
             }
-            return buildDecorations(state, getViewportRange(null), false);
+            const viewport = getViewportRange(null);
+            return buildFullState(state, viewport, false);
           },
 
           apply(
             tr: Transaction,
-            oldDecos: DecorationSet,
+            oldPluginState: VirtualScrollPluginState,
             _oldState: EditorState,
             newState: EditorState,
-          ): DecorationSet {
-            // ノード数が閾値未満なら無効化
+          ): VirtualScrollPluginState {
             if (newState.doc.childCount < threshold) {
-              return DecorationSet.empty;
+              return { ...EMPTY_PLUGIN_STATE };
             }
 
-            // ドキュメント変更またはビューポート変更時にデコレーション再構築
-            if (tr.docChanged || tr.getMeta('viewportChanged') || tr.getMeta('recalculateHeights')) {
-              const scrollContainer = tr.getMeta('scrollContainer') as Element | null ?? null;
-              return buildDecorations(newState, getViewportRange(scrollContainer), tr.docChanged);
+            const scrollContainer = tr.getMeta('scrollContainer') as Element | null ?? null;
+            const viewport = getViewportRange(scrollContainer);
+
+            if (tr.docChanged) {
+              // ドキュメント変更: 高さキャッシュをクリアして全再構築
+              return buildFullState(newState, viewport, true);
             }
 
-            // ドキュメント変更なし・ビューポート変更なし → 前回のデコレーションを再利用
-            return oldDecos;
+            if (tr.getMeta('recalculateHeights')) {
+              // スクロール停止後の高さ再計測: heightAccum 再構築 + 全デコレーション更新
+              return rebuildHeightsAndApply(newState, viewport);
+            }
+
+            if (tr.getMeta('viewportChanged')) {
+              // スクロール: インクリメンタル差分更新（★ 主要最適化）
+              return applyIncrementalViewportUpdate(oldPluginState, newState.doc, viewport);
+            }
+
+            return oldPluginState;
           },
         },
 
         view(editorView: EditorView) {
-          // スクロールコンテナの遅延検出:
-          // useEditor() が DOM 接続前に EditorView を作成するため、
-          // view() 時点ではスクロールコンテナが見つからないことがある。
-          // リトライ付きの遅延検出で DOM マウント後にスクロールハンドラを接続する。
           let scrollContainer: HTMLElement | null = null;
           let detectTimer: ReturnType<typeof setInterval> | null = null;
           let detectRetries = 0;
           let postDocChangeTimer: ReturnType<typeof setTimeout> | null = null;
 
-          // スクロールイベントで仮想スクロールを更新
-          const handleScroll = throttle(() => {
+          // 適応スロットル付きスクロールハンドラ
+          const dispatchScroll = () => {
             if (editorView.isDestroyed) return;
             if (editorView.state.doc.childCount < threshold) return;
             editorView.dispatch(
@@ -228,7 +402,13 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
                 .setMeta('viewportChanged', true)
                 .setMeta('scrollContainer', scrollContainer),
             );
-          }, SCROLL_THROTTLE_MS);
+          };
+
+          // ノード数に応じてスロットル間隔を動的調整
+          const handleScroll = makeAdaptiveThrottle(
+            dispatchScroll,
+            () => editorView.state.doc.childCount,
+          );
 
           // スクロール終了後に高さキャッシュを更新
           let scrollEndTimer: ReturnType<typeof setTimeout> | null = null;
@@ -238,7 +418,6 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
               if (editorView.isDestroyed) return;
               if (editorView.state.doc.childCount < threshold) return;
 
-              // ビューポート内の全ノードの実測高さをキャッシュ
               recalculateVisibleHeights(editorView, scrollContainer);
 
               editorView.dispatch(
@@ -249,19 +428,16 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
             }, SCROLL_END_DEBOUNCE_MS);
           };
 
-          /** スクロールコンテナにイベントリスナーを接続する */
           const attachListeners = (container: HTMLElement) => {
             container.addEventListener('scroll', handleScroll as EventListener, { passive: true });
             container.addEventListener('scroll', handleScrollEnd as EventListener, { passive: true });
           };
 
-          /** スクロールコンテナからイベントリスナーを解除する */
           const detachListeners = (container: HTMLElement) => {
             container.removeEventListener('scroll', handleScroll as EventListener);
             container.removeEventListener('scroll', handleScrollEnd as EventListener);
           };
 
-          /** ビューポートを再計算するトランザクションをディスパッチする */
           const dispatchViewportRecalc = () => {
             if (editorView.isDestroyed) return;
             if (editorView.state.doc.childCount < threshold) return;
@@ -272,12 +448,8 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
             );
           };
 
-          /**
-           * スクロールコンテナの検出を試みる。
-           * 見つかったらリスナーを接続し、初回ビューポート再計算を実行する。
-           */
           const tryDetectContainer = () => {
-            if (editorView.isDestroyed) return true; // stop retrying
+            if (editorView.isDestroyed) return true;
 
             const found = findScrollContainer(editorView);
             if (!found) return false;
@@ -285,9 +457,7 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
             scrollContainer = found;
             attachListeners(scrollContainer);
 
-            // 初回ビューポート再計算
             if (editorView.state.doc.childCount >= threshold) {
-              // RAF で次フレームに実行し、レイアウト確定後の正確なビューポートを使う
               window.requestAnimationFrame(() => {
                 if (!editorView.isDestroyed) {
                   dispatchViewportRecalc();
@@ -298,9 +468,7 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
             return true;
           };
 
-          // 即座に検出を試みる
           if (!tryDetectContainer()) {
-            // DOM 未接続の場合、定期的にリトライ
             detectTimer = setInterval(() => {
               detectRetries++;
               if (tryDetectContainer() || detectRetries >= CONTAINER_DETECT_MAX_RETRIES) {
@@ -314,11 +482,7 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
 
           return {
             update(view: EditorView, prevState: EditorState) {
-              // ドキュメントが変更され、かつ閾値を超えている場合、
-              // 遅延後にビューポート再計算をスケジュールする。
-              // setContent/paste 後に正しいスクロール位置でデコレーションを再構築するため。
               if (view.state.doc !== prevState.doc && view.state.doc.childCount >= threshold) {
-                // スクロールコンテナが未検出なら再検出を試みる
                 if (!scrollContainer) {
                   tryDetectContainer();
                 }
@@ -327,7 +491,6 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
                 postDocChangeTimer = setTimeout(() => {
                   postDocChangeTimer = null;
                   dispatchViewportRecalc();
-                  // 実測高さを取得して精度を上げる
                   setTimeout(() => {
                     if (!editorView.isDestroyed && scrollContainer) {
                       recalculateVisibleHeights(view, scrollContainer);
@@ -355,7 +518,8 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
 
         props: {
           decorations(state: EditorState): DecorationSet | undefined {
-            return pluginKey.getState(state) as DecorationSet | undefined;
+            const pluginState = pluginKey.getState(state) as VirtualScrollPluginState | undefined;
+            return pluginState?.decoSet;
           },
         },
       }),
@@ -381,7 +545,6 @@ function recalculateVisibleHeights(
     const nodeBottom = nodeTop + nodeHeight;
     accumulatedHeight += nodeHeight;
 
-    // ビューポート内のノードのみ実測
     if (nodeBottom >= viewport.top && nodeTop <= viewport.bottom) {
       try {
         const domNode = editorView.nodeDOM(offset);

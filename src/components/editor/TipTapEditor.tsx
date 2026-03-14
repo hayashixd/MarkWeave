@@ -93,8 +93,13 @@ import { useTabStore } from '../../store/tabStore';
 export type EditorMode = 'wysiwyg' | 'source';
 
 const LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES = 3 * 1024 * 1024;
-/** performance-design.md §2: ノード数が閾値を超えたらソースモードに切替 */
+/** performance-design.md §2: ProseMirror ポジション空間サイズが閾値を超えたらソースモードに切替 */
 const LARGE_FILE_NODE_COUNT_THRESHOLD = 3000;
+/**
+ * トップレベルブロック数閾値。仮想スクロールが 16ms 予算を超え始める 2000 ノード手前で
+ * ソースモードへ切替することでスクロールジャンクを防ぐ。
+ */
+const LARGE_FILE_BLOCK_COUNT_THRESHOLD = 1500;
 /** 大規模ドキュメントでの連続更新時にシリアライズを間引く閾値 */
 const LARGE_DOC_SERIALIZE_DEBOUNCE_NODE_THRESHOLD = 1200;
 const LARGE_DOC_SERIALIZE_DEBOUNCE_MS = 120;
@@ -529,14 +534,17 @@ export function MarkdownEditor({
 
       // performance-design.md §2: ノード数による大規模ファイル判定
       // パース後にノード数をチェックし、閾値超過時はソースモードへ切替
+      // nodeSize: ProseMirror ポジション空間サイズ（文字数に近い値）
+      // childCount: トップレベルブロック数（仮想スクロールの負荷に直結）
       const nodeCount = editor.state.doc.nodeSize;
-      if (nodeCount >= LARGE_FILE_NODE_COUNT_THRESHOLD) {
+      const blockCount = editor.state.doc.childCount;
+      if (nodeCount >= LARGE_FILE_NODE_COUNT_THRESHOLD || blockCount >= LARGE_FILE_BLOCK_COUNT_THRESHOLD) {
         lastEmittedContentRef.current = initialContent;
         setSourceText(initialContent);
         setMode('source');
         showToast(
           'warning',
-          `ノード数が多いため（${nodeCount}）、ソースモードで開きました。`,
+          `ノード数が多いため（blocks: ${blockCount}）、ソースモードで開きました。`,
         );
       }
     };
