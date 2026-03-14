@@ -56,6 +56,7 @@ export interface MenuActions {
   help_shortcuts: () => void;
   help_version: () => void;
   help_feedback: () => void;
+  help_check_updates: () => void;
 }
 
 export function useMenuListener(actions: MenuActions) {
