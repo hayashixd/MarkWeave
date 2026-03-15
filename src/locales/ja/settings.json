@@ -1,0 +1,15 @@
+{
+  "title": "設定",
+  "tabs": {
+    "general": "一般",
+    "editor": "エディタ",
+    "appearance": "外観",
+    "writing": "執筆スタイル",
+    "templates": "テンプレート",
+    "snippets": "スニペット",
+    "plugins": "プラグイン"
+  },
+  "sidebar": {
+    "showAdvancedTabs": "高度なサイドバータブを表示（Git・グラフ・バックリンク・AI）"
+  }
+}

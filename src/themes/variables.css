@@ -1,0 +1,104 @@
+/**
+ * グローバル CSS Custom Properties（ライトテーマのデフォルト値）
+ *
+ * theme-design.md §2 に準拠。
+ * テーマ切り替えは <html data-theme="..."> 属性で行う。
+ */
+
+:root {
+  /* ── ベースカラー ─────────────────── */
+  --color-bg:           #ffffff;
+  --color-bg-secondary: #f6f8fa;
+  --color-bg-tertiary:  #eaeef2;
+
+  --color-text:         #24292f;
+  --color-text-muted:   #57606a;
+  --color-text-subtle:  #8c959f;
+
+  --color-border:       #d0d7de;
+  --color-border-muted: #eaeef2;
+
+  --color-accent:       #0969da;
+  --color-accent-hover: #0550ae;
+
+  --color-success:      #1a7f37;
+  --color-warning:      #9a6700;
+  --color-danger:       #cf222e;
+
+  /* ── タイポグラフィ ──────────────── */
+  --font-sans:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono:   "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-head:   var(--font-sans);
+  --font-size-base: 16px;
+  --line-height-base: 1.6;
+
+  /* ── スペーシング ───────────────── */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* ── ボーダー ───────────────────── */
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+  --border-radius-lg: 12px;
+
+  /* ── トランジション ──────────────── */
+  --transition-fast: 80ms ease;
+  --transition-normal: 160ms ease;
+
+  /* ── タブバー ────────────────────── */
+  --editor-tabbar-bg:         var(--color-bg-secondary);
+  --editor-tabbar-border:     var(--color-border);
+  --editor-tab-bg:            transparent;
+  --editor-tab-bg-active:     var(--color-bg);
+  --editor-tab-text:          var(--color-text-muted);
+  --editor-tab-text-active:   var(--color-text);
+  --editor-tab-text-dirty:    var(--color-warning);
+
+  /* ── ツールバー ─────────────────── */
+  --editor-toolbar-bg:        var(--color-bg-secondary);
+  --editor-toolbar-border:    var(--color-border);
+  --editor-toolbar-icon:      var(--color-text-muted);
+  --editor-toolbar-icon-hover: var(--color-text);
+  --editor-toolbar-btn-bg-active: var(--color-bg-tertiary);
+
+  /* ── サイドバー ─────────────────── */
+  --editor-sidebar-bg:        var(--color-bg-secondary);
+  --editor-sidebar-border:    var(--color-border);
+  --editor-sidebar-item-bg-hover:  var(--color-bg-tertiary);
+  --editor-sidebar-item-bg-active: var(--color-accent);
+  --editor-sidebar-item-text-active: #ffffff;
+
+  /* ── ステータスバー ──────────────── */
+  --editor-statusbar-bg:      var(--color-bg-secondary);
+  --editor-statusbar-text:    var(--color-text-muted);
+  --editor-statusbar-border:  var(--color-border);
+
+  /* ── エディタ本体 ───────────────── */
+  --editor-content-bg:        var(--color-bg);
+  --editor-content-text:      var(--color-text);
+  --editor-content-font:      var(--font-sans);
+  --editor-content-font-size: var(--font-size-base);
+  --editor-content-line-height: var(--line-height-base);
+  --editor-cursor-color:      var(--color-accent);
+  --editor-selection-bg:      rgba(9, 105, 218, 0.2);
+  --editor-focus-outline:     2px solid var(--color-accent);
+
+  /* ── プレビュー層 ───────────────── */
+  --preview-heading-color:     var(--color-text);
+  --preview-heading-border:    var(--color-border);
+  --preview-code-bg:           var(--color-bg-secondary);
+  --preview-code-text:         var(--color-text);
+  --preview-code-font:         var(--font-mono);
+  --preview-inline-code-bg:    rgba(175, 184, 193, 0.2);
+  --preview-blockquote-border: var(--color-border);
+  --preview-blockquote-text:   var(--color-text-muted);
+  --preview-table-border:      var(--color-border);
+  --preview-table-header-bg:   var(--color-bg-secondary);
+  --preview-table-row-alt-bg:  var(--color-bg-secondary);
+  --preview-link-color:        var(--color-accent);
+  --preview-link-hover:        var(--color-accent-hover);
+  --preview-task-checkbox-color: var(--color-accent);
+}

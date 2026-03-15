@@ -1,0 +1,39 @@
+{
+  "actions": {
+    "save": "保存",
+    "saveAs": "名前を付けて保存",
+    "saveAndClose": "保存して閉じる",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "delete": "削除",
+    "rename": "名前を変更",
+    "open": "開く",
+    "newFile": "新しいファイル",
+    "openFile": "ファイルを開く",
+    "openFolder": "フォルダを開く",
+    "undo": "元に戻す",
+    "redo": "やり直し"
+  },
+  "status": {
+    "ready": "準備完了",
+    "loading": "読み込み中…",
+    "saving": "保存中…",
+    "unsaved": "未保存",
+    "modified": "変更あり",
+    "draft": "下書き"
+  },
+  "time": {
+    "justNow": "たった今",
+    "minutesAgo": "{{count}}分前",
+    "hoursAgo": "{{count}}時間前",
+    "daysAgo": "{{count}}日前"
+  },
+  "confirm": {
+    "unsavedChanges": "変更が保存されていません。閉じてもよろしいですか？"
+  },
+  "dropOverlay": {
+    "dropHere": "ここにドロップして開く",
+    "supportedFormats": ".md / .html ファイルに対応",
+    "orDropFile": "またはここにファイルをドロップ"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "respectGitignore": true,
+  "permissions": {
+    "deny": [
+      "Read(./target/**)",
+      "Read(./node_modules/**)",
+      "Read(./.git/**)",
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
+      "Read(**/*.lock)",
+      "Read(./dist/**)",
+      "Read(./build/**)",
+      "Read(./.tauri/**)"
+    ]
+  }
+}

@@ -1,0 +1,30 @@
+/**
+ * Solarized Light テーマの CSS Custom Properties。
+ *
+ * theme-design.md §1.2 に準拠。
+ * Ethan Schoonover の Solarized 配色に基づく。
+ */
+
+[data-theme="solarized-light"] {
+  --color-bg:           #fdf6e3;
+  --color-bg-secondary: #eee8d5;
+  --color-bg-tertiary:  #e4ddc8;
+
+  --color-text:         #657b83;
+  --color-text-muted:   #839496;
+  --color-text-subtle:  #93a1a1;
+
+  --color-border:       #d3c6a6;
+  --color-border-muted: #eee8d5;
+
+  --color-accent:       #268bd2;
+  --color-accent-hover: #1a6fb0;
+
+  --color-success:      #859900;
+  --color-warning:      #b58900;
+  --color-danger:       #dc322f;
+
+  --editor-selection-bg: rgba(38, 139, 210, 0.15);
+  --preview-inline-code-bg: rgba(238, 232, 213, 0.6);
+  --preview-heading-color: #586e75;
+}

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<!--
+  mermaid-sandbox.html - Mermaid レンダリング用サンドボックス iframe
+  security-design.md §4.1.2 に準拠。
+
+  主 WebView の CSP を汚染しないため、Mermaid はこの sandbox iframe 内で実行する。
+  iframe は sandbox="allow-scripts" のみ（allow-same-origin は付与しない）で読み込まれる。
+  postMessage でのみ親ウィンドウと通信する。
+-->
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'unsafe-inline'">
+  <title>Mermaid Sandbox</title>
+</head>
+<body>
+  <div id="graph"></div>
+  <script type="module">
+    import mermaid from '/node_modules/mermaid/dist/mermaid.esm.min.mjs';
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: 'default',
+    });
+
+    let idCounter = 0;
+
+    window.addEventListener('message', async (event) => {
+      const data = event.data;
+      if (data?.type !== 'render') return;
+
+      const id = `mermaid-sandbox-${++idCounter}`;
+      try {
+        const { svg } = await mermaid.render(id, data.definition);
+        window.parent.postMessage({ type: 'mermaid-result', svg, requestId: data.requestId }, '*');
+      } catch (error) {
+        window.parent.postMessage({
+          type: 'mermaid-result',
+          error: error instanceof Error ? error.message : String(error),
+          requestId: data.requestId,
+        }, '*');
+      }
+    });
+
+    // 準備完了を親に通知
+    window.parent.postMessage({ type: 'mermaid-sandbox-ready' }, '*');
+  </script>
+</body>
+</html>

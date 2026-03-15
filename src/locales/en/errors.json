@@ -1,0 +1,16 @@
+{
+  "file": {
+    "readFailed": "Failed to read file",
+    "writeFailed": "Failed to save file",
+    "notFound": "File not found",
+    "permissionDenied": "Permission denied"
+  },
+  "editor": {
+    "parseFailed": "Failed to parse Markdown",
+    "exportFailed": "Export failed"
+  },
+  "general": {
+    "unexpected": "An unexpected error occurred",
+    "networkError": "A network error occurred"
+  }
+}

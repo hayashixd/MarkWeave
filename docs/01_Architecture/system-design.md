@@ -1,0 +1,947 @@
+# システム設計ドキュメント
+
+> プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
+> バージョン: 0.9 (コアアーキテクチャ原則・Rust バックエンド構成・データ基盤設計を追加)
+> 更新日: 2026-02-25
+
+---
+
+## 1. システム概要
+
+### 1.1 アーキテクチャ方針
+
+本エディタは **ContentEditable + AST（抽象構文木）ベースのハイブリッド構成** を採用し、
+フロントエンドとバックエンドの責務を明確に分離する。
+Markdown ファイルの内部表現には **mdast（Markdown AST）準拠の型定義** を使用し、
+TipTap JSON を編集中の SoT とするハイブリッド戦略でシームレスな変換・編集を実現する。
+HTML ファイル編集は Phase 5 で別エディタコンポーネント（HtmlEditor）として実装する。
+
+#### コアアーキテクチャ原則
+
+| 原則 | 説明 |
+|------|------|
+| **完全な双方向変換（ロスレス）** | Markdown と内部表現（TipTap JSON）の間で情報の欠落を許さないラウンドトリップ変換を実現し、Markdown を単一の真実源（Single Source of Truth）として扱う。詳細: [markdown-tiptap-conversion.md](../02_Core_Editor/markdown-tiptap-conversion.md) |
+| **ローカル・オフラインファースト** | 外部サーバーに依存せず、すべてのデータとインデックスをローカル環境で処理・完結させる。AI API 等の外部通信は Rust 経由のオプション機能とし、オフラインでも全コア機能が動作する |
+| **フロントエンド/バックエンドの責務分離** | UI・エディタロジック（React + TipTap）とシステム操作（Rust: ファイル I/O、SQLite、外部 API 通信）を Tauri IPC で明確に分離する |
+| **適材適所のマルチエンジン構成** | WYSIWYG 編集のコアには TipTap（ProseMirror）を使用し、ソースモードや巨大ファイル編集・YAML Front Matter 編集には CodeMirror 6 を使用する |
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    ユーザー入力                           │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│                  Input Handler                           │
+│  キーボード / マウス / ドラッグ&ドロップ / ペースト      │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Editor Core                           │
+│                                                         │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐ │
+│  │  MD Parser  │    │  内部 AST   │    │   State     │ │
+│  │ HTML Parser │◄──►│ (mdast準拠) │◄──►│  Manager    │ │
+│  └─────────────┘    └──────┬──────┘    └─────────────┘ │
+│                            │                            │
+│              ┌─────────────┼─────────────┐              │
+│              │             │             │              │
+│       ┌──────▼──────┐ ┌───▼────┐  ┌─────▼──────┐      │
+│       │MD Serializer│ │Converter│  │HTML        │      │
+│       │(AST→.md)   │ │MD↔HTML │  │Serializer  │      │
+│       └─────────────┘ └────────┘  │(AST→.html) │      │
+│                                   └────────────┘       │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│                    Renderer                              │
+│                                                         │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │              表示モード（切替可能）                 │   │
+│  │                                                    │   │
+│  │  [WYSIWYG]    Typora 式フォーカスデコレーション     │   │
+│  │               フォーカスブロック: ソースマーカー表示│   │
+│  │               非フォーカスブロック: レンダリング    │   │
+│  │                                                    │   │
+│  │  [ソース表示]  全ブロック: CodeMirror 6            │   │
+│  └────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────┐
+│                  File System Layer                       │
+│  Tauri plugin-fs（.md / .html 両対応）                   │
+│  ※ブラウザFile System Access APIは不使用                 │
+└─────────────────────────────────────────────────────────┘
+                        │
+                        ▼
+┌──────────────┬──────────────┬──────────────────────────┐
+│  Windows     │  Android     │  iOS / macOS / Linux     │
+│  （Phase 1） │  （Phase 8） │  （Phase 8）             │
+└──────────────┴──────────────┴──────────────────────────┘
+```
+
+### 1.1.1 データ処理とローカルデータベース
+
+PKM（パーソナルナレッジマネジメント）としての機能を支えるデータ基盤。
+
+#### SQLite によるメタデータインデックス
+
+Rust バックエンド側で `rusqlite` を使用し、ワークスペース内の Markdown ファイル（YAML フロントマター、タグ、タスク、双方向リンクなど）をバックグラウンドで解析・インデックス化する。これにより、フロントエンド側からの高速な動的クエリ（Dataview 的なリストやカレンダー描画）が可能になる。
+
+> 詳細設計: [metadata-query-design.md](../05_Features/metadata-query-design.md)（SQLite スキーマ・クエリ構文・ビュー UI）
+
+#### ファイルロックと排他制御
+
+複数ウィンドウ間で同一ファイルを開くことによる履歴（Undo/Redo）の破損や競合を防ぐため、以下の方針を採用する:
+
+- **Phase 1〜6（タブベース）**: アプリ内タブで同一ファイルの多重オープンを検知し、既存タブにフォーカスを移動させる。`tabStore` のファイルパス一覧で重複を判定
+- **Phase 7 以降（マルチウィンドウ）**: 1 つのウィンドウのみに「書き込み権限」を付与し、他は Read-Only モードとする排他制御を実装
+
+> 外部エディタとの競合については [file-workspace-design.md §4.2.1](../04_File_Workspace/file-workspace-design.md) に設計済み。
+
+---
+
+### 1.2 技術スタック（確定）
+
+#### プラットフォーム
+
+| 用途 | 採用技術 | 備考 |
+|------|---------|------|
+| デスクトップフレームワーク | **Tauri 2.0**（Rust） | Windows / macOS / Linux 対応 |
+| モバイル | **Tauri 2.0**（同一コード） | Android / iOS 対応は Phase 8 で実施 |
+| WebView（Windows） | **WebView2**（Microsoft製） | Windows 10/11 に標準搭載 |
+| WebView（Android） | Chrome WebView | OS標準 |
+| WebView（iOS） | WKWebView（Safari相当） | OS標準 |
+
+> Electron / Tauri の選定理由: [decision-log.md §1](../00_Meta/decision-log.md)
+
+#### フロントエンド
+
+| 用途 | 採用技術 | 採用しなかった候補 |
+|------|---------|----------------|
+| UIフレームワーク | **React + TypeScript** | Vue.js、Svelte |
+| エディタエンジン | **TipTap** | ProseMirror 直接（[decision-log.md §2](../00_Meta/decision-log.md) 参照） |
+| Markdownパーサ | **remark / unified** | marked、markdown-it |
+| HTMLパーサ | **rehype-parse** | parse5 |
+| MD→HTML変換 | **remark-rehype** | — |
+| HTML→MD変換 | **turndown** | — |
+| HTML AST操作 | **hast-util-\*** | — |
+| CSSインライン化 | **juice** | — |
+| 数式 | **KaTeX** | MathJax |
+| 図表 | **Mermaid.js** | — | ⚠️ 主 WebView での直接実行は行わない。サンドボックス iframe 内で実行（`security-design.md §4.1.2` 参照） |
+| コード言語推定 | ヒューリスティック | linguist-languages |
+| スタイル | **Tailwind CSS** | CSS Modules |
+| ビルド | **Vite + Tauri CLI** | webpack |
+| テスト | **Vitest + Playwright** | Jest |
+
+> TipTap / ProseMirror の選定理由: [decision-log.md §2](../00_Meta/decision-log.md)
+
+#### ファイルシステム
+
+| 用途 | 採用技術 | 備考 |
+|------|---------|------|
+| ファイル読み書き | **@tauri-apps/plugin-fs** | ブラウザFile System Access APIは不使用 |
+| ファイルダイアログ | **@tauri-apps/plugin-dialog** | ネイティブのファイル選択ダイアログ |
+| ファイル関連付け | Tauri のファイル関連付け設定 | .md/.markdown をダブルクリックで開く（.html は Phase 5 で追加予定） |
+| ファイル変更監視 | **@tauri-apps/plugin-fs**（watch） | 外部エディタとの競合検知 |
+| セッション永続化 | **@tauri-apps/plugin-store** | タブ状態・設定のJSONファイル保存 |
+| シングルインスタンス | **tauri-plugin-single-instance** | 2重起動防止・外部ファイルオープン受信 |
+
+#### 確定した全体構成
+
+```
+Tauri 2.0（Rust）
+  ├─ ファイルシステム操作
+  ├─ ネイティブメニュー・ウィンドウ管理
+  ├─ ファイル関連付け（.md / .markdown — .html は Phase 5 で追加予定）
+  └─ WebView（OS標準）
+       └─ React + TypeScript（フロントエンド）
+            └─ TipTap（ProseMirrorラッパー）
+                 ├─ remark / unified（Markdownパーサ）
+                 ├─ rehype（HTMLパーサ・変換）
+                 ├─ KaTeX（数式）
+                 └─ Mermaid.js（図表）
+```
+
+---
+
+## 2. コアアーキテクチャ設計
+
+### 2.1 ドキュメントモデル（AST）
+
+Markdown ファイルの内部表現には **mdast（Markdown AST）準拠の型定義** を採用している（`src/core/document/ast.ts`）。
+編集中は TipTap JSON（ProseMirror ドキュメントモデル）が SoT となり、保存時に remark-stringify で `.md` ファイルにシリアライズする。
+
+> **Markdown ↔ TipTap 変換の詳細設計**（スキーママッピング・SoTアーキテクチャ・生HTML保持・ラウンドトリップテスト・GFM拡張対応）は
+> 👉 **[docs/markdown-tiptap-conversion.md](./markdown-tiptap-conversion.md)** を参照。
+
+```typescript
+// 内部 AST 型定義（mdast 準拠 — src/core/document/ast.ts）
+interface Root {
+  type: 'root';
+  children: BlockNode[];
+}
+
+// ブロックノード例
+interface Heading {
+  type: 'heading';
+  depth: 1 | 2 | 3 | 4 | 5 | 6;
+  children: InlineNode[];
+}
+
+interface Paragraph {
+  type: 'paragraph';
+  children: InlineNode[];
+}
+
+interface CodeBlock {
+  type: 'code';
+  lang: string | null;
+  value: string;
+}
+
+// Markdown 固有ノード
+interface MathBlock {
+  type: 'math';
+  value: string;
+}
+
+// HTML ファイル編集は HtmlEditor コンポーネント（Phase 5）で別途扱う。
+// Markdown パース: remark で mdast にパース → markdown-to-tiptap.ts で TipTap JSON に変換
+// 保存: TipTap JSON → tiptap-to-markdown.ts で Markdown にシリアライズ
+```
+
+### 2.2 WYSIWYG レンダリングモデル
+
+#### 2つの表示モード（実装済み）
+
+Markdown エディタは以下の2モードを切り替え可能とする。デフォルトは **WYSIWYG**（Typora 式フォーカスデコレーション付き）。
+
+| モード | ID | 説明 | デフォルト |
+|--------|-----|------|-----------|
+| **WYSIWYG** | `wysiwyg` | Typora 式フォーカスデコレーションにより、カーソル位置のブロックにソースマーカーを表示し、それ以外はレンダリング表示。`TyporaFocusExtension` で実現 | ✅ |
+| **ソース表示** | `source` | 全テキストを CodeMirror 6 でソース表示 | |
+
+> **設計メモ**: 初期設計では `typora` / `wysiwyg` / `source` / `split` の4モードを検討していたが、実装ではTypora式の挙動を `wysiwyg` モード内の `TyporaFocusExtension`（ProseMirror Decoration ベース）として統合した。`split` モードは将来的な追加候補として保留。
+
+#### モード切り替えUI
+
+```
+キーボードショートカット:
+  Ctrl+/ (または Cmd+/) → WYSIWYG ⇔ ソース表示トグル
+
+メニュー:
+  表示 → ソースモード切替
+```
+
+#### WYSIWYG モード（Typora 式デコレーション）の状態遷移
+
+```
+[レンダリング状態（非フォーカスブロック）]
+   │
+   │ クリック / キーボードフォーカス移動
+   ▼
+[フォーカスブロック: TyporaFocusExtension がソースマーカーを Decoration で表示]
+   │
+   │ 別ブロッククリック / カーソル移動
+   ▼
+[デコレーション解除 → レンダリング状態に戻る]
+   │
+   │ 入力変更
+   ▼
+[AST更新] ──► [シリアライズ] ──► [ファイル同期（デバウンス）]
+```
+
+#### 各モードの TipTap 実装方針
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  共通: TipTap Editor インスタンス（ProseMirror内部）         │
+│        内部ドキュメントモデルは常に同一                      │
+└──────────────────┬──────────────────────────────────────────┘
+                   │ editorMode: 'wysiwyg' | 'source'
+          ┌────────┴────────────────────────────────────┐
+          │                                             │
+          ▼                                             ▼
+   source モード                              wysiwyg モード
+   ──────────────                              ────────────────
+   TipTap Editor を非表示にし                 TipTap Editor でリッチ編集
+   CodeMirror 6 でソース編集                  TyporaFocusExtension が
+   （シンタックスハイライト付き）             フォーカスブロックに Markdown
+                                              デリミタを Decoration で表示
+```
+
+#### モード管理の実装（実装済み）
+
+**実装方式**: モード状態は React の `useState` で管理し（`TipTapEditor.tsx`）、Typora 式のフォーカス表示は `TyporaFocusExtension`（ProseMirror Decoration ベース）で実現している。
+
+```typescript
+// src/components/editor/TipTapEditor.tsx
+
+export type EditorMode = 'wysiwyg' | 'source';
+
+// MarkdownEditor コンポーネント内
+const [mode, setMode] = useState<EditorMode>('wysiwyg');
+
+// Ctrl+/ でモードをトグル
+const toggleMode = useCallback(() => {
+  if (mode === 'wysiwyg') {
+    // TipTap JSON → Markdown にシリアライズしてソース表示
+    setMode('source');
+  } else {
+    // Markdown → TipTap JSON にパースして WYSIWYG 表示
+    setMode('wysiwyg');
+  }
+}, [mode]);
+```
+
+#### Typora 式フォーカスデコレーション（TyporaFocusExtension）
+
+```typescript
+// src/extensions/TyporaFocusExtension.ts
+
+/**
+ * WYSIWYG モードでカーソルが存在するブロックに対して、
+ * Markdown のソースマーカー（**、*、~~、`、[]() 等）を
+ * ProseMirror Widget Decoration で表示する。
+ *
+ * カーソルが離れると即座にデコレーションが非表示になり
+ * レンダリング表示に戻る。
+ *
+ * 対象マーク: bold(**), italic(*), strike(~~), code(`), link([]())
+ * 対象ブロックプレフィックス: heading(# レベル数に応じた #)
+ */
+export const TyporaFocusExtension = Extension.create({
+  name: 'typoraFocus',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      key: pluginKey,
+      state: {
+        init(_, state) { return createDecorations(state); },
+        apply(tr, oldDecos, _, newState) {
+          if (tr.docChanged || tr.selectionSet) {
+            return createDecorations(newState);
+          }
+          return oldDecos;
+        },
+      },
+      props: {
+        decorations(state) { return pluginKey.getState(state); },
+      },
+    })];
+  },
+});
+```
+
+**設計の利点**:
+- NodeView のカスタム実装が不要 — Decoration で非侵襲的にソースマーカーを表示
+- ProseMirror 標準の選択/カーソル管理と自然に統合
+- ドキュメント変更またはセレクション変更時のみ再計算（パフォーマンス効率）
+
+#### ファイルサイズ閾値（確定）
+
+**仕様**: 以下のいずれかの条件を超えると、WYSIWYG モードを無効化しソースモード（CodeMirror）に自動切り替えする。
+
+| 指標 | 閾値（仮） | 根拠 |
+|------|-----------|------|
+| ファイルサイズ | **3MB 以上** | Markdown 3MB ≒ 約6万行。書籍1冊分相当でWYSIWYG編集の実用範囲外 |
+| ProseMirror ノード数 | **3,000 ノード以上** | NodeView の描画コストがフレームレートに影響し始める目安 |
+
+どちらか一方でも閾値を超えた場合に自動切り替えが発動する。
+
+```typescript
+// src/components/editor/TipTapEditor.tsx
+
+const LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES = 3 * 1024 * 1024;  // 3MB
+const LARGE_FILE_NODE_COUNT_THRESHOLD = 3000;
+
+// ファイル読み込み時にサイズチェック → 閾値超過時はソースモードに切替
+const contentSizeBytes = new TextEncoder().encode(initialContent).length;
+if (contentSizeBytes >= LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES && mode === 'wysiwyg') {
+  setSourceText(initialContent);
+  setMode('source');
+  showToast('warning', 'ファイルサイズが大きいためソースモードで開きました。');
+}
+
+// パース後のノード数チェック
+if (editor && editor.state.doc.nodeSize >= LARGE_FILE_NODE_COUNT_THRESHOLD) {
+  setSourceText(initialContent);
+  setMode('source');
+  showToast('warning', `ノード数が多いため（${nodeCount}）、ソースモードで開きました。`);
+}
+```
+
+**UX**:
+- 自動切り替え時はトースト通知「ファイルが大きいためソースモードで開きました（3MB 以上）」を表示する
+- ユーザーは手動で WYSIWYG に切り替え可能（ただし動作が遅くなる旨を警告）
+- 閾値はユーザー設定で変更可能にする（将来的に）
+
+> **注意**: 仮値であり、実装後のパフォーマンス計測（大きな .md ファイルでのフレームレート測定）を経て調整する。
+
+#### WYSIWYG モード: フォーカスブロックの Decoration 表示
+
+WYSIWYG モードでは `TyporaFocusExtension` が ProseMirror の Selection 変化を監視し、
+カーソルが存在するブロックに対して Markdown デリミタを Widget Decoration で表示する。
+クリックやキーボード移動による明示的なフォーカスブロック計算は ProseMirror 標準の Selection が担当し、
+`TyporaFocusExtension` は `selectionSet` トランザクションに反応して Decoration を更新する。
+
+```
+ユーザーが H1 の「World」という文字をクリック
+  └─ ProseMirror が posAtCoords() でカーソル位置を設定
+       │
+       ▼
+  TyporaFocusExtension の apply() が selectionSet を検知
+       │
+       ▼
+  カーソル位置のブロックに対して Decoration を再計算
+  （見出しプレフィックス #、インラインマーク ** * ~~ ` []() 等）
+       │
+       ▼
+  フォーカスブロック: ソースマーカー付きで表示
+  非フォーカスブロック: レンダリング表示のまま
+```
+
+**インラインノードのフォーカス境界**:
+
+カーソルが存在するブロック全体に対してソースマーカーが表示される。太字・リンク等のインラインノードをクリックしても、含む段落ブロック全体のデリミタが表示される。
+
+### 2.2.1 Source-of-Truth 戦略（ハイブリッド採用）
+
+| フェーズ | SoT | 概要 |
+|---------|-----|------|
+| **読み込み時** | ファイル | `.md` → mdast → TipTap JSON（一方向・完全忠実） |
+| **編集中** | TipTap JSON | ユーザー操作は TipTap 内部で完結 |
+| **保存時** | → ファイルへ | TipTap JSON → mdast → `.md`（remark-stringify で正規化） |
+| **外部変更検知** | ファイルウォッチャー | 変更を検知したらダイアログで再読込を促す |
+
+完全な File-as-SoT への移行は、ラウンドトリップテストが全フィクスチャでパスした後に検討する。
+詳細: [markdown-tiptap-conversion.md §3](./markdown-tiptap-conversion.md#3-source-of-truth-アーキテクチャ比較と採用方針)
+
+### 2.3 AI最適化モジュール
+
+AIコピー機能は、エディタコアとUIの間に位置する独立したモジュールとして実装する。
+
+```
+エディタ（ProseMirror）
+  │  getMarkdown()
+  ▼
+┌──────────────────────────────────────────────────┐
+│              AI Optimizer                        │
+│                                                  │
+│  normalizeCodeFences()                           │
+│  normalizeHeadings()       変換パイプライン       │
+│  annotateCodeBlocks()   ──────────────────►      │
+│  normalizeListMarkers()    最適化済みMarkdown     │
+│  trimExcessiveWhitespace()                       │
+│  annotateLinks()                                 │
+│                                                  │
+│  analyzePromptStructure() → PromptAnalysis       │
+│  buildReport()            → 変更点レポート        │
+└──────────────────────────────────────────────────┘
+  │  optimizedText
+  ▼
+navigator.clipboard.writeText()
+  │
+  ▼
+[AIコピー完了 → ユーザーがChatGPT/Claude等にペースト]
+```
+
+### 2.4 テーブル編集モジュール
+
+テーブルは特別なコンポーネントとして実装する。
+
+```
+テーブルコンポーネントの責務:
+├── セルの編集（インラインWYSIWYG）
+├── Tab/Shift+Tabでセル間移動
+├── 行の追加・削除・並び替え（DnD）
+├── 列の追加・削除・並び替え（DnD）
+├── 列幅のリサイズ（ドラッグ）
+├── セル配置（左/中/右）
+└── コンテキストメニュー
+```
+
+---
+
+## 3. モジュール設計
+
+### 3.1 ディレクトリ構成（詳細）
+
+```
+src/
+├── core/                          # エディタコアロジック
+│   ├── document/
+│   │   ├── ast.ts                 # 統合ASTの型定義（hast互換）
+│   │   ├── document-model.ts      # ドキュメントの操作API
+│   │   └── cursor.ts              # カーソル・セレクション管理
+│   ├── parser/
+│   │   ├── markdown-parser.ts     # Markdown → 内部AST
+│   │   ├── html-parser.ts         # HTML → 内部AST          ★新規
+│   │   ├── serializer.ts          # 内部AST → Markdown
+│   │   └── html-serializer.ts     # 内部AST → HTML          ★新規
+│   ├── converter/
+│   │   ├── mdast-to-tiptap.ts     # mdast → TipTap JSON 変換 ★新規
+│   │   ├── tiptap-to-mdast.ts     # TipTap JSON → mdast 変換 ★新規
+│   │   ├── md-to-html.ts          # MD変換パイプライン       ★新規
+│   │   └── html-to-md.ts          # HTML→MD変換パイプライン  ★新規
+│   ├── commands/
+│   │   ├── text-commands.ts       # 太字、斜体等のコマンド
+│   │   ├── block-commands.ts      # 見出し、リスト等のコマンド
+│   │   ├── table-commands.ts      # テーブル操作コマンド
+│   │   └── html-commands.ts       # HTML固有コマンド         ★新規
+│   ├── history/
+│   │   └── history-manager.ts     # Undo/Redo
+│   └── editor.ts                  # エディタのエントリポイント
+│
+├── renderer/                      # レンダリングエンジン
+│   ├── wysiwyg/
+│   │   ├── prosemirror-setup.ts   # ProseMirrorの設定
+│   │   ├── schema.ts              # ProseMirrorスキーマ（MD用）
+│   │   ├── html-schema.ts         # ProseMirrorスキーマ（HTML用）★新規
+│   │   ├── node-views/
+│   │   │   ├── heading-view.ts    # 見出しのWYSIWYGビュー
+│   │   │   ├── table-view.ts      # テーブルのWYSIWYGビュー
+│   │   │   ├── code-block-view.ts # コードブロックビュー
+│   │   │   ├── math-view.ts       # 数式ビュー（KaTeX）
+│   │   │   ├── image-view.ts      # 画像ビュー
+│   │   │   ├── div-view.ts        # divブロックビュー        ★新規
+│   │   ├── raw-html-block.ts  # 生HTMLブロック保持       ★新規
+│   │   └── raw-html-inline.ts # 生HTMLインライン保持     ★新規
+│   │   └── plugins/
+│   │       ├── input-rules.ts     # 入力ルール（`# `→H1等）
+│   │       ├── key-bindings.ts    # キーバインディング
+│   │       └── placeholder.ts     # プレースホルダー
+│   ├── html/                                                  ★新規
+│   │   ├── html-editor-setup.ts   # HTML編集モードのセットアップ
+│   │   ├── split-view.ts          # スプリット表示（ソース/プレビュー）
+│   │   └── live-preview.ts        # HTMLリアルタイムプレビュー
+│   └── source/
+│       └── source-view.ts         # ソースモードのビュー
+│
+├── components/                    # UIコンポーネント（React）
+│   ├── Editor/
+│   │   ├── Editor.tsx             # メインエディタコンポーネント
+│   │   ├── HtmlEditor.tsx         # HTML編集UIコンポーネント   ★新規
+│   │   ├── Toolbar.tsx            # Markdownツールバー
+│   │   ├── HtmlToolbar.tsx        # HTML編集ツールバー         ★新規
+│   │   └── StatusBar.tsx          # ステータスバー
+│   ├── HtmlMeta/                                               ★新規
+│   │   └── MetadataPanel.tsx      # <head>メタデータ編集パネル
+│   ├── Sidebar/
+│   │   ├── Sidebar.tsx            # サイドバー
+│   │   ├── FileTree.tsx           # ファイルツリー
+│   │   └── Outline.tsx            # アウトラインパネル
+│   ├── Table/
+│   │   ├── TableEditor.tsx        # テーブル編集UI
+│   │   ├── TableCell.tsx          # セルコンポーネント
+│   │   └── TableContextMenu.tsx   # コンテキストメニュー
+│   └── common/
+│       ├── Modal.tsx              # モーダル
+│       ├── ContextMenu.tsx        # 汎用コンテキストメニュー
+│       ├── ColorPicker.tsx        # カラーピッカー             ★新規
+│       └── ResizeHandle.tsx       # リサイズハンドル
+│
+├── plugins/                       # プラグインシステム
+│   ├── plugin-api.ts              # プラグインAPI定義
+│   ├── plugin-manager.ts          # プラグイン管理
+│   └── built-in/
+│       ├── mermaid-plugin.ts      # Mermaid図表
+│       ├── math-plugin.ts         # 数式
+│       └── image-plugin.ts        # 画像処理
+│
+├── store/                         # アプリケーション状態管理
+│   ├── tabStore.ts                # タブ状態管理（Zustand）
+│   ├── session.ts                 # セッション保存・復元（plugin-store）
+│   └── settingsStore.ts           # ユーザー設定（エディタモード等）
+│
+├── hooks/                         # Reactカスタムフック
+│   ├── useCloseGuard.ts           # ウィンドウクローズ時の未保存ガード
+│   └── useFileOpenListener.ts     # 外部ファイルオープンイベント受信
+│
+├── menu/                          # Tauriネイティブメニュー管理
+│   └── recentFilesMenu.ts         # 最近使ったファイルメニュー動的更新
+│
+├── file/                          # ファイル管理
+│   ├── file-manager.ts            # ファイルの読み書き（.md/.html両対応）
+│   ├── watcher.ts                 # ファイル変更監視
+│   └── export/
+│       ├── html-exporter.ts       # HTMLエクスポート（スタイル付き）
+│       └── pdf-exporter.ts        # PDFエクスポート
+│
+├── themes/                        # テーマシステム
+│   ├── theme-manager.ts           # テーマ管理
+│   └── default/
+│       ├── editor.css             # エディタスタイル
+│       ├── preview.css            # レンダリングスタイル
+│       └── html-export.css        # HTMLエクスポート用テーマ CSS ★新規
+│
+├── utils/                         # ユーティリティ
+│   ├── debounce.ts
+│   ├── clipboard.ts               # クリップボード操作
+│   └── keyboard.ts                # キーボードユーティリティ
+│
+├── i18n/                         # 国際化設定
+│   ├── i18n.ts                   # i18next の初期化設定
+│   └── locales/                  # ja.json, en.json 等の辞書ファイル
+│
+├── types/                        # アプリ横断の TypeScript 型定義
+│   ├── tauri.d.ts                # Tauri IPC コマンドのインターフェース
+│   └── settings.d.ts             # AppSettings の型定義
+│
+└── app.tsx                        # アプリケーションエントリポイント
+```
+
+> ディレクトリ構成（レイヤー分離型）の採用理由: [decision-log.md §4](../00_Meta/decision-log.md)
+
+### 3.2 バックエンド構成 (src-tauri/src/)
+
+Rust 側は、フロントエンドからの IPC 呼び出し（コマンド）と、ファイル操作や DB 操作といった OS ネイティブの処理を分離して設計する。
+
+```
+src-tauri/
+├── Cargo.toml                    # Rust パッケージ設定・依存クレート
+├── tauri.conf.json               # Tauri システム設定・権限（CSP 等）
+├── capabilities/
+│   └── default.json              # Tauri Capabilities（FS スコープ・権限定義）
+│
+└── src/
+    ├── main.rs                   # Tauri アプリケーションのビルド・セットアップ
+    │
+    ├── commands/                 # フロントエンドから invoke() で呼ばれるエンドポイント
+    │   ├── fs_commands.rs        # ファイル読み書き・リネーム・削除・排他制御チェック
+    │   ├── db_commands.rs        # メタデータクエリの実行（SQLite）
+    │   ├── export_commands.rs    # HTMLエクスポート処理
+    │   ├── git_commands.rs       # Git 操作コマンド
+    │   ├── plugin_commands.rs    # プラグイン管理コマンド
+    │   ├── recent_files.rs       # 最近使ったファイル管理
+    │   ├── window_commands.rs    # ウィンドウ生成・フォーカス制御
+    │   └── window_sync.rs        # ウィンドウ間同期
+    │   # ※ ai_commands.rs は Phase 8（AI 連携機能）で追加予定
+    │
+    ├── db/                       # SQLite (rusqlite) 連携モジュール
+    │   ├── connection.rs         # データベース接続プール管理
+    │   ├── migrations.rs         # スキーマの初期化・マイグレーション
+    │   └── queries.rs            # ファイルメタデータ（タグ・リンク・タスク）の更新・抽出
+    │
+    ├── fs/                       # ファイルシステム操作のコアロジック
+    │   ├── watcher.rs            # 外部エディタによるファイル変更検知（notify クレート）
+    │   └── markdown_parser.rs    # バックグラウンドでの Front Matter / タグ解析
+    │
+    ├── menu/                     # OS ネイティブのメニューバー管理
+    │   └── native_menu.rs        # i18n 対応のシステムメニュー生成
+    │
+    └── models/                   # データ構造定義（serde シリアライズ / デシリアライズ）
+        ├── file_info.rs          # ファイルメタデータの構造体
+        └── settings.rs           # Rust 側で扱う設定の構造体
+```
+
+**フロントエンド ↔ バックエンド責務分担表:**
+
+| 責務 | フロントエンド（TypeScript） | バックエンド（Rust） |
+|------|--------------------------|-------------------|
+| エディタ操作・AST 管理 | ✅ TipTap / ProseMirror | — |
+| Markdown ↔ TipTap 変換 | ✅ remark / unified | — |
+| UI レンダリング | ✅ React | — |
+| 状態管理 | ✅ Zustand | — |
+| ファイル読み書き | — | ✅ plugin-fs / Tauri スコープ |
+| ファイル変更監視 | — | ✅ notify クレート |
+| SQLite メタデータ管理 | invoke() でクエリ要求 | ✅ rusqlite |
+| 外部 API 通信（AI 等） | invoke() で委譲 | ✅ reqwest（CSP で WebView 直接通信禁止）|
+| セキュアストレージ | — | ✅ plugin-stronghold（API キー暗号化保管）|
+
+### 3.3 静的アセット構成 (public/)
+
+```
+public/
+├── icons/                        # アプリアイコン群
+└── plugin-runtime.html           # サードパーティプラグイン隔離実行用 iframe（Phase 7）
+# ※ mermaid-sandbox.html は Mermaid レンダリングが MermaidBlock 拡張内で
+#   直接実装されたため、個別のサンドボックス HTML は不要となった
+```
+
+> **設計根拠**: Vite のビルドに巻き込まれない `public/` にサンドボックス用のプレーン HTML を置き、
+> React 側から `postMessage` 経由で安全に通信する。詳細: [security-design.md §4.1.2](./security-design.md)
+
+---
+
+## 4. 主要機能の実装設計
+
+### 4.1 WYSIWYG モード実装
+
+#### モード管理（実装済み）
+
+```typescript
+// src/components/editor/TipTapEditor.tsx
+type EditorMode = 'wysiwyg' | 'source';
+
+// React useState でコンポーネントローカルに管理
+const [mode, setMode] = useState<EditorMode>('wysiwyg');
+```
+
+#### WYSIWYG モード（Typora 式）の動作
+
+```
+ユーザーがブロックをクリック / カーソル移動
+  → ProseMirror が Selection を設定
+  → TyporaFocusExtension の Plugin.state.apply() が selectionSet を検知
+  → カーソル位置のブロックに対して Decoration を再計算
+  → ソースマーカー（Markdown デリミタ）が Widget Decoration で表示される
+  → 別ブロックに移動すると前のブロックのデコレーションが解除されレンダリング表示に戻る
+
+ソース表示モード:
+  → TipTap Editor を非表示にし CodeMirror 6 ビューを代わりに表示
+  → Markdown ソースを CodeMirror で直接編集
+  → モード切替時に Front Matter を含む完全な Markdown テキストをシリアライズ/パースして双方向変換
+```
+
+#### ブロック別の NodeView 対応表
+
+| ブロック種別 | WYSIWYG（Typora 式デコレーション） | ソース |
+|------------|-----------------------------------|--------|
+| 見出し（H1〜H6） | ✅ TipTap + `#` プレフィックスデコレーション | CodeMirror |
+| 段落 | ✅ TipTap + インラインマークデコレーション | CodeMirror |
+| コードブロック | ✅ CodeBlockLowlight（シンタックスハイライト） | CodeMirror |
+| テーブル | ✅ テーブルコンポーネント（コンテキストメニュー付き） | CodeMirror |
+| 数式（KaTeX） | ✅ KaTeXレンダリング | CodeMirror |
+| Mermaid図表 | ✅ SVGレンダリング | CodeMirror |
+| 画像 | ✅ img要素（アノテーション対応） | CodeMirror |
+| 引用ブロック | ✅ TipTap blockquote | CodeMirror |
+
+### 4.2 テーブル実装
+
+```
+テーブルの内部表現:
+  - ProseMirrorのtable拡張を参考に独自実装
+  - または prosemirror-tables ライブラリの活用
+
+テーブル操作のコマンド設計:
+  TableCommands.addRow(pos: 'before' | 'after', rowIndex: number)
+  TableCommands.removeRow(rowIndex: number)
+  TableCommands.addColumn(pos: 'before' | 'after', colIndex: number)
+  TableCommands.removeColumn(colIndex: number)
+  TableCommands.moveRow(from: number, to: number)
+  TableCommands.moveColumn(from: number, to: number)
+  TableCommands.setAlignment(colIndex: number, align: 'left' | 'center' | 'right')
+```
+
+### 4.3 入力ルール（オートフォーマット）
+
+Typora式/常にWYSIWYGモードでは、Markdown 記法の一部を「入力中に構造化ノードへ変換」する。
+
+#### 4.3.1 対象トリガー（最小セット）
+
+| トリガー | 変換先 | 発火タイミング |
+|---------|--------|--------------|
+| `# ` / `## ` / `### ` / `#### ` / `##### ` / `###### ` | Heading 1〜6 | 行頭でスペース入力時 |
+| `- ` / `* ` / `+ ` | Bullet List Item | 行頭でスペース入力時 |
+| `1. `（`2. ` など連番も含む） | Ordered List Item | 行頭でスペース入力時 |
+| `> ` | Blockquote | 行頭でスペース入力時 |
+| `` ``` `` + `Enter` | Fenced Code Block | 行頭で Enter 入力時 |
+| `---` + `Enter` | Thematic Break | 行頭で Enter 入力時 |
+| `$$` + `Enter` | Math Block | 行頭で Enter 入力時 |
+| `- [ ] ` / `- [x] ` | Task List Item | 行頭で末尾スペース入力時 |
+| `| a | b |` + `Enter` | Table | 2 行目の区切り行（`| --- | --- |`）成立時 |
+
+> 変換ルールは `@tiptap/core` の InputRule / PasteRule で実装し、Markdown シリアライズ時に逆変換可能なノードへ正規化する。
+
+#### 4.3.2 ガード条件
+
+オートフォーマットは次の条件のいずれかを満たす場合に**発火しない**。
+
+1. `event.isComposing === true`（IME 変換中）
+2. カーソルが code block / math block / HTML ブロック内部にある
+3. エディタモードが `source`（CodeMirror）
+4. ユーザー設定 `editor.autoFormat.enabled === false`
+
+IME 中の誤爆防止は本プロジェクトの最重要要件であり、InputRule とキーボードハンドラの両方で同一ガードを適用する。
+
+#### 4.3.3 変換失敗時のフォールバック
+
+- パターン不一致時はプレーンテキストのまま保持し、入力を阻害しない
+- 変換処理で例外が発生した場合は `logger.warn` を記録し、トランザクションをキャンセルして入力継続
+- AST 整合性チェックに失敗した場合は当該トランザクションのみ破棄（ドキュメント全体はロールバックしない）
+
+#### 4.3.4 Undo/Redo 粒度
+
+- 「トリガー入力 + 構造変換」を 1 トランザクションとして履歴化する
+- `Ctrl+Z` 1 回で直前のオートフォーマット結果を取り消せること
+- YAML Front Matter（CodeMirror）側履歴とは統合しない（履歴スタック独立）
+
+#### 4.3.5 将来拡張（Phase 7 以降）
+
+- `*** ` → 水平線 + 段落分割
+- `1)` 記法の ordered list 入力補助
+- 連続入力時の list tight/loose 判定自動化
+
+上記は設計候補として保持し、既存仕様（最小セット）を優先する。
+
+### 4.4 Undo/Redo
+
+- ProseMirrorのトランザクション履歴を使用
+- 全操作がトランザクションとして記録される
+- `Ctrl+Z` / `Ctrl+Shift+Z` で操作
+
+---
+
+## 5. データフロー
+
+### 5.1 保存フロー（Markdown）
+
+```
+ユーザー入力
+  → ProseMirrorトランザクション
+  → 内部AST更新
+  → デバウンス（500ms）
+  → 内部ASTをMarkdownにシリアライズ
+  → .md ファイルに書き込み
+```
+
+### 5.2 保存フロー（HTML）
+
+```
+ユーザー入力
+  → ProseMirrorトランザクション（HTMLスキーマ）
+  → 内部AST更新
+  → デバウンス（500ms）
+  → 内部ASTをHTMLにシリアライズ
+  → .html ファイルに書き込み
+```
+
+### 5.3 読み込みフロー
+
+```
+ファイルオープン
+  → 拡張子判定（.md / .html）
+  │
+  ├─ .md の場合
+  │    → remarkでmdastにパース
+  │    → remark-rehypeでhastに変換
+  │    → 内部ASTに格納
+  │    → Markdownエディタモードを起動
+  │
+  └─ .html の場合
+       → rehype-parseでhastにパース
+       → 内部ASTに格納
+       → HTMLエディタモードを起動
+```
+
+### 5.4 変換フロー（MD → HTML エクスポート）
+
+```
+現在のMarkdownドキュメント
+  → 内部AST（hast）
+  → rehype-highlightでコードをハイライト
+  → rehype-katexで数式をレンダリング
+  → rehype-stringifyでHTML文字列生成
+  → HTMLテンプレートに注入
+  → juiceでCSSをインライン化
+  → スタンドアロン .html ファイルとして書き出し
+```
+
+### 5.5 変換フロー（HTML → MD 変換）
+
+```
+現在のHTMLドキュメント
+  → turndownでMarkdown文字列へ変換
+  → 変換不可能要素の警告リスト生成
+  → ユーザーに警告を表示（確認ダイアログ）
+  → 承認後: .md ファイルとして保存 / 新規タブで開く
+```
+
+---
+
+## 6. 開発フェーズ
+
+> **正式な実装計画は [`feature-list.md`](../00_Meta/feature-list.md) を参照（SoT）。**
+> 本セクションはフェーズ概要のみを示す。詳細タスク・優先度管理は feature-list.md で行うこと。
+
+| フェーズ | 内容 |
+|--------------------|------|
+| **Phase 1** | MVP（環境構築・基本 WYSIWYG 編集・スマートペースト・エラーハンドリング） |
+| **Phase 2** | テーブル編集（Excel ライク操作） |
+| **Phase 3** | リッチ機能（数式・Mermaid・検索・ワークスペース管理） |
+| **Phase 4** | MD → HTML エクスポート |
+| **Phase 5** | HTML WYSIWYG 編集 |
+| **Phase 6** | HTML ↔ MD 双方向変換 |
+| **Phase 7** | 高度な機能（PDF・Pandoc・スラッシュコマンド・Zen モード） |
+| **Phase 7.5** | PKM・ナレッジベース機能（メタデータクエリ・グラフビュー・Wikiリンク） |
+| **Phase 8** | AI 連携機能・モバイル（Android / iOS）対応 |
+
+---
+
+## 7. 品質方針
+
+### テスト戦略
+
+| テスト種別 | ツール | 対象 |
+|---------|-------|------|
+| ユニットテスト | Vitest | パーサ、シリアライザ、コマンド |
+| コンポーネントテスト | Testing Library | Reactコンポーネント |
+| E2Eテスト | Playwright | エディタの統合動作 |
+
+### パフォーマンス目標
+
+| 指標 | 目標値 |
+|------|--------|
+| 起動時間 | < 1秒 |
+| 10,000行ファイルのロード | < 500ms |
+| キー入力レイテンシ | < 16ms（60fps）|
+| メモリ使用量 | < 200MB |
+
+---
+
+## 8. 未解決の設計課題
+
+#### 技術選定済み
+
+- ✅ プラットフォーム: **Tauri 2.0**（Windows優先、将来Android/iOS）
+- ✅ エディタエンジン: **TipTap**（ProseMirrorラッパー）+ **CodeMirror 6**（ソースモード）
+- ✅ ファイルシステム: **@tauri-apps/plugin-fs**
+- ✅ フロントエンド: **React + TypeScript + Vite**
+- ✅ 状態管理: **Zustand**（settingsStore / tabStore / workspaceStore）
+- ✅ セッション永続化: **@tauri-apps/plugin-store**
+- ✅ シングルインスタンス: **tauri-plugin-single-instance**
+- ✅ メタデータ DB: **SQLite**（Rust 側 rusqlite）
+- ✅ セキュアストレージ: **plugin-stronghold**（API キー暗号化保管）
+
+#### 未解決の設計課題
+
+1. ✅ **WYSIWYGのモード**: `wysiwyg`（Typora 式フォーカスデコレーション付き）と `source` の2モード切り替えに確定。Typora 式の挙動は `TyporaFocusExtension`（Decoration ベース）で WYSIWYG モード内に統合
+2. ✅ **MD↔TipTap 変換スキーママッピング**: mdast ↔ TipTap ノード対応表を確定。[markdown-tiptap-conversion.md §2](./markdown-tiptap-conversion.md#2-mdast--tiptap-スキーマ-マッピング) 参照
+3. ✅ **Source-of-Truth アーキテクチャ**: ハイブリッド戦略を採用確定（編集中は TipTap JSON が SoT、保存時にファイルへシリアライズ）。[markdown-tiptap-conversion.md §3](./markdown-tiptap-conversion.md#3-source-of-truth-アーキテクチャ比較と採用方針) 参照
+4. ✅ **生HTMLの保持**: `rawHtmlBlock` / `rawHtmlInline` カスタムノードで不透明保持する方針に確定。[markdown-tiptap-conversion.md §4](./markdown-tiptap-conversion.md#4-生html-の表現保持戦略) 参照
+5. ✅ **ラウンドトリップテスト方針**: Vitest + フィクスチャファイル34本の戦略を確定。[markdown-tiptap-conversion.md §5](./markdown-tiptap-conversion.md#5-ラウンドトリップテスト実装方針) 参照
+6. ✅ **GFM拡張の変換課題**: テーブルalign・タスクリスト3値・脚注の格納戦略・タイト/ルーズリストを確定。[markdown-tiptap-conversion.md §6](./markdown-tiptap-conversion.md#6-gfm拡張の変換課題と対策) 参照
+7. ✅ **コンフリクト解決**: 外部エディタで変更されたファイルの扱い（ファイルウォッチャー＋再読込ダイアログの方針は確定）
+8. ✅ **タブ vs 複数ウィンドウ**: アプリ内タブをベースに採用確定（WebviewWindowはPhase 5以降）。[window-tab-session-design.md §1](./window-tab-session-design.md#1-タブ-vs-複数ウィンドウ設計方針) 参照
+9. ✅ **セッション復元**: plugin-store を使ったタブ状態の保存・復元方針を確定。[window-tab-session-design.md §2](./window-tab-session-design.md#2-セッション復元) 参照
+10. ✅ **未保存変更の管理**: `onCloseRequested` + Zustand `isDirty` フラグの方針を確定。[window-tab-session-design.md §3](./window-tab-session-design.md#3-未保存変更の管理) 参照
+11. ✅ **最近使ったファイル履歴**: Tauriメニュー動的更新 + Windows `SHAddToRecentDocs` の方針を確定。[window-tab-session-design.md §4](./window-tab-session-design.md#4-最近使ったファイル履歴) 参照
+12. ✅ **ファイル関連付け・シングルインスタンス**: `tauri-plugin-single-instance` + `tauri.conf.json` の方針を確定。現在 `.md` / `.markdown` のみ設定済み。`.html` の関連付けは Phase 5（HTML WYSIWYG 編集）で追加予定。[window-tab-session-design.md §5](./window-tab-session-design.md#5-ファイル関連付けとシングルインスタンス制御) 参照
+13. ✅ **大きなファイルの自動モード切り替え**: ファイルサイズ 3MB 以上 / ProseMirror ノード数 3,000 以上でソースモードに自動切り替えする仕様に確定。[system-design.md §2.2 ファイルサイズ閾値](#ファイルサイズ閾値確定) 参照
+14. ✅ **マルチファイル検索**: Rust 内製（walkdir + regex）による全文検索に確定。[search-design.md §3.2](../05_Features/search-design.md)、[performance-design.md §6.2](./performance-design.md) 参照
+15. ✅ **画像ストレージ**: ローカルパス管理・コピー先フォルダの設計を確定。[image-storage-design.md](./image-storage-design.md) 参照。モバイル対応も同ドキュメントに追記済み
+16. ✅ **プラグインサンドボックス**: ビルトイン=メインスレッド / サードパーティ=iframe sandbox の二層構造に確定。[plugin-api-design.md §4](./plugin-api-design.md) 参照
+17. ✅ **CSS編集の範囲**: HTMLファイル編集時の`<style>`タグ内CSSの扱いを確定。[html-editing-design.md §8](../05_Features/HTML/html-editing-design.md) 参照
+18. ✅ **相対パス解決**: HTML編集時の画像・CSS・JSの相対パス解決を確定。[html-editing-design.md §9](../05_Features/HTML/html-editing-design.md) 参照
+19. ✅ **HTML→MD変換ロス**: 変換時の情報ロス許容範囲を確定。[html-editing-design.md §10](../05_Features/HTML/html-editing-design.md) 参照
+20. ✅ **JavaScript / HTML セキュリティ**: `<script>` タグを含むHTMLの安全な扱い方・HTMLプレビューのサニタイズ・Tauri fs スコープ制限を確定。[security-design.md](./security-design.md) 参照
+21. ✅ **AI言語推定の精度**: linguist-languages 連携・ヒューリスティック改善を確定。[ai-design.md §9](../05_Features/AI/ai-design.md) 参照
+22. ✅ **カスタムテンプレート保存**: ユーザー定義テンプレートの永続化・管理 UI を確定。[ai-design.md §10](../05_Features/AI/ai-design.md) 参照
+23. ✅ **AIプロバイダ連携（将来）**: Rust 経由の外部 API 通信設計（CSP `connect-src 'none'` + Tauri コマンド委譲）を確定。[security-design.md §4.6](./security-design.md) 参照
+24. ✅ **モバイルUI設計**: タッチ操作・画面サイズに対応したUI変更の方針を確定。[cross-platform-design.md §5](./cross-platform-design.md#5-モバイル-ui-設計方針) 参照
+25. ✅ **Windows WebView2の最低要件**: Windows 10 1903 以降に確定。[cross-platform-design.md §6](./cross-platform-design.md#6-プラットフォーム固有機能の設計) 参照
+26. ✅ **配布・アップデート方法**: GitHub Actions リリース・tauri-plugin-updater・コード署名を確定。[distribution-design.md](../07_Platform_Settings/distribution-design.md) 参照
+27. ✅ **クロスプラットフォーム設計方針**: WebView差異・キーボードショートカット抽象化・ファイルシステムAPI差異を確定。[cross-platform-design.md](./cross-platform-design.md) 参照
+28. ✅ **パフォーマンス設計**: 仮想スクロール・インクリメンタルパース・バックグラウンド保存・全文検索の方針を確定。[performance-design.md](./performance-design.md) 参照
+29. ✅ **自動保存の詳細仕様**: ファイルサイズ別デバウンス・リトライ・並行保存防止を確定。[window-tab-session-design.md §9](./window-tab-session-design.md#9-自動保存の詳細仕様) 参照
+30. ✅ **クラッシュリカバリ設計**: チェックポイントベースのリカバリ方針を確定。[window-tab-session-design.md §10](./window-tab-session-design.md#10-クラッシュリカバリ設計) 参照
+31. ✅ **Typora式カーソル位置計算**: クリック位置から ProseMirror ノード位置への変換アルゴリズムを確定。[system-design.md §2.2 Typora式カーソル位置計算](#typora式モード-クリック位置からのカーソルポジション計算重要設計) 参照
+32. ✅ **変換サポートレベルマトリクス**: 各 Markdown 要素の変換保証レベル（A〜D）を確定。[markdown-tiptap-conversion.md §8](./markdown-tiptap-conversion.md#8-変換サポートレベルマトリクス) 参照
+
+---
+
+*このドキュメントは設計の方向性を示すものであり、実装進行に伴い更新される。*

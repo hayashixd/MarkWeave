@@ -1,0 +1,29 @@
+/**
+ * GitHub テーマの CSS Custom Properties。
+ *
+ * theme-design.md §1.2 に準拠。
+ * GitHub の Primer Design System に近い配色。
+ */
+
+[data-theme="github"] {
+  --color-bg:           #ffffff;
+  --color-bg-secondary: #f6f8fa;
+  --color-bg-tertiary:  #eaeef2;
+
+  --color-text:         #1f2328;
+  --color-text-muted:   #656d76;
+  --color-text-subtle:  #8c959f;
+
+  --color-border:       #d0d7de;
+  --color-border-muted: #d8dee4;
+
+  --color-accent:       #0969da;
+  --color-accent-hover: #0550ae;
+
+  --color-success:      #1a7f37;
+  --color-warning:      #9a6700;
+  --color-danger:       #cf222e;
+
+  --editor-selection-bg: rgba(9, 105, 218, 0.15);
+  --preview-inline-code-bg: rgba(175, 184, 193, 0.2);
+}

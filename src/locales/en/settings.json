@@ -1,0 +1,15 @@
+{
+  "title": "Settings",
+  "tabs": {
+    "general": "General",
+    "editor": "Editor",
+    "appearance": "Appearance",
+    "writing": "Writing Style",
+    "templates": "Templates",
+    "snippets": "Snippets",
+    "plugins": "Plugins"
+  },
+  "sidebar": {
+    "showAdvancedTabs": "Show advanced sidebar tabs (Git, Graph, Backlinks, AI)"
+  }
+}

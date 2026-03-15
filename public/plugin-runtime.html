@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<!--
+  plugin-runtime.html - サードパーティプラグイン用 iframe ランタイム
+
+  plugin-api-design.md §4.2 に準拠。
+  - sandbox="allow-scripts" のみ（allow-same-origin は付与しない）
+  - このページは <iframe sandbox="allow-scripts" src="/plugin-runtime.html"> で読み込まれる
+  - プラグインコードは 'load_plugin' メッセージで注入される
+  - postMessage でのみ PluginBridge と通信する
+-->
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plugin Runtime</title>
+  <style>
+    body { margin: 0; padding: 0; background: transparent; }
+  </style>
+</head>
+<body>
+<script>
+  /**
+   * プラグインランタイム
+   *
+   * サードパーティプラグインはこのスコープ内で実行される。
+   * PluginBridge との通信は postMessage/onmessage のみ。
+   */
+
+  // ---------------------------------------------------------------------------
+  // プラグイン側の API プロキシ
+  // ---------------------------------------------------------------------------
+
+  let callIdCounter = 0;
+  const pendingCalls = new Map();
+
+  /**
+   * PluginBridge に API 呼び出しを要求する。
+   * @param {string} method
+   * @param {unknown[]} args
+   * @returns {Promise<unknown>}
+   */
+  function callApi(method, args) {
+    return new Promise((resolve, reject) => {
+      const callId = String(++callIdCounter);
+      const timer = setTimeout(() => {
+        pendingCalls.delete(callId);
+        reject(new Error('Plugin API timeout: ' + method));
+      }, 5000);
+
+      pendingCalls.set(callId, { resolve, reject, timer });
+
+      parent.postMessage({
+        type: 'api_call',
+        callId,
+        method,
+        args: args ?? [],
+      }, '*');
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // PluginBridge からの応答・イベントを受信
+  // ---------------------------------------------------------------------------
+
+  const eventHandlers = {};
+
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+
+    if (data?.type === 'api_response') {
+      const pending = pendingCalls.get(data.callId);
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      pendingCalls.delete(data.callId);
+      if (data.error) {
+        pending.reject(new Error(data.error));
+      } else {
+        pending.resolve(data.result);
+      }
+      return;
+    }
+
+    if (data?.type === 'editor_event') {
+      const handlers = eventHandlers[data.eventName] ?? [];
+      for (const handler of handlers) {
+        try { handler(data.payload); } catch (e) { console.error(e); }
+      }
+      return;
+    }
+
+    if (data?.type === 'load_plugin') {
+      loadPlugin(data.pluginJs);
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // プラグイン API オブジェクト（PluginBridge へのプロキシ）
+  // ---------------------------------------------------------------------------
+
+  const pluginApi = {
+    editor: {
+      getMarkdown: () => callApi('editor.getMarkdown', []),
+      insertText: (text) => callApi('editor.insertText', [text]),
+    },
+    fs: {
+      readFile: (path) => callApi('fs.readFile', [path]),
+      writeFile: (path, content) => callApi('fs.writeFile', [path, content]),
+      listDirectory: (path) => callApi('fs.listDirectory', [path]),
+    },
+    clipboard: {
+      readText: () => callApi('clipboard.readText', []),
+      writeText: (text) => callApi('clipboard.writeText', [text]),
+    },
+    network: {
+      fetch: (url, options) => callApi('network.fetch', [url, options]),
+    },
+    ui: {
+      showToast: (message, type) => callApi('ui.showToast', [message, type]),
+      showDialog: (options) => callApi('ui.showDialog', [options]),
+    },
+    events: {
+      on: (eventName, handler) => {
+        if (!eventHandlers[eventName]) eventHandlers[eventName] = [];
+        eventHandlers[eventName].push(handler);
+      },
+      off: (eventName, handler) => {
+        if (!eventHandlers[eventName]) return;
+        eventHandlers[eventName] = eventHandlers[eventName].filter((h) => h !== handler);
+      },
+    },
+  };
+
+  // ---------------------------------------------------------------------------
+  // プラグインコードの読み込み・実行
+  // ---------------------------------------------------------------------------
+
+  function loadPlugin(pluginJs) {
+    try {
+      // プラグインコードを Function で実行（eval の代替、スコープを限定）
+      const pluginFn = new Function('api', pluginJs);
+      pluginFn(pluginApi);
+    } catch (err) {
+      // エラーを親ウィンドウに報告
+      parent.postMessage({
+        type: 'plugin_error',
+        error: String(err),
+      }, '*');
+      console.error('[Plugin Runtime] プラグイン実行エラー:', err);
+    }
+  }
+
+  // 準備完了を親に通知
+  parent.postMessage({ type: 'runtime_ready' }, '*');
+</script>
+</body>
+</html>

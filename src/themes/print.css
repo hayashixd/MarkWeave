@@ -1,0 +1,88 @@
+/**
+ * print.css
+ *
+ * PDF エクスポート用の印刷スタイル。
+ * export-interop-design.md §3.3 に準拠。
+ *
+ * HTML テンプレートに <style> として注入され、
+ * Tauri WebView の print API 経由で PDF 出力時に適用される。
+ */
+
+@media print {
+  @page {
+    margin: 20mm 25mm;
+  }
+
+  body {
+    font-size: 12pt;
+    line-height: 1.6;
+    color: #000;
+    background: #fff;
+  }
+
+  /* TOC・ナビゲーションは非表示 */
+  .toc,
+  nav {
+    display: none;
+  }
+
+  /* ページ分割制御 */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    page-break-inside: avoid;
+  }
+
+  pre, blockquote, table, figure, img {
+    page-break-inside: avoid;
+  }
+
+  /* コードブロックの折り返し */
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  /* リンクの後にURLを表示 */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+
+  /* ページ内リンクにはURL注釈を付けない */
+  a[href^="#"]::after {
+    content: "";
+  }
+
+  /* 画像のオーバーフロー防止 */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* テーブルのスタイル調整 */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th, td {
+    border: 1px solid #999;
+    padding: 6px 10px;
+  }
+
+  th {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* コードブロック背景色を印刷時も維持 */
+  pre, code {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

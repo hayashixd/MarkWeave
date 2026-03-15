@@ -1,0 +1,1397 @@
+# パフォーマンス設計ドキュメント
+
+> プロジェクト: Markdown / HTML Editor - Typora ライク WYSIWYG エディタ
+> バージョン: 1.0
+> 更新日: 2026-02-24
+
+---
+
+## 目次
+
+1. [パフォーマンス目標と計測指標](#1-パフォーマンス目標と計測指標)
+2. [ファイルサイズ閾値とモード自動切り替え](#2-ファイルサイズ閾値とモード自動切り替え)
+3. [仮想スクロール設計](#3-仮想スクロール設計)
+4. [インクリメンタルパース設計](#4-インクリメンタルパース設計)
+5. [バックグラウンド保存と非同期 I/O](#5-バックグラウンド保存と非同期-io)
+6. [全文検索のパフォーマンス](#6-全文検索のパフォーマンス)
+7. [メモリ管理設計](#7-メモリ管理設計)
+8. [パフォーマンス計測・プロファイリング方法](#8-パフォーマンス計測プロファイリング方法)
+
+---
+
+## 1. パフォーマンス目標と計測指標
+
+### 1.1 パフォーマンスバジェット
+
+| 指標 | 目標値 | 計測方法 |
+|------|--------|---------|
+| 起動時間（コールドスタート） | **< 1.0秒** | `performance.now()` from main.tsx mount |
+| 10,000行ファイルのロード → 表示 | **< 500ms** | `markdownToTipTap()` + `editor.setContent()` の合計 |
+| 通常キー入力のレイテンシ | **< 16ms** (60fps) | Chrome DevTools → Performance |
+| 1,000行ファイルのキー入力レイテンシ | **< 16ms** | 同上 |
+| 3,000行ファイルのキー入力レイテンシ | **< 32ms** (30fps) | WYSIWYG モードが厳しくなる閾値 |
+| 自動保存（500KB ファイル）の書き込み | **< 50ms** | `writeTextFile` の実行時間 |
+| メモリ使用量（通常使用時） | **< 200MB** | Windows タスクマネージャー |
+| メモリ使用量（3MB ファイル開放後） | **< 400MB** | 同上（ソースモード使用） |
+
+### 1.2 計測シナリオ
+
+パフォーマンス退行を検出するため、以下のシナリオを定期的に計測する。
+
+| シナリオ | ファイルサイズ | モード |
+|---------|-------------|------|
+| 小規模ファイル（日常的な用途） | ～ 50KB (約 1,000行) | Typora式 |
+| 中規模ファイル（技術文書） | ～ 300KB (約 5,000行) | Typora式 |
+| 大規模ファイル（自動ソースモード） | ～ 3MB | ソースモード |
+| テーブル多用ドキュメント | 100テーブル × 10行 | Typora式 |
+| 数式多用ドキュメント | 500個の KaTeX ブロック | Typora式 |
+
+---
+
+## 2. ファイルサイズ閾値とモード自動切り替え
+
+> `system-design.md §2.2 ファイルサイズ閾値` の詳細版。
+
+### 2.1 閾値設計の根拠
+
+**3MB / ノード数 3,000** という閾値は以下の実験的根拠に基づく仮値。
+実装後に実機計測で調整する。
+
+| 計測条件 | 閾値の根拠 |
+|---------|----------|
+| Markdown 3MB ≒ 約6万行 | 書籍1冊分相当。WYSIWYG 編集が実用的でない規模 |
+| ProseMirror ノード 3,000 | NodeView の DOM 描画コストが蓄積し 60fps を維持できなくなる目安 |
+
+### 2.2 閾値チェックのタイミング
+
+```typescript
+// src/core/editor.ts
+
+/**
+ * ファイルを開く際にモードを決定する。
+ * パース前にサイズチェック、パース後にノード数チェックを行う。
+ */
+export async function openDocument(
+  filePath: string,
+  userPreference: EditorMode
+): Promise<{ content: TipTapDoc; initialMode: EditorMode }> {
+
+  // Step 1: ファイルを読み込む
+  const markdown = await readTextFile(filePath);
+  const sizeBytes = new TextEncoder().encode(markdown).length;
+
+  // Step 2: ファイルサイズチェック（パース前に早期リターン可能）
+  if (sizeBytes >= FILE_SIZE_THRESHOLD_BYTES) {
+    showToast(`ファイルが大きいためソースモードで開きます (${formatBytes(sizeBytes)})`);
+    return { content: parseForSourceMode(markdown), initialMode: 'source' };
+  }
+
+  // Step 3: パースしてノード数チェック
+  const doc = markdownToTipTap(markdown);
+  const nodeCount = countNodes(doc);
+
+  if (nodeCount >= NODE_COUNT_THRESHOLD) {
+    showToast(`ノード数が多いためソースモードで開きます (${nodeCount} ノード)`);
+    return { content: doc, initialMode: 'source' };
+  }
+
+  return { content: doc, initialMode: userPreference };
+}
+
+function countNodes(doc: TipTapDoc): number {
+  let count = 0;
+  function walk(node: TipTapNode) {
+    count++;
+    node.content?.forEach(walk);
+  }
+  walk(doc);
+  return count;
+}
+```
+
+### 2.3 ソースモード固定時の UX
+
+```
+閾値超過時のユーザーフロー:
+
+[ファイルを開く]
+  → サイズ/ノード数チェック
+  → 閾値超過
+  → トースト通知:「ファイルが大きいためソースモード (CodeMirror) で開きました」
+  → [WYSIWYG で開く] ボタン付き（クリックで強制 WYSIWYG、速度低下の旨を警告）
+
+WYSIWYG で強制的に開く場合:
+  → 確認ダイアログ:「このファイルは大きいため動作が遅くなる可能性があります。WYSIWYG で開きますか？」
+  → 承認後: WYSIWYG モードで開く（ユーザーの自己責任）
+```
+
+---
+
+## 3. 仮想スクロール設計
+
+### 3.1 仮想スクロールの必要性
+
+ProseMirror は DOM ベースのエディタのため、ノード数が増えると **DOM ノードの総数** が直接レンダリング負荷に影響する。
+
+```
+1,000 段落 × 各段落の DOM ノード数（5〜20個）= 5,000〜20,000 DOM ノード
+→ 再描画コストが増大し、タイピングが重くなる
+```
+
+### 3.2 ProseMirror の仮想スクロールアプローチ
+
+ProseMirror には公式の仮想スクロールはないが、以下のアプローチで実現できる。
+
+**採用方針: クリッピングによるビューポート外 NodeView の DOM 非描画**
+
+```typescript
+// src/renderer/wysiwyg/plugins/virtual-scroll.ts
+
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+
+const VIEWPORT_MARGIN_PX = 500; // ビューポート外に追加で描画するマージン
+
+/**
+ * ビューポート外のブロックノードに 'hidden' デコレーションを付与し、
+ * NodeView 側で DOM を最小化する（height: Xpx の空プレースホルダーに置き換える）。
+ */
+export const virtualScrollPlugin = new Plugin({
+  key: new PluginKey('virtualScroll'),
+
+  state: {
+    init(_, state) {
+      return buildDecorations(state, getViewportRange(), false);
+    },
+    apply(tr, old, _, newState) {
+      if (!tr.docChanged && !tr.getMeta('viewportChanged')) return old;
+      // docChanged=true のとき buildDecorations 内で高さキャッシュをリセットする
+      return buildDecorations(newState, getViewportRange(), tr.docChanged);
+    },
+  },
+
+  view(editorView) {
+    // スクロールイベントで仮想スクロールを更新
+    const scrollHandler = throttle(() => {
+      editorView.dispatch(
+        editorView.state.tr.setMeta('viewportChanged', true)
+      );
+    }, 100); // 100ms でスロットル
+
+    editorView.dom.closest('.editor-scroll-container')
+      ?.addEventListener('scroll', scrollHandler);
+
+    return {
+      destroy() {
+        editorView.dom.closest('.editor-scroll-container')
+          ?.removeEventListener('scroll', scrollHandler);
+      },
+    };
+  },
+
+  props: {
+    decorations(state) {
+      return this.getState(state);
+    },
+  },
+});
+
+function getViewportRange(): { top: number; bottom: number } {
+  const scrollContainer = document.querySelector('.editor-scroll-container');
+  if (!scrollContainer) return { top: 0, bottom: window.innerHeight };
+  const rect = scrollContainer.getBoundingClientRect();
+  const scrollTop = scrollContainer.scrollTop;
+  return {
+    top: scrollTop - VIEWPORT_MARGIN_PX,
+    bottom: scrollTop + rect.height + VIEWPORT_MARGIN_PX,
+  };
+}
+
+function buildDecorations(state: EditorState, viewport: { top: number; bottom: number }): DecorationSet {
+  const decorations: Decoration[] = [];
+  let accumulatedHeight = 0;
+
+  state.doc.forEach((node, offset) => {
+    const nodeHeight = getNodeHeight(node);  // 推定高さ（キャッシュ済み）
+    const nodeTop = accumulatedHeight;
+    const nodeBottom = nodeTop + nodeHeight;
+
+    if (nodeBottom < viewport.top || nodeTop > viewport.bottom) {
+      // ビューポート外: 'virtuallyHidden' デコレーションを付与
+      decorations.push(
+        Decoration.node(offset, offset + node.nodeSize, {
+          'data-virtually-hidden': 'true',
+          'data-height': String(nodeHeight),
+        })
+      );
+    }
+
+    accumulatedHeight += nodeHeight;
+  });
+
+  return DecorationSet.create(state.doc, decorations);
+}
+```
+
+```tsx
+// NodeView での仮想スクロール対応（例: ParagraphNodeView）
+export function ParagraphNodeView({ node, decorations }: NodeViewProps) {
+  const isVirtuallyHidden = decorations.some(
+    (d) => d.spec['data-virtually-hidden'] === 'true'
+  );
+
+  if (isVirtuallyHidden) {
+    const height = decorations.find((d) => d.spec['data-height'])?.spec['data-height'];
+    // DOM を最小化: テキストのない高さ固定のプレースホルダー
+    return (
+      <div
+        className="paragraph-placeholder"
+        style={{ height: `${height}px`, minHeight: '1.5em' }}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  return <p>{/* 通常レンダリング */}</p>;
+}
+```
+
+### 3.3 ノード高さのキャッシュ
+
+仮想スクロールはノードの高さを事前に知る必要がある。完全に正確でなくてもよい（スクロール中に補正）。
+
+#### nodeId の生成方針
+
+ProseMirror のノードには固有 ID がなく、位置（`offset`）はドキュメント変更で変化する。
+そのため `nodeId` は以下のルールで生成する：
+
+**`nodeId = "${node.type.name}:${offset}"`**（ポジションベース）
+
+- `buildDecorations()` の `doc.forEach((node, offset) => ...)` で得られる `offset` を使う
+- ドキュメント変更時にキャッシュが古くなるため、`tr.docChanged` のときにキャッシュを**全クリア**する
+- これにより「古いポジションの高さを新しいノードに誤適用する」問題を回避できる
+
+> 代替案として「ノードのテキスト内容ハッシュ」でキャッシュする方式も検討したが、
+> 同一テキストのノードが複数あるケースで衝突するため、ポジションベースを採用する。
+
+```typescript
+// src/renderer/wysiwyg/node-height-cache.ts
+
+/** nodeId = "${typeName}:${offset}" の形式 */
+export function makeNodeId(node: ProseMirrorNode, offset: number): string {
+  return `${node.type.name}:${offset}`;
+}
+
+// ノード高さキャッシュ（nodeId → 実測高さ px）
+const heightCache = new Map<string, number>();
+
+/**
+ * ドキュメント変更時にキャッシュを全クリアする。
+ * virtualScrollPlugin の apply() から呼び出すこと。
+ */
+export function invalidateHeightCache(): void {
+  heightCache.clear();
+}
+
+const DEFAULT_HEIGHTS: Record<string, number> = {
+  paragraph: 28,        // 1行段落の推定高さ
+  heading: 40,          // 見出しの推定高さ
+  codeBlock: 100,       // コードブロックの推定高さ（4行分）
+  table: 120,           // テーブルの推定高さ
+  blockquote: 56,       // 引用ブロックの推定高さ
+  mathBlock: 60,        // 数式ブロックの推定高さ
+};
+
+/**
+ * ノードの推定高さを返す。
+ * @param node   - ProseMirror ノード
+ * @param offset - doc.forEach のコールバックで得られるノードオフセット
+ */
+export function getEstimatedHeight(node: ProseMirrorNode, offset: number): number {
+  const nodeId = makeNodeId(node, offset);
+
+  // キャッシュヒット: 実測値を返す
+  if (heightCache.has(nodeId)) return heightCache.get(nodeId)!;
+
+  // キャッシュミス: ノードタイプのデフォルト値 + テキスト量に比例した推定
+  const base = DEFAULT_HEIGHTS[node.type.name] ?? 28;
+  const textLength = node.textContent.length;
+  const lineEstimate = Math.ceil(textLength / 60); // 60文字 = 1行の目安
+  return base * Math.max(1, lineEstimate);
+}
+
+/**
+ * DOM がレンダリングされた後に実測値をキャッシュする。
+ * NodeView の useEffect / componentDidMount から呼ぶこと。
+ *
+ * @param node   - ProseMirror ノード（NodeView.node）
+ * @param offset - NodeView.getPos() の戻り値
+ * @param dom    - NodeView のルート DOM 要素
+ */
+export function updateHeightCache(
+  node: ProseMirrorNode,
+  offset: number,
+  dom: HTMLElement
+): void {
+  const nodeId = makeNodeId(node, offset);
+  heightCache.set(nodeId, dom.getBoundingClientRect().height);
+}
+```
+
+`buildDecorations()` での使い方:
+
+```typescript
+// 修正版 buildDecorations（nodeId 生成と invalidate 対応）
+function buildDecorations(
+  state: EditorState,
+  viewport: { top: number; bottom: number },
+  docChanged: boolean
+): DecorationSet {
+  if (docChanged) {
+    invalidateHeightCache(); // ドキュメント変更時にキャッシュをリセット
+  }
+
+  const decorations: Decoration[] = [];
+  let accumulatedHeight = 0;
+
+  state.doc.forEach((node, offset) => {
+    const nodeHeight = getEstimatedHeight(node, offset); // offset を渡す
+    const nodeTop = accumulatedHeight;
+    const nodeBottom = nodeTop + nodeHeight;
+
+    if (nodeBottom < viewport.top || nodeTop > viewport.bottom) {
+      decorations.push(
+        Decoration.node(offset, offset + node.nodeSize, {
+          'data-virtually-hidden': 'true',
+          'data-height': String(nodeHeight),
+          'data-node-offset': String(offset), // NodeView 側で updateHeightCache を呼ぶために必要
+        })
+      );
+    }
+
+    accumulatedHeight += nodeHeight;
+  });
+
+  return DecorationSet.create(state.doc, decorations);
+}
+```
+
+NodeView 側での実測値更新:
+
+```tsx
+// NodeView (例: ParagraphNodeView) で getPos() を使い実測値をキャッシュ
+export function ParagraphNodeView({ node, getPos, decorations }: NodeViewProps) {
+  const domRef = useRef<HTMLDivElement>(null);
+  const isVirtuallyHidden = decorations.some(
+    (d) => d.spec['data-virtually-hidden'] === 'true'
+  );
+
+  useEffect(() => {
+    // 実際にレンダリングされたらキャッシュを更新（非 hidden のときのみ）
+    if (domRef.current && !isVirtuallyHidden) {
+      const offset = getPos();
+      if (offset !== undefined) {
+        updateHeightCache(node, offset, domRef.current);
+      }
+    }
+  });
+
+  if (isVirtuallyHidden) {
+    const height = decorations.find((d) => d.spec['data-height'])?.spec['data-height'];
+    return (
+      <div
+        className="paragraph-placeholder"
+        style={{ height: `${height}px`, minHeight: '1.5em' }}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  return <div ref={domRef}><p>{/* 通常レンダリング */}</p></div>;
+}
+```
+
+### 3.4 仮想スクロールのがたつき（Jitter）対策
+
+高さ推定がズレているノードが多い場合、スクロール時に「画面が跳ねる」現象が発生する。
+
+#### 発生メカニズム
+
+```
+推定高さ: paragraph = 28px（固定）
+実際の高さ: 3行にわたる段落 = 84px
+
+ビューポート外として「28px のプレースホルダー」を配置
+→ スクロールしてビューポート内に入ると実際の DOM（84px）に切り替わる
+→ 合計高さが突然 +56px 増加 → スクロール位置が補正される → がたつき
+```
+
+#### 対策1: 推定精度の改善（DEFAULT_HEIGHTS の根拠）
+
+```typescript
+// DEFAULT_HEIGHTS は以下の測定値に基づく（ブラウザ zoom 100%、Noto Sans 14px 時）
+// 測定方法: 各ノードタイプの空インスタンスを 100 個レンダリングして平均を取る
+const DEFAULT_HEIGHTS: Record<string, number> = {
+  paragraph:  28,  // 1行: line-height 1.6 × 14px ≈ 22px + margin 6px
+  heading:    {1: 48, 2: 40, 3: 34, 4: 30}[attrs.level] ?? 40,
+  codeBlock:  104, // min-height: 4行分 = 22px × 4 + padding 16px
+  table:      132, // header + 2行 = 33px × 4
+  blockquote:  52, // padding 8px + 1行 22px + border 4px + margin 18px
+  listItem:    28, // 1行と同じ
+  mathBlock:   64, // KaTeX のデフォルト高さ + margin
+  image:      200, // 画像ロード前のプレースホルダー高さ
+};
+
+// CJK テキスト（日本語・中国語）は英語より行高が高い
+// → 1行あたり +4px を加算する（フォントによる）
+const CJK_HEIGHT_BONUS_PER_LINE = 4;
+
+export function getEstimatedHeight(node: ProseMirrorNode, offset: number): number {
+  const cached = heightCache.get(makeNodeId(node, offset));
+  if (cached !== undefined) return cached;
+
+  const base = DEFAULT_HEIGHTS[node.type.name] ?? 28;
+
+  // テキスト量による行数推定（CJK は1文字2バイト相当として計算）
+  const textLength = node.textContent.length;
+  // 全角文字が多い場合は1行あたりの文字数を減らす
+  const hasCjk = /[\u3000-\u9FFF\uF900-\uFAFF]/.test(node.textContent);
+  const charsPerLine = hasCjk ? 30 : 60;
+  const lines = Math.max(1, Math.ceil(textLength / charsPerLine));
+
+  return base + (lines - 1) * (22 + (hasCjk ? CJK_HEIGHT_BONUS_PER_LINE : 0));
+}
+```
+
+#### 対策2: スクロール中に overscan（先読み描画）を設ける
+
+```typescript
+// VIEWPORT_MARGIN_PX を大きくして「先読み範囲」を増やす
+// → 高さ不一致による補正がビューポート外で起きるため、ユーザーには見えない
+
+const VIEWPORT_MARGIN_PX = 800; // デフォルト 500px から拡大（解像度の1画面分相当）
+```
+
+**トレードオフ**:
+- `VIEWPORT_MARGIN_PX` が大きいほど DOM ノード数が増え、仮想スクロールの効果が薄れる
+- 推奨: 500px（デフォルト）で計測し、がたつきが目立つ場合のみ 800px に拡大
+
+#### 対策3: スクロール終了後に高さキャッシュを更新
+
+```typescript
+// スクロールが止まった後（200ms 静止）にビューポート内全ノードの高さを再計測する
+const onScrollEnd = debounce(() => {
+  // ビューポート内の全 NodeView が updateHeightCache() を呼ぶよう
+  // 'recalculate-heights' メタを dispatch する
+  editorView.dispatch(
+    editorView.state.tr.setMeta('recalculateHeights', true)
+  );
+}, 200);
+
+scrollContainer.addEventListener('scroll', onScrollEnd, { passive: true });
+```
+
+#### 対策4: requestAnimationFrame による高さ更新の非同期化
+
+```typescript
+// NodeView の useEffect で高さ更新を rAF に遅延させる
+// → レイアウトスラッシングを防止し、スクロールのメインスレッドをブロックしない
+useEffect(() => {
+  const raf = requestAnimationFrame(() => {
+    if (domRef.current && !isVirtuallyHidden) {
+      const offset = getPos();
+      if (offset !== undefined) {
+        updateHeightCache(node, offset, domRef.current);
+      }
+    }
+  });
+  return () => cancelAnimationFrame(raf);
+});
+```
+
+**まとめ: がたつき対策の優先度**
+
+| 対策 | 効果 | 実装コスト | 優先度 |
+|---|---|---|---|
+| DEFAULT_HEIGHTS を実測値に | 高 | 低（定数変更のみ） | **高** |
+| overscan マージン拡大 | 中 | 低（定数変更のみ） | **中** |
+| スクロール終了後の再計測 | 高 | 中 | **中** |
+| rAF による非同期化 | 中 | 低 | **低** |
+
+---
+
+仮想スクロールは常に有効にするのではなく、閾値超過時のみ有効にする。
+（小規模ドキュメントではオーバーヘッドが無駄になるため）
+
+```typescript
+// src/core/editor.ts
+
+const VIRTUAL_SCROLL_NODE_THRESHOLD = 500; // 500ノード以上で仮想スクロールを有効化
+
+export function getEditorExtensions(nodeCount: number): Extension[] {
+  const extensions = [
+    // ... 基本エクステンション
+  ];
+
+  if (nodeCount >= VIRTUAL_SCROLL_NODE_THRESHOLD) {
+    extensions.push(VirtualScrollExtension);
+  }
+
+  return extensions;
+}
+```
+
+---
+
+## 4. インクリメンタルパース設計
+
+### 4.1 全文再パースの問題点
+
+現在の設計では保存時に `tiptapToMarkdown(editor.getJSON())` で全文シリアライズを行う。
+大きなドキュメントでは毎回の保存が重くなる可能性がある。
+
+```
+全文再パース（現状）:
+  [TipTap doc 変更] → [getJSON()] → [tiptapToMarkdown(整文)] → [writeTextFile]
+
+10,000行ファイルの場合:
+  - getJSON(): ~5ms
+  - tiptapToMarkdown(): ~50ms（文字列生成コスト）
+  - writeTextFile(): ~30ms（ディスクI/O）
+  合計: ~85ms / 500ms debounce ごとに発生
+```
+
+### 4.2 インクリメンタルシリアライズ（Phase 3 以降の改善）
+
+Phase 1 では全文シリアライズで実装し、パフォーマンス計測後に以下の改善を検討する。
+
+```typescript
+// 将来的なインクリメンタルシリアライズのアイデア（設計案）
+
+/**
+ * ProseMirror のトランザクションから「変更されたブロック」を特定し、
+ * そのブロックのみを再シリアライズして前回の Markdown に差し込む。
+ *
+ * ★ 実装難度が高く、ラウンドトリップの完全性が保証されてから検討する。
+ * Phase 1 では全文シリアライズで問題ない（小〜中規模ファイルで 85ms 以下なら許容範囲）。
+ */
+export function incrementalSerialize(
+  prevMarkdown: string,
+  tr: Transaction,
+  prevDoc: Node,
+  newDoc: Node
+): string {
+  const changedRanges = getChangedBlockRanges(tr, prevDoc, newDoc);
+  // changedRanges: 変更されたブロックの { from, to, newMarkdown } リスト
+
+  let result = prevMarkdown;
+  // 後ろから適用（前から適用するとオフセットがずれる）
+  for (const range of changedRanges.reverse()) {
+    result = result.slice(0, range.prevStart) + range.newMarkdown + result.slice(range.prevEnd);
+  }
+  return result;
+}
+```
+
+**Phase 1 での方針**: 全文シリアライズを維持。500ms デバウンス（100KB 未満の小ファイル基準）で体感は問題ない。
+ファイルサイズ別の正式なデバウンス値は `window-tab-session-design.md §9` が SoT（100KB〜1MB は 1000ms、1MB〜3MB は 2000ms）。
+300KB ファイルでの `tiptapToMarkdown` が 100ms を超えるようなら Web Worker への移行を検討する。
+
+### 4.3 Web Worker へのシリアライズ移行（必要に応じて）
+
+```typescript
+// src/core/serializer-worker.ts（将来的な実装）
+
+// Web Worker 内で実行（メインスレッドをブロックしない）
+self.addEventListener('message', (e: MessageEvent<{ json: TipTapDoc }>) => {
+  const markdown = tiptapToMarkdown(e.data.json);
+  self.postMessage({ markdown });
+});
+```
+
+```typescript
+// メインスレッドからの呼び出し
+const serializerWorker = new Worker(
+  new URL('./core/serializer-worker.ts', import.meta.url),
+  { type: 'module' }
+);
+
+export function serializeInBackground(doc: TipTapDoc): Promise<string> {
+  return new Promise((resolve) => {
+    serializerWorker.postMessage({ json: doc });
+    serializerWorker.addEventListener('message', (e) => {
+      resolve(e.data.markdown);
+    }, { once: true });
+  });
+}
+```
+
+---
+
+## 5. バックグラウンド保存と非同期 I/O
+
+### 5.1 Rust バックエンドでの非同期書き込み
+
+Tauri の `writeTextFile` は Rust の非同期 I/O を使用しており、フロントエンドの `await` 中も
+JavaScript のメインスレッドはブロックされない（Promise ベースの非同期呼び出し）。
+
+```
+[JS: await writeTextFile(path, content)]
+  │
+  ├─ JS は await 中にイベントループを解放（他の処理が動ける）
+  │
+  └─ Rust: tokio::fs::write()（非同期I/O） → OS
+                                               │
+                                  ファイルシステムへの書き込み
+                                               │
+                                           完了通知
+  │
+  └─ JS: await が解決 → tabStore.markSaved()
+```
+
+**懸念点**: `tiptapToMarkdown()` による Markdown 文字列生成はメインスレッドで同期的に実行される。
+これが主なレイテンシ要因になる。（前述の Web Worker 移行で解決）
+
+### 5.2 保存の優先度管理
+
+| 保存のトリガー | 優先度 | デバウンス |
+|-------------|--------|----------|
+| `Ctrl+S`（手動保存） | **最高** | なし（即時実行） |
+| `onCloseRequested`（アプリ終了前） | **高** | なし（即時実行） |
+| 自動保存（debounce 経過） | **通常** | 500ms〜2000ms |
+| チェックポイント（クラッシュ対策） | **低** | 30秒ごと（インターバル） |
+
+```typescript
+// src/file/save-manager.ts
+//
+// NOTE: getAutoSaveDebounce() の実装は window-tab-session-design.md §9.2 を単一の真実源（SoT）とする。
+//       このファイルでは import して使用すること。
+
+import { getAutoSaveDebounce } from './auto-save';
+
+type SavePriority = 'immediate' | 'debounced' | 'checkpoint';
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function scheduleSave(
+  filePath: string,
+  content: string,
+  priority: SavePriority = 'debounced'
+): void {
+  if (priority === 'immediate') {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    performSave(filePath, content);
+    return;
+  }
+
+  if (priority === 'debounced') {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    const contentBytes = new TextEncoder().encode(content).length;
+    const delay = getAutoSaveDebounce(contentBytes);
+
+    if (delay === null) {
+      // 3MB 超: 自動保存を行わない（手動保存のみ）
+      return;
+    }
+
+    debounceTimer = setTimeout(() => performSave(filePath, content), delay);
+    return;
+  }
+  // checkpoint は外部のインターバルで管理
+}
+```
+
+---
+
+## 6. 全文検索のパフォーマンス
+
+### 6.1 単一ファイル内検索
+
+現在開いているファイルの検索は TipTap / ProseMirror の組み込み検索機能（または `@tiptap/extension-search-and-replace`）で対応する。
+
+```typescript
+// src/renderer/wysiwyg/extensions/search.ts
+// TipTap の公式拡張を活用
+
+import SearchAndReplace from '@tiptap/extension-search-and-replace';
+
+const extensions = [
+  SearchAndReplace.configure({
+    searchResultClass: 'search-highlight',
+    caseSensitive: false,
+    disableRegex: false,
+  }),
+];
+
+// 検索の実行
+editor.commands.setSearchTerm('検索ワード');
+editor.commands.goToNextSearchResult();
+```
+
+**パフォーマンス**: 単一ファイル内の検索は TipTap が JavaScript で実行。
+通常の Markdown ファイル（数百KB以下）では問題ない。
+
+### 6.2 フォルダ内全文検索（Phase 4）
+
+複数ファイルをまたぐ全文検索は **Rust バックエンド（walkdir + regex クレート）** で実行する。
+外部 ripgrep バイナリには依存しない（バイナリサイズ・クロスコンパイルの複雑さを避けるため）。
+詳細な方針は `search-design.md §1` および `§3.2` を参照。
+
+```rust
+// src-tauri/src/commands/search.rs
+
+use std::path::PathBuf;
+use std::fs;
+use regex::Regex;
+
+#[derive(serde::Serialize)]
+pub struct SearchResult {
+    pub file_path: String,
+    pub line_number: usize,
+    pub line_content: String,
+    pub match_start: usize,
+    pub match_end: usize,
+}
+
+/// フォルダ内の全 .md/.html ファイルを検索する（Rust で非同期実行）
+#[tauri::command]
+pub async fn search_in_folder(
+    folder_path: String,
+    query: String,
+    case_sensitive: bool,
+    use_regex: bool,
+) -> Result<Vec<SearchResult>, String> {
+    let pattern = if use_regex {
+        if case_sensitive {
+            Regex::new(&query).map_err(|e| e.to_string())?
+        } else {
+            Regex::new(&format!("(?i){}", query)).map_err(|e| e.to_string())?
+        }
+    } else {
+        let escaped = regex::escape(&query);
+        if case_sensitive {
+            Regex::new(&escaped).map_err(|e| e.to_string())?
+        } else {
+            Regex::new(&format!("(?i){}", escaped)).map_err(|e| e.to_string())?
+        }
+    };
+
+    let mut results = Vec::new();
+    let walker = walkdir::WalkDir::new(&folder_path)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.file_type().is_file()
+                && matches!(
+                    e.path().extension().and_then(|s| s.to_str()),
+                    Some("md") | Some("markdown") | Some("html") | Some("htm")
+                )
+        });
+
+    for entry in walker {
+        let path = entry.path();
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(_) => continue, // 読めないファイルはスキップ
+        };
+
+        for (line_idx, line) in content.lines().enumerate() {
+            for m in pattern.find_iter(line) {
+                results.push(SearchResult {
+                    file_path: path.to_string_lossy().to_string(),
+                    line_number: line_idx + 1,
+                    line_content: line.to_string(),
+                    match_start: m.start(),
+                    match_end: m.end(),
+                });
+            }
+        }
+
+        // 結果が多すぎる場合は早期終了（UI を固まらせない）
+        if results.len() > 10_000 {
+            break;
+        }
+    }
+
+    Ok(results)
+}
+```
+
+**パフォーマンス特性**:
+- Rust の `walkdir` + `regex` クレートは JavaScript の同等処理より 5〜20 倍高速
+- 1,000ファイル × 平均 100KB = 100MB のコーパスで概ね 500ms 以内に完了する見込み
+- 結果を 10,000件で打ち切る（UI のレンダリングコスト対策）
+
+---
+
+## 7. メモリ管理設計
+
+### 7.1 画像の遅延読み込み
+
+`ImageNodeView` はビューポート外の画像を `asset://` に変換しない（ `src` を空にする）。
+`IntersectionObserver` でビューポートに入ったときに初めて読み込む。
+
+```tsx
+// src/renderer/wysiwyg/ImageNodeView.tsx（遅延読み込み対応版）
+
+export function ImageNodeView({ node, getCurrentFilePath }: ImageNodeViewProps) {
+  const [displaySrc, setDisplaySrc] = useState<string>('');
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return;
+
+    const observer = new IntersectionObserver(
+      async ([entry]) => {
+        if (!entry.isIntersecting) return;
+        observer.disconnect();
+
+        // ビューポートに入ったら画像を読み込む
+        const src = node.attrs.src as string;
+        if (src.startsWith('http')) {
+          setDisplaySrc(src); // 外部URL
+        } else {
+          const { resolve, dirname } = await import('@tauri-apps/api/path');
+          const { convertFileSrc } = await import('@tauri-apps/api/core');
+          const mdDir = await dirname(getCurrentFilePath());
+          const absolutePath = await resolve(mdDir, src);
+          setDisplaySrc(convertFileSrc(absolutePath));
+        }
+      },
+      { rootMargin: '200px' } // 200px 手前で事前読み込み
+    );
+
+    observer.observe(img);
+    return () => observer.disconnect();
+  }, [node.attrs.src]);
+
+  return (
+    <NodeViewWrapper>
+      <img ref={imgRef} src={displaySrc || undefined} alt={node.attrs.alt} />
+    </NodeViewWrapper>
+  );
+}
+```
+
+### 7.2 タブ切り替え時のメモリ解放
+
+タブを切り替えた際、非アクティブなタブの TipTap インスタンスを **一時的に破棄** するか
+**保持し続ける** かを選択する必要がある。
+
+| 方針 | メリット | デメリット |
+|------|--------|----------|
+| 保持し続ける（現状） | タブ切り替えが速い | タブ数 × メモリ消費 |
+| 非アクティブを破棄 | メモリ節約 | 切り替え時に再パースが必要（遅い） |
+| 遅延破棄（LRU） | バランスが良い | 実装が複雑 |
+
+**採用方針**: Phase 1 では「保持し続ける」シンプルな実装を採用。
+タブ数が増えてメモリ問題が顕在化した場合（Phase 4 以降）に **LRU で最大 5 タブを保持** する方式に移行する。
+
+```typescript
+// src/store/tabStore.ts（将来的な LRU 実装の概要）
+
+const MAX_ACTIVE_EDITORS = 5;
+
+// LRU キャッシュ: 最近使ったタブの TipTap インスタンスを最大 5 個保持
+// 6個目を開くと最も古いインスタンスを破棄（テキスト内容は Zustand に保持）
+```
+
+### 7.3 不要になった画像キャッシュの定期削除
+
+外部 URL 画像のキャッシュ（`$APP_CACHE_DIR/images/`）は定期的に削除する。
+
+```typescript
+// src/app.tsx
+
+useEffect(() => {
+  // アプリ起動時に古い画像キャッシュを削除（500MB 上限）
+  invoke('purge_image_cache', { maxBytes: 500 * 1024 * 1024 });
+}, []);
+```
+
+---
+
+## 8. パフォーマンス計測・プロファイリング方法
+
+### 8.1 起動時間の計測
+
+```typescript
+// src/main.tsx
+
+const startTime = performance.now();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(<App />);
+
+// App コンポーネントの最初の useEffect で計測完了
+useEffect(() => {
+  const mountTime = performance.now() - startTime;
+  console.log(`[Perf] App mount: ${mountTime.toFixed(1)}ms`);
+}, []);
+```
+
+### 8.2 ファイルロード時間の計測
+
+```typescript
+// src/file/file-manager.ts
+
+export async function openAndParseFile(path: string): Promise<TipTapDoc> {
+  const t0 = performance.now();
+  const markdown = await readTextFile(path);
+
+  const t1 = performance.now();
+  const doc = markdownToTipTap(markdown);
+
+  const t2 = performance.now();
+  console.log(`[Perf] File read: ${(t1 - t0).toFixed(1)}ms, Parse: ${(t2 - t1).toFixed(1)}ms`);
+
+  return doc;
+}
+```
+
+### 8.3 キー入力レイテンシの計測
+
+Chrome DevTools の **Performance タブ** を使い、「タイピング中のフレームレート」を確認する。
+
+```
+計測手順:
+1. Chrome DevTools → Performance → Record 開始
+2. テキストを 10 文字入力
+3. Record 停止
+4. Frame rate グラフで 60fps (16ms/frame) を下回っていないか確認
+5. Long Task（50ms 以上のタスク）が発生していないか確認
+```
+
+### 8.4 メモリ使用量の計測
+
+Windows タスクマネージャー または Chrome DevTools の Memory タブ。
+
+```
+計測シナリオ:
+1. アプリ起動直後のメモリ（ベースライン）
+2. 1MB ファイルを開いた後
+3. 3MB ファイルをソースモードで開いた後
+4. タブを 5 つ開いた後
+5. 大きなファイルを閉じた後（メモリが解放されているか確認）
+```
+
+### 8.5 パフォーマンスリグレッションの防止
+
+```typescript
+// tests/performance/load-time.bench.ts（Vitest Benchmark）
+
+import { bench, describe } from 'vitest';
+import { markdownToTipTap } from '../../src/core/converter/mdast-to-tiptap';
+import { tiptapToMarkdown } from '../../src/core/converter/tiptap-to-mdast';
+
+// テスト用フィクスチャ: 1,000行の Markdown
+const FIXTURE_1000_LINES = '...' // テストフィクスチャ
+
+describe('Parser performance', () => {
+  bench('markdownToTipTap (1,000 lines)', () => {
+    markdownToTipTap(FIXTURE_1000_LINES);
+  });
+
+  bench('tiptapToMarkdown (1,000 lines)', () => {
+    const doc = markdownToTipTap(FIXTURE_1000_LINES);
+    tiptapToMarkdown(doc);
+  });
+});
+```
+
+---
+
+## 9. CodeMirror 6 ↔ TipTap/ProseMirror 双方向同期設計
+
+レンダリングモード切り替え（WYSIWYG ↔ ソース ↔ Split）において、CodeMirror と TipTap 間のデータ同期はパフォーマンスの核心となる。
+
+### 9.1 モード切り替えの責務分担
+
+```
+TipTap (WYSIWYG)
+    ↕ tiptapToMarkdown() / markdownToTipTap()   ← 変換層
+CodeMirror 6 (ソースモード / Split の左ペイン)
+    ↕ markdownToHtml()                           ← Split の右ペインのみ
+プレビュー HTML (Split の右ペイン、DOMPurify でサニタイズ済み)
+```
+
+**SoT（Source of Truth）の切り替え**:
+
+| モード | SoT | 書き込み先 | 読み取り元 |
+|---|---|---|---|
+| Typora / WYSIWYG | TipTap JSON | TipTap | TipTap |
+| ソース | CodeMirror テキスト | CodeMirror | CodeMirror |
+| Split | CodeMirror テキスト | CodeMirror | CodeMirror（左）+ HTML（右） |
+
+モード切り替え時に SoT が変わる → **切り替え時点でのシリアライズ/デシリアライズが必須**。
+
+### 9.2 TipTap → CodeMirror（WYSIWYG → ソースモード）
+
+```typescript
+// src/core/mode-manager.ts
+
+export async function switchToSourceMode(
+  editor: Editor,
+  codeMirrorView: EditorView, // CodeMirror の EditorView
+): Promise<void> {
+  // Step 1: TipTap の現在内容を Markdown にシリアライズ
+  const markdown = tiptapToMarkdown(editor.getJSON());
+
+  // Step 2: CodeMirror にセット（全置換）
+  codeMirrorView.dispatch({
+    changes: {
+      from: 0,
+      to: codeMirrorView.state.doc.length,
+      insert: markdown,
+    },
+    // カーソルをドキュメント先頭に設定（またはポジションを引き継ぐ）
+    selection: { anchor: 0 },
+  });
+
+  // Step 3: TipTap を非表示、CodeMirror を表示
+  editor.setEditable(false); // 入力を受け付けない（表示は維持）
+  showCodeMirror();
+
+  // Step 4: TipTap の Undo 履歴をクリアしない
+  // → ソースモードから WYSIWYG に戻った後も Undo は動作する（後述）
+}
+```
+
+**パフォーマンス**:
+- `tiptapToMarkdown()` は 500KB ドキュメントで約 85ms（Phase 1 許容範囲）
+- モード切り替えは「ユーザーが意図的に行う操作」であるため、100ms 以下なら許容
+- 1MB 超のドキュメントでは Web Worker に委譲（Phase 3 以降）
+
+### 9.3 CodeMirror → TipTap（ソースモード → WYSIWYG）
+
+```typescript
+export async function switchToWysiwygMode(
+  editor: Editor,
+  codeMirrorView: EditorView,
+): Promise<void> {
+  // Step 1: CodeMirror の現在テキストを取得
+  const markdown = codeMirrorView.state.doc.toString();
+
+  // Step 2: Markdown を TipTap JSON に変換
+  const json = markdownToTipTap(markdown);
+
+  // Step 3: TipTap にロード（Undo 履歴を上書きしない）
+  // setContent() は第2引数 emitUpdate=false で履歴に残さない
+  editor.commands.setContent(json, false);
+
+  // Step 4: CodeMirror を非表示、TipTap を表示・有効化
+  hideCodeMirror();
+  editor.setEditable(true);
+
+  // Step 5: カーソル位置の引き継ぎ（ベストエフォート）
+  // CodeMirror のカーソル行数 → TipTap の対応ノードを探してフォーカス
+  const codeMirrorLine = codeMirrorView.state.selection.main.head;
+  // ← 完全一致は困難なため、同じ行番号のブロックにフォーカスを設定する近似実装
+}
+```
+
+**Undo 履歴の扱い**:
+- ソースモードでの編集は CodeMirror の Undo/Redo（`Ctrl+Z`）が管理する
+- WYSIWYG に戻った時点で `editor.commands.setContent(json, false)` を使い、
+  TipTap 側の履歴に「内容ロード」が記録されないようにする
+- ソースモード中の変更を WYSIWYG の Undo で元に戻すことは**できない**（仕様として割り切る）
+
+### 9.4 Split モードのリアルタイム同期
+
+```typescript
+// src/components/Editor/SplitView.tsx
+
+export function SplitView() {
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const updatePreview = useMemo(
+    () => debounce(async (markdown: string) => {
+      // CodeMirror → HTML（300ms デバウンス）
+      const html = await markdownToHtml(markdown); // remark で変換
+      const safeHtml = DOMPurify.sanitize(html);
+      if (previewRef.current) {
+        previewRef.current.innerHTML = safeHtml;
+      }
+    }, 300),
+    []
+  );
+
+  return (
+    <div className="split-view">
+      <div className="split-left">
+        <CodeMirrorEditor
+          onChange={(markdown) => updatePreview(markdown)}
+        />
+      </div>
+      <div className="split-right" ref={previewRef} />
+    </div>
+  );
+}
+```
+
+**パフォーマンス目標**:
+- Split モードでの変換: 300ms デバウンス後に 100ms 以内で完了すること
+- プレビューの「ちらつき」対策: `innerHTML` の差分更新ではなく全置換（简易实装）
+  - Phase 3 以降: `morphdom` で差分 DOM 更新に切り替えて「スクロール位置の維持」を実現
+
+### 9.5 モード切り替え時のパフォーマンスバジェット
+
+| 操作 | 目標時間 | 計測対象 |
+|---|---|---|
+| WYSIWYG → ソース（100KB） | < 100ms | `tiptapToMarkdown()` + CodeMirror セット |
+| ソース → WYSIWYG（100KB） | < 200ms | `markdownToTipTap()` + TipTap ロード |
+| Split プレビュー更新（100KB） | < 150ms | `markdownToHtml()` + DOMPurify |
+| WYSIWYG → ソース（1MB） | < 1000ms | Web Worker 使用（Phase 3） |
+
+---
+
+## 10. Phase 1 パフォーマンス優先度と MVP 境界の明確化
+
+「Phase 1 MVP の範囲肥大化」を防ぐため、パフォーマンス機能のフェーズを明示する。
+
+### Phase 1a: 最低限の動作（MVP コア）
+
+**目標: 基本的な Markdown 編集が動作すること**
+
+- [ ] `markdownToTipTap()` / `tiptapToMarkdown()` の基本実装（段落・見出し・リスト・コード・インライン）
+- [ ] ファイルの読み書き（Tauri plugin-fs）
+- [ ] 自動保存（デバウンス 1000ms）
+- [ ] Typora モード（基本）: クリックしたブロックのみソース表示
+- [ ] 仮想スクロール: **Phase 1a では実装しない**（1000 行超のファイルはソースモードにフォールバック）
+
+**スコープ外（Phase 1a では実装しない）**:
+- CodeMirror 6 統合（ソースモード / Split モード）
+- 仮想スクロール
+- テーブル・GFM 拡張
+- KaTeX / Mermaid
+- AI 機能
+
+### Phase 1b: エディタの基本機能完成
+
+**目標: 4 モードが全て動作し、日常的な Markdown ファイルを編集できること**
+
+- [ ] CodeMirror 6 統合（ソースモード）: §9.2, §9.3 の実装
+- [ ] Split モード（CodeMirror + HTML プレビュー）: §9.4 の実装
+- [ ] GFM テーブル変換
+- [ ] ファイルウォッチャー（外部エディタ変更の検知）
+- [ ] 仮想スクロール: 500 ノード超のドキュメントで有効化
+
+**パフォーマンス計測のマイルストーン（Phase 1b 完了条件）**:
+
+```
+✅ 100KB の Markdown ファイルを開いてから最初のキー入力まで < 300ms
+✅ 1000 行のドキュメントでタイピング遅延 < 16ms（60fps 維持）
+✅ WYSIWYG ↔ ソースモード切り替え < 200ms
+✅ 自動保存が UI をブロックしない（非同期ファイル書き込み）
+```
+
+### Phase 2 以降（MVP 後）
+
+- [ ] 仮想スクロール: がたつき対策（§3.4）の全対策を実装
+- [ ] Web Worker でのシリアライズ（1MB 超ファイル向け）
+- [ ] KaTeX / Mermaid レンダリング（§4.1.1, §4.1.2 の CSP 対応実装）
+- [ ] 全文検索（Rust バックエンド）
+- [ ] AI 機能（§4.6 の Rust 経由 API）
+
+---
+
+## 9. バックグラウンド非同期処理アーキテクチャ（入力レイテンシ保護）
+
+### 9.1 問題：非同期処理が入力レイテンシに与える影響
+
+§1.1 のパフォーマンスバジェットでは「通常キー入力レイテンシ < 16ms」を掲げているが、
+以下の処理がメインスレッドをブロックするとこの目標値を達成できない:
+
+| 処理 | 発生タイミング | ブロック懸念 |
+|------|-------------|-----------|
+| SQLite メタデータインデックス更新 | ファイル保存（デバウンス後） | Rust 側処理が Tauri IPC 応答を待つ場合 |
+| Wikiリンク・双方向リンクグラフ再計算 | ファイル保存 / 編集時 | D3.js レイアウト計算がメインスレッドで実行される場合 |
+| 全文検索インデックス再構築 | 保存後バックグラウンド | ファイル数が多い場合に長時間化 |
+| 画像圧縮・WebP 変換 | 画像ペースト後 | CPU 集中処理 |
+
+### 9.2 完全非同期アーキテクチャの設計原則
+
+**フロントエンド（React）はイベント通知のみを受け取る**
+
+Rust バックエンドで実行されるすべてのバックグラウンド処理は、完全に非同期で動作し、
+フロントエンドへの通知には Tauri の `emit` イベントのみを使用する。
+
+```
+フロントエンド (React / TipTap)
+  │
+  │  ① Tauri invoke（fire-and-forget）
+  │     例: invoke('save_file', { content, tabId })
+  │
+  ▼
+Rust バックエンド（Tauri）
+  │
+  ├── ファイル書き込み（tokio::spawn → 非同期 I/O）
+  │     完了後: emit('file_saved', { tabId, timestamp })
+  │
+  ├── SQLite メタデータ更新（tokio::spawn → 別タスク）
+  │     完了後: emit('metadata_updated', { tabId })
+  │
+  └── Wikiリンクインデックス更新（tokio::spawn → 別タスク）
+        完了後: emit('links_indexed', { tabId })
+
+フロントエンド (React)
+  │
+  └── listen('metadata_updated', () => { /* UI を必要に応じて更新 */ })
+```
+
+**設計原則**:
+
+| 原則 | 内容 |
+|------|------|
+| **Fire-and-forget** | `invoke()` の結果を `await` で待たない。保存完了は emit イベントで非同期に受け取る |
+| **Rust 側は `tokio::spawn`** | DB 処理・AST 解析はすべて `tokio::spawn` でバックグラウンドタスクとして実行 |
+| **フロントエンドは never block** | IPC 呼び出し後はメインスレッドを即座に解放し、次の keydown イベントを受け付ける |
+| **優先度付きキュー** | 保存・インデックス更新は低優先度キューで実行。UI 操作（ペイン切り替え等）を先行させる |
+
+### 9.3 D3.js グラフ計算の非同期化
+
+Wikiリンクグラフ（[wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) §11）の
+D3.js フォースレイアウト計算は CPU 集中型であり、メインスレッドで実行すると
+入力レイテンシを悪化させる可能性がある。
+
+**対策: Web Worker への委譲**
+
+```typescript
+// src/workers/graph-layout.worker.ts
+// Web Worker で D3.js フォースシミュレーションを実行
+
+import * as d3 from 'd3-force';
+
+self.onmessage = (event: MessageEvent<GraphData>) => {
+  const { nodes, edges } = event.data;
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id((d: any) => d.id))
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(400, 300));
+
+  // tick を同期的に実行（Worker 内なので UI をブロックしない）
+  simulation.tick(300);
+
+  self.postMessage({ nodes: simulation.nodes() });
+};
+```
+
+```typescript
+// src/components/GraphView.tsx
+const worker = new Worker(new URL('../workers/graph-layout.worker.ts', import.meta.url));
+
+function GraphView({ graphData }: { graphData: GraphData }) {
+  const [layout, setLayout] = useState<LayoutResult | null>(null);
+
+  useEffect(() => {
+    worker.postMessage(graphData); // Worker に委譲（ノンブロッキング）
+    worker.onmessage = (e) => setLayout(e.data);
+  }, [graphData]);
+
+  // layout が null の間はローディング表示
+  if (!layout) return <GraphSkeleton />;
+  return <GraphCanvas layout={layout} />;
+}
+```
+
+### 9.4 Yjs CRDT 導入時の Web Worker オフロード戦略（Phase 6 以降向け事前設計）
+
+`window-tab-session-design.md §12.4 / §13.8` で将来オプションとして言及されている **Yjs CRDT** を導入する場合、CRDT のエンコード処理・差分計算がメインスレッドをブロックし、**16ms のパフォーマンスバジェットを破壊するリスク**がある。
+
+**問題のメカニズム**:
+```
+キー入力 → TipTap トランザクション → [16ms 以内に]
+  ├─ DOM 更新                    ≈ 2〜5ms   ← OK
+  ├─ Y.Doc への変換 + エンコード  ≈ 5〜50ms+ ← 問題（大規模ドキュメントで顕著）
+  └─ 合計で 16ms 超過 → コマ落ち
+```
+
+**事前設計の原則**: Yjs を導入する段階で以下を初期設計に組み込む（後付けは困難）。
+
+| 原則 | 具体的手法 |
+|------|-----------|
+| CRDT 処理をメインスレッドから分離 | `@tiptap/extension-collaboration` のアップデートハンドラを Web Worker でラップ |
+| 差分エンコードを非同期化 | `Y.encodeStateAsUpdate()` を Worker 内で実行し、postMessage で結果を受け取る |
+| チェックポイント保存はバックグラウンド | CRDT ドキュメントスナップショット（`Uint8Array`）の書き込みは Rust バックグラウンドタスクで実行 |
+
+```typescript
+// src/workers/crdt-sync.worker.ts（Phase 6 以降の実装スケルトン）
+// CRDT 差分エンコード・チェックポイント保存を Web Worker で実行する雛形
+
+import * as Y from 'yjs';
+
+let ydoc: Y.Doc | null = null;
+
+self.onmessage = (event: MessageEvent) => {
+  const { type, payload } = event.data;
+
+  switch (type) {
+    case 'INIT':
+      // Y.Doc を Worker 内で初期化
+      ydoc = new Y.Doc();
+      if (payload.initialState) {
+        Y.applyUpdate(ydoc, payload.initialState);
+      }
+      break;
+
+    case 'APPLY_UPDATE':
+      // メインスレッドからの変更を適用
+      if (ydoc) Y.applyUpdate(ydoc, payload.update);
+      break;
+
+    case 'ENCODE_CHECKPOINT':
+      // チェックポイント保存用に状態をエンコード
+      if (ydoc) {
+        const state = Y.encodeStateAsUpdate(ydoc);
+        self.postMessage({ type: 'CHECKPOINT_READY', payload: state });
+      }
+      break;
+  }
+};
+```
+
+> **実装タイミング**: Yjs CRDT は Phase 6 以降の将来検討であり、現在実装は不要。
+> ただし Phase 6 以降で Yjs を採用する場合は、**必ず Worker オフロードを前提とした設計**で進めること（後付け対応はアーキテクチャを壊す）。
+
+---
+
+### 9.5 自動保存デバウンスと非同期処理のシーケンス
+
+```
+ユーザーがキー入力
+  │ (< 16ms でイベント処理、メインスレッドを解放)
+  ▼
+TipTap が EditorState を更新
+  │
+  ▼
+debounce タイマー開始（500ms 小ファイル / 1000ms 大ファイル）
+  │
+  ▼ タイマー満了
+invoke('save_file', ...) → 即座に return（await しない）
+  │
+  ▼
+[Rust バックグラウンドタスク群が並行実行]
+  ├── ファイル書き込み
+  ├── SQLite インデックス更新
+  └── リンクグラフ更新
+
+  → 各処理完了時に emit イベント
+  → フロントエンドが UI を更新（ダーティマーカー解除等）
+```
+
+> **SoT（真の自動保存デバウンス仕様）**: `window-tab-session-design.md §9` を参照。
+> 本ドキュメントは非同期アーキテクチャのパフォーマンス面のみを扱う。
+
+---
+
+## 関連ドキュメント
+
+- [system-design.md](./system-design.md) — システム全体設計（§2.2 ファイルサイズ閾値）
+- [window-tab-session-design.md](../04_File_Workspace/window-tab-session-design.md) — 自動保存の詳細仕様（§9）
+- [metadata-query-design.md](../05_Features/metadata-query-design.md) — SQLite インデックス更新設計
+- [wikilinks-backlinks-design.md](../05_Features/wikilinks-backlinks-design.md) — リンクグラフ計算設計（§11）
+
+---
+
+*このドキュメントは実装フェーズでパフォーマンス計測結果に基づいて更新する。閾値の数値は仮値であり、実測後に調整すること。*

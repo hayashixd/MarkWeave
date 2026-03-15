@@ -1,0 +1,62 @@
+{
+  "aria": {
+    "markdownEditor": "Markdown エディタ",
+    "editorArea": "エディタ領域"
+  },
+  "statusBar": {
+    "tab": "タブ: {{size}}",
+    "spaces": "スペース: {{size}}",
+    "indentStyle": {
+      "spaces": "スペース",
+      "tabs": "タブ"
+    },
+    "indentSettings": "インデント設定",
+    "indentStyle_label": "スタイル",
+    "tabWidth": "タブ幅",
+    "lineEnding": "改行コード",
+    "encoding": "文字コード",
+    "fileFormat": "ファイル形式（クリックで変換メニュー）",
+    "saveAsOther": "別名で保存",
+    "saveAsMarkdown": "Markdown として保存 (.md)",
+    "saveAsHtml": "HTML として保存 (.html)",
+    "readingTime": "{{minutes}}分で読了",
+    "readingTimeTooltip": "推定読了時間（約500文字/分で計算）: {{charCount}}文字",
+    "readability": "可読性: {{score}}",
+    "readabilityTooltip": "可読性スコア: {{score}}/100（{{label}}）\n漢字率: {{kanjiRatio}}%\n平均文長: {{avgSentenceLength}}文字/文",
+    "writingGoal": "執筆目標: {{current}} / {{target}}文字",
+    "writingGoalCount": "{{current}} / {{target}}文字",
+    "draftTooltip": "YAML Front Matter に draft: true が設定されています"
+  },
+  "readOnly": {
+    "label": "読み取り専用（別のウィンドウで編集中）",
+    "acquireEdit": "編集権限を取得する"
+  },
+  "welcome": {
+    "tagline": "書く・変換する・AIに渡す — 全部ここで",
+    "newFile": "新しいファイル",
+    "openFile": "ファイルを開く",
+    "recentFiles": "最近使ったファイル",
+    "new": "新規",
+    "open": "開く",
+    "zenMode": "Zen モード",
+    "focusMode": "フォーカスモード"
+  },
+  "dailyNote": {
+    "dayNames": ["日", "月", "火", "水", "木", "金", "土"],
+    "todaysTasks": "今日のタスク",
+    "notes": "メモ",
+    "reflection": "振り返り"
+  },
+  "sidebar": {
+    "label": "サイドバー",
+    "open": "サイドバーを開く",
+    "close": "サイドバーを閉じる",
+    "tabOutline": "アウトライン",
+    "tabFiles": "ファイル",
+    "tabAi": "AI テンプレート",
+    "tabBacklinks": "バックリンク",
+    "tabTags": "タグ",
+    "tabGraph": "グラフ",
+    "tabGit": "Git"
+  }
+}
