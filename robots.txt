@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://hayashixd.github.io/MarkWeave/sitemap.xml
