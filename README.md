@@ -4,7 +4,7 @@
 
 Windows / Linux 対応 · ローカルファースト · 買い切り $24.99
 
-**[➡ Gumroad で購入する](https://xdhyskh.gumroad.com/l/qwctrq)**
+**[➡ Gumroad で購入する](https://xdhyskh.gumroad.com/l/qwctrq)** · **[➡ 開発記事（Zenn）](https://zenn.dev/hayashixd/articles/f00eea197f087c)**
 
 ---
 
