@@ -135,7 +135,7 @@
 - [ ] エディタ内機能の場合: `TipTapEditor.tsx` にカスタムイベントリスナーを追加
 
 ### 4. feature-list.md を更新
-- [ ] `docs/00_Meta/feature-list.md` の該当機能の「使い方」列に `メニュー → ...` のパスを記載
+- [ ] `docs/00_Meta/feature-list.md` の該当機能カテゴリの「操作方法」列にメニューパス（例: `メニュー → ファイル → エクスポート → HTML`）を記載
 
 ---
 

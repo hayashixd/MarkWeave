@@ -1,48 +1,97 @@
 # MarkWeave
 
-> **Write. Polish. Publish.**
-> Markdown で技術記事を書いて、Zenn / Qiita / dev.to にそのまま公開できる
-> ローカルファースト WYSIWYG エディタ。
+**Markdown 記法を見ずに書いて、技術記事をそのまま公開できるローカル WYSIWYG エディタ。**
 
 Windows / Linux 対応 · ローカルファースト · 買い切り予定
 
 ---
 
-## デモ
+## こんな不満、ありませんか？
 
-### Markdown 記法がリアルタイムで整形される
+- **Typora で書いている** → 気持ちいいが、Zenn / Qiita に合わせた公開フローが弱い
+- **VS Code + プレビューで書いている** → ウィンドウを行き来するたびに書くリズムが崩れる
+- **ChatGPT / Claude に貼るとき毎回手作業で整形している** → 見出しレベルがずれていたり、言語タグが抜けていたり
+- **ファイルはローカルに持ちたい** → Notion や HackMD のクラウド依存が嫌
 
-`# ` を入力すれば見出しに、`- ` を入力すればリストに。Typora のような書き心地。
+MarkWeave はこの 4 つを、余計な機能を足さずに解決するために作りました。
+
+---
+
+## 解決策
+
+### 1. 記法を見ずに書ける（Typora 式 WYSIWYG）
+
+`# ` を入力した瞬間に見出しに変わる。`- ` でリストに。
+Markdown を知っている人が「記法を見なくて済む」書き心地。
 
 ![WYSIWYG formatting demo](doc-public/demo-gifs/wysiwyg-formatting.gif)
 
 ---
 
-### コードブロックをそのまま HTML に書き出せる
+### 2. コードブロックごと HTML に書き出せる
 
-シンタックスハイライト付きのコードブロックを含む記事を、スタンドアロン HTML としてエクスポート。
+シンタックスハイライト・数式・Mermaid 図表を含む記事を、スタンドアロン HTML としてそのまま出力。
+画像は Base64 で埋め込まれるのでリンク切れゼロ。Zenn / Qiita へのコピーにも使える。
 
 ![Code block to HTML export demo](doc-public/demo-gifs/code-block-export.gif)
 
 ---
 
-### AI コピーボタンでワンクリック最適化
+### 3. AI に貼る前の整形が不要になる
 
-ツールバーの **[AI コピー]** を押すと、見出し階層・コードブロックの言語タグ・空白行を自動整形してクリップボードへコピー。そのまま Claude / ChatGPT に貼れる。
+**[AI コピー]** ボタン一つで、見出し階層の補正・コードブロックへの言語タグ付け・余分な空行の削除を自動処理してクリップボードへコピー。
+そのまま Claude / ChatGPT に貼れる。
 
 ![AI copy demo](doc-public/demo-gifs/ai-copy.gif)
 
 ---
 
-### フォーカスモード・タイプライターモード
+### 4. 書くことだけに集中できる
 
-書くことだけに集中できる執筆環境。サイドバーを隠すフォーカスモードと、現在行を画面中央に固定するタイプライターモードを搭載。
+フォーカスモード・タイプライターモード・Zen モードで、ツールの存在を消せる。
 
 ![Focus mode demo](doc-public/demo-gifs/focus-mode.gif)
 
 ---
 
+## 主な機能
+
+### 執筆
+
+| 機能 | 説明 |
+|------|------|
+| WYSIWYG 編集 | 入力と同時に整形。`Ctrl+/` でいつでもソース表示に切り替え |
+| テーブル | D&D での並び替え・列幅リサイズ・セル間 Tab 移動 |
+| コードブロック | シンタックスハイライト付き。40+ 言語対応 |
+| 数式（KaTeX） | `$...$` インライン / `$$...$$` ブロック |
+| Mermaid 図表 | フローチャート・シーケンス図等をインライン表示 |
+| フォーカス / タイプライター / Zen | 集中執筆モード 3 種（F8 / F9 / F11） |
+| スラッシュコマンド | `/` でブロック・テンプレートを素早く挿入 |
+| ポモドーロ / ワードスプリント | 執筆セッション管理ツール |
+
+### エクスポート
+
+| 形式 | 説明 |
+|------|------|
+| HTML | テーマ選択付きスタンドアロン HTML。画像 Base64 埋め込み（`Ctrl+Shift+E`） |
+| PDF | 印刷品質 PDF 出力（`Ctrl+Alt+P`） |
+| Word / LaTeX / ePub | Pandoc 連携（要 Pandoc インストール） |
+
+### AI 機能（BYOK）
+
+自分の Claude API キーを設定して使います。当アプリは API コストを負担しません。
+
+| 機能 | 説明 |
+|------|------|
+| AI コピー | 見出し補正・言語タグ付け・余白整形 → クリップボードへ |
+| AI テンプレート | ブログ構成・コード解説・会議メモ等のテンプレートを挿入 |
+| テキスト選択 AI アシスト | 選択範囲を Claude API で改善 / 翻訳 / 要約 |
+
+---
+
 ## インストール（開発版）
+
+正式リリース版は準備中です。ソースからビルドする場合:
 
 ### 必要な環境
 
@@ -55,63 +104,37 @@ Windows / Linux 対応 · ローカルファースト · 買い切り予定
 
 > **Linux:** `webkit2gtk`・`libayatana-appindicator3` 等が必要です。[Tauri 公式ドキュメント](https://v2.tauri.app/start/prerequisites/#linux) を参照してください。
 
-### セットアップ
-
 ```bash
 git clone <repository-url>
 cd markweave
 pnpm install
-```
-
-### 起動
-
-```bash
-# ブラウザで UI だけ確認（Tauri API は動作しない）
-pnpm dev
-
-# デスクトップアプリとして起動（推奨）
-pnpm tauri dev
-```
-
-### ビルド
-
-```bash
-pnpm tauri build
-# → src-tauri/target/release/bundle/ にインストーラーが生成されます
+pnpm tauri dev   # デスクトップアプリとして起動
 ```
 
 ---
 
-## 主な機能
+## 動作環境・サポート
 
-| 機能 | 説明 |
+| 項目 | 内容 |
 |------|------|
-| WYSIWYG 編集 | `# ` → 見出し、`- ` → リストなど Markdown 記法を入力と同時に変換 |
-| ソース / WYSIWYG 切り替え | `Ctrl+/` で随時切り替え可能 |
-| HTML エクスポート | テーマ選択付きのスタンドアロン HTML を出力 |
-| PDF / Word / EPUB エクスポート | Pandoc 連携 |
-| AI コピー | 見出し階層・コードブロック言語タグ・空白行を自動整形してコピー |
-| AI テンプレート | ブログ構成・コードレビュー依頼などのプロンプトをサイドバーから挿入 |
-| フォーカスモード | サイドバー非表示・余白拡大の執筆専用レイアウト |
-| タイプライターモード | 現在行を画面中央に固定 |
-| 検索・置換 | `Ctrl+F` / `Ctrl+H` |
-| タブ管理 | 複数ファイルをタブで同時に開く |
-| ファイルツリー | ワークスペースフォルダをサイドバーで管理 |
+| 対応 OS | Windows 10/11、Linux（x86-64） |
+| macOS | 未対応（開発者が Mac を所持していないため動作確認不可） |
+| ライセンス | MIT |
+| 価格（予定） | 買い切り $24.99、3 デバイスまで。サブスクなし |
+| アップデート | アプリ内自動アップデート（署名済みパッケージ） |
+| サポート | GitHub Issues |
+| データ | すべてローカル保存。外部送信なし |
+
+詳細（既知の制限・返金ポリシー・プライバシー）: **[SUPPORT.md](./SUPPORT.md)**
 
 ---
 
 ## テスト
 
 ```bash
-# ユニット・統合テスト（Vitest）
-pnpm test
-
-# E2E テスト（Playwright）
-pnpm dlx playwright install chromium   # 初回のみ
-pnpm test:e2e
-
-# Markdown ↔ TipTap JSON ラウンドトリップテスト
-npm run test:roundtrip
+pnpm test                  # ユニット・統合テスト（Vitest）
+pnpm test:e2e              # E2E テスト（Playwright）
+npm run test:roundtrip     # Markdown ↔ TipTap JSON ラウンドトリップテスト
 ```
 
 ---
@@ -129,17 +152,10 @@ npm run test:roundtrip
 
 ---
 
-## 設計ドキュメント
+## 設計ドキュメント（開発者向け）
 
 | ドキュメント | 内容 |
 |------------|------|
 | [design-index.md](./docs/00_Meta/design-index.md) | 設計ファイル索引 |
-| [feature-list.md](./docs/00_Meta/feature-list.md) | 機能一覧・ロードマップ |
+| [feature-list.md](./docs/00_Meta/feature-list.md) | 機能一覧・ショートカット |
 | [system-design.md](./docs/01_Architecture/system-design.md) | システム全体設計 |
-| [markdown-tiptap-conversion.md](./docs/02_Core_Editor/markdown-tiptap-conversion.md) | Markdown ↔ TipTap 変換設計 |
-
----
-
-## ライセンス
-
-TBD
