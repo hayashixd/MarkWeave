@@ -1,0 +1,75 @@
+Markdown を記法なしで書いて、技術記事をそのまま公開できるエディタ
+
+Typora ライクな WYSIWYG 編集 × Zenn / Qiita 向けエクスポート × ローカルファースト。
+Markdown を知っているエンジニアが「記法を意識せずに書ける」書き心地を、プラットフォーム公開ワークフローと組み合わせました。ファイルはすべてローカルに。クラウド不要。
+
+---
+
+こんな問題を解決します
+
+・Typora で書いているが、Zenn / Qiita に合わせた公開フローが弱い
+・VS Code + プレビューで書いているが、行き来するたびにリズムが崩れる
+・ChatGPT / Claude に貼るとき毎回手作業で整形している
+・ファイルはローカルに持ちたい（Notion / HackMD のクラウド依存が嫌）
+
+---
+
+主な機能
+
+✅ Typora 式 WYSIWYG（# で見出し、- でリスト、入力と同時にレンダリング）
+✅ テーブル（ドラッグ並び替え・列幅リサイズ・セル間 Tab 移動）
+✅ コードブロック（40+ 言語・シンタックスハイライト）
+✅ 数式（KaTeX）・Mermaid 図表（フローチャート等）
+✅ YAML Front Matter GUI 編集（Zenn のタイトル・タグ・emoji 等）
+✅ Markdown エクスポート（Zenn / Qiita 向け最適化）
+✅ HTML エクスポート（画像 Base64 埋め込み・スタンドアロン）
+✅ PDF / Word / EPUB（Pandoc 連携）
+✅ AI コピー（見出し・言語タグ補正後にクリップボードへコピー）
+✅ AI テンプレート（BYOK：自分の Claude API キーで動作）
+✅ Zen / フォーカス / タイプライターモード
+✅ ポモドーロ / ワードスプリント
+✅ ワークスペース（フォルダ管理）・外部変更検知（Dropbox / OneDrive 対応）
+✅ アプリ内自動アップデート
+
+---
+
+このライセンスに含まれるもの
+
+・Windows 版（.msi インストーラー）
+・Linux 版（.AppImage）
+・3 デバイスまで利用可
+・アプリ内自動アップデート（将来バージョンも含む）
+
+---
+
+動作環境
+
+🪟 Windows 10/11（x86-64）
+🐧 Linux（x86-64）
+🍎 macOS：将来対応予定
+
+---
+
+よくある質問
+
+Q. 試用版はありますか？
+ソースコードを GitHub で公開しています。Node.js / Rust の開発環境があれば無料でビルドして試せます。
+→ https://github.com/hayashixd/MarkWeave
+
+Q. 支払い方法は？
+クレジットカード（Visa / Mastercard / AmEx）および PayPal に対応しています。
+
+Q. Windows でインストール時に SmartScreen の警告が出ます。
+現在 Authenticode 署名がないため警告が表示されます。「詳細情報 → 実行」でインストールできます。正式販売版では署名を整備予定です。
+
+Q. macOS には対応していますか？
+現在は Windows・Linux のみ対応です。macOS は将来対応予定です。
+
+Q. 返金はできますか？
+Gumroad の標準返金ポリシーに準じます。購入後のお問い合わせは Gumroad のメッセージ機能からご連絡ください。
+
+---
+
+📖 詳細ページ・マニュアル: https://hayashixd.github.io/MarkWeave/
+💻 GitHub: https://github.com/hayashixd/MarkWeave
+📝 開発記事（Zenn）: https://zenn.dev/hayashixd/articles/f00eea197f087c
