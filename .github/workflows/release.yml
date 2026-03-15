@@ -59,6 +59,7 @@ jobs:
           releaseBody: |
             ## 変更点
             このリリースの変更点は CHANGELOG.md を参照してください。
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
+          generateReleaseNotes: true
           args: ${{ matrix.args }}
