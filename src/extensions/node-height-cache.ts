@@ -19,16 +19,6 @@ import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 const MAX_CACHE_SIZE = 2000;
 
 /**
- * ノードのコンテンツに基づくフィンガープリントを生成する。
- * テキスト内容の簡易ハッシュ + 構造情報でキーを構成する。
- */
-function makeContentFingerprint(node: ProseMirrorNode): string {
-  const text = node.textContent;
-  const hash = simpleHash(text);
-  return `${node.type.name}:${text.length}:${node.childCount}:${hash}`;
-}
-
-/**
  * 簡易ハッシュ関数（FNV-1a ベース）。
  * 暗号学的安全性は不要、高速かつ低衝突が目的。
  */
@@ -39,6 +29,47 @@ function simpleHash(str: string): number {
     hash = (hash * 0x01000193) | 0; // FNV prime, keep 32-bit
   }
   return hash >>> 0; // unsigned
+}
+
+// CJK テキスト（日本語・中国語）は英語より行高が高い
+const CJK_HEIGHT_BONUS_PER_LINE = 4;
+const CJK_REGEX = /[\u3000-\u9FFF\uF900-\uFAFF]/;
+
+/**
+ * textContent を1度だけ取得して返す内部ヘルパー。
+ * ProseMirror の textContent は getter で毎回再帰的に文字列を連結するため、
+ * 複数回呼ぶと GC 圧力が大きい。1回取得してキャッシュする。
+ */
+interface NodeTextInfo {
+  fingerprint: string;
+  textLength: number;
+  hasCjk: boolean;
+}
+
+/**
+ * ノードのコンテンツに基づくフィンガープリントとテキスト情報を生成する。
+ * textContent は1回のみ取得し、fingerprint・textLength・hasCjk を一括返却。
+ */
+function getNodeTextInfo(node: ProseMirrorNode): NodeTextInfo {
+  const text = node.textContent;
+  const textLength = text.length;
+  let hash: number;
+  if (textLength <= 256) {
+    hash = simpleHash(text);
+  } else {
+    // 長いノード: 先頭128文字 + 末尾128文字のサンプルハッシュで計算量を軽減
+    hash = simpleHash(text.slice(0, 128) + text.slice(-128));
+  }
+  const fingerprint = `${node.type.name}:${textLength}:${node.childCount}:${hash}`;
+  const hasCjk = textLength > 0 ? CJK_REGEX.test(text) : false;
+  return { fingerprint, textLength, hasCjk };
+}
+
+/**
+ * フィンガープリントのみが必要な場合（updateHeightCache 用）。
+ */
+function makeContentFingerprint(node: ProseMirrorNode): string {
+  return getNodeTextInfo(node).fingerprint;
 }
 
 // ノード高さキャッシュ（contentFingerprint → 実測高さ px）
@@ -60,10 +91,6 @@ export function invalidateHeightCache(): void {
     }
   }
 }
-
-// CJK テキスト（日本語・中国語）は英語より行高が高い
-const CJK_HEIGHT_BONUS_PER_LINE = 4;
-const CJK_REGEX = /[\u3000-\u9FFF\uF900-\uFAFF]/;
 
 // performance-design.md §3.4 に基づくデフォルト高さ（実測ベース）
 const DEFAULT_HEIGHTS: Record<string, number> = {
@@ -87,11 +114,14 @@ const DEFAULT_HEIGHTS: Record<string, number> = {
  * ノードの推定高さを返す。
  * キャッシュにヒットすれば実測値、なければテキスト量ベースの推定値を返す。
  *
+ * 最適化: textContent を1回だけ取得し、fingerprint・textLength・hasCjk を
+ * 一括で得ることで GC 圧力を削減。
+ *
  * @param node ProseMirror ノード
  * @param _offset オフセット（後方互換のために残すが、キャッシュキーには使用しない）
  */
 export function getEstimatedHeight(node: ProseMirrorNode, _offset: number): number {
-  const fingerprint = makeContentFingerprint(node);
+  const { fingerprint, textLength, hasCjk } = getNodeTextInfo(node);
 
   // キャッシュヒット: 実測値を返す
   const cached = heightCache.get(fingerprint);
@@ -100,11 +130,8 @@ export function getEstimatedHeight(node: ProseMirrorNode, _offset: number): numb
   // キャッシュミス: ノードタイプのデフォルト値 + テキスト量に比例した推定
   const base = DEFAULT_HEIGHTS[node.type.name] ?? 28;
 
-  // テキスト量による行数推定（CJK は1文字が幅広）
-  const textLength = node.textContent.length;
   if (textLength === 0) return base;
 
-  const hasCjk = CJK_REGEX.test(node.textContent);
   const charsPerLine = hasCjk ? 30 : 60;
   const lines = Math.max(1, Math.ceil(textLength / charsPerLine));
 

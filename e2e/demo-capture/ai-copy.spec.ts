@@ -1,20 +1,24 @@
 /**
- * デモ GIF 撮影: AI コピー機能
+ * デモ GIF 撮影: AI 向けに清書してコピー機能
  *
- * "ワンクリックで AI 向けに最適化してコピーできる" を伝えるデモ。
+ * 伝えたいこと:
+ *   「見出し階層の飛び・リスト記号のバラつきを、1クリックで自動修正してコピーできる」
+ *
+ * ビフォー/アフターの流れ:
+ *   Frame 1: H1 → H3（H2 スキップ）が含まれるエディタ（Before）
+ *   Frame 2: 差分プレビューモーダル — ### → ## の修正が赤/緑で見える
+ *   Frame 3: 「コピー済み ✓ (1件修正)」— 清書完了
+ *
+ * ※ コードブロック（``` InputRule）は TipTap の重い処理を引き起こすため使用しない。
+ *
  * 出力: doc-public/demo-gifs/ai-copy.gif
- *
- * フレーム構成:
- *   1. 記事コンテンツが入力されたエディタ
- *   2. AI コピードロップダウンを開いた状態（オプション一覧）
- *   3. AI コピーボタンをクリックしてコピー済みになった状態
  */
 import { test, expect } from '@playwright/test';
 import { GifRecorder } from '../helpers/gif';
 
 const OUTPUT_PATH = 'doc-public/demo-gifs/ai-copy.gif';
 
-test.describe('デモ GIF 撮影: AI コピー機能', () => {
+test.describe('デモ GIF 撮影: AI 向けに清書してコピー機能', () => {
   test.setTimeout(120_000);
 
   test('ai-copy', async ({ page }) => {
@@ -27,62 +31,72 @@ test.describe('デモ GIF 撮影: AI コピー機能', () => {
       quality: 8,
     });
 
-    // ── コンテンツを入力 ──────────────────────────────────
+    // ── アプリ起動 ────────────────────────────────────────
     await page.goto('/');
     await expect(page.locator('.editor-container')).toBeVisible();
 
     const editor = page.locator('.ProseMirror');
     await editor.click();
 
-    await page.keyboard.type('# TypeScript Tips');
+    // ── コンテンツ入力 ────────────────────────────────────
+    // H1 タイトル
+    await page.keyboard.type('# TypeScript Handbook');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
-    await page.keyboard.type('A practical guide for TypeScript developers.');
+    await page.keyboard.type('A practical guide for writing type-safe code.');
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
-    await page.keyboard.type('## Type Inference');
+
+    // H3 を直接入力（H2 をスキップ → 見出し階層ジャンプ）
+    // normalizeHeadings が ### → ## に修正する
+    await page.keyboard.type('### Type Inference');
     await page.keyboard.press('Enter');
-    await page.keyboard.type('- Use `const` for better inference');
+    await page.keyboard.type('Let TypeScript infer types whenever possible.');
     await page.keyboard.press('Enter');
-    // 2項目目以降は既にリスト内なので "- " は不要（InputRule は段落先頭のみ発動）
-    await page.keyboard.type('Avoid explicit `any`');
     await page.keyboard.press('Enter');
-    await page.keyboard.type('Prefer `unknown` over `any`');
+
+    // リスト（- で統一）
+    await page.keyboard.type('- Use const for better inference');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('- Avoid explicit any type');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('- Prefer unknown over any');
     await page.waitForTimeout(400);
 
-    // ── Frame 1: 記事が入力されたエディタ ────────────────
-    await recorder.addFrame(page, 1500);
+    // ── Frame 1: Before — H1→H3 の見出しジャンプがあるエディタ ──
+    await page.keyboard.press('Control+Home');
+    await page.waitForTimeout(300);
+    await recorder.addFrame(page, 2000);
 
-    // ── ドロップダウンを開く ──────────────────────────────
-    const dropdownTrigger = page.locator('.ai-copy-button__dropdown-trigger').first();
-    const triggerVisible = await dropdownTrigger.isVisible().catch(() => false);
-
-    if (triggerVisible) {
-      await dropdownTrigger.click();
-      await page.waitForTimeout(400);
-
-      // ── Frame 2: ドロップダウン（オプション一覧）が開いた状態 ──
-      await recorder.addFrame(page, 2000);
-
-      // ドロップダウンを閉じる
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(300);
-    } else {
-      // ドロップダウントリガーが見つからなかった場合はスキップ
-      await recorder.addFrame(page, 1000);
-    }
-
-    // ── メインの AI コピーボタンをクリック ────────────────
+    // ── AI向けに清書してコピー ボタンをクリック → 差分プレビューが開く ──
     const aiCopyBtn = page.locator('.ai-copy-button').first();
     const btnVisible = await aiCopyBtn.isVisible().catch(() => false);
 
     if (btnVisible) {
       await aiCopyBtn.click();
-      await page.waitForTimeout(500);
+      // 差分プレビューモーダルが開くのを待つ
+      await page.waitForSelector('.fixed.inset-0', { timeout: 10_000 }).catch(() => null);
+      await page.waitForTimeout(600);
 
-      // ── Frame 3: コピー済み状態 ───────────────────────────
-      await recorder.addFrame(page, 2000);
+      // ── Frame 2: 差分プレビュー — ### → ## の修正が赤/緑で見える ──
+      await recorder.addFrame(page, 3000);
+
+      // 「この設定でコピー」ボタンをクリック
+      const copyBtn = page.locator('button').filter({ hasText: 'この設定でコピー' }).first();
+      const copyBtnVisible = await copyBtn.isVisible().catch(() => false);
+
+      if (copyBtnVisible) {
+        await copyBtn.click();
+        await page.waitForTimeout(700);
+
+        // ── Frame 3: 「コピー済み ✓ (1件修正)」が表示 ──
+        await recorder.addFrame(page, 2500);
+      } else {
+        await recorder.addFrame(page, 1500);
+      }
     } else {
+      await recorder.addFrame(page, 1000);
+      await recorder.addFrame(page, 1000);
       await recorder.addFrame(page, 1000);
     }
 

@@ -45,6 +45,7 @@ import { SmartPasteExtension } from '../../extensions/SmartPasteExtension';
 import { SafeInputRulesExtension } from '../../extensions/SafeInputRulesExtension';
 import { markdownToTipTap } from '../../lib/markdown-to-tiptap';
 import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown';
+import { IncrementalSerializer } from '../../lib/incremental-serialize';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
 import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
@@ -100,8 +101,8 @@ const LARGE_FILE_NODE_COUNT_THRESHOLD = 3000;
  * ソースモードへ切替することでスクロールジャンクを防ぐ。
  */
 const LARGE_FILE_BLOCK_COUNT_THRESHOLD = 1500;
-/** 大規模ドキュメントでの連続更新時にシリアライズを間引く閾値 */
-const LARGE_DOC_SERIALIZE_DEBOUNCE_NODE_THRESHOLD = 1200;
+/** 大規模ドキュメントでの連続更新時にシリアライズを間引く閾値（仮想スクロール有効化と同期） */
+const LARGE_DOC_SERIALIZE_DEBOUNCE_NODE_THRESHOLD = 500;
 const LARGE_DOC_SERIALIZE_DEBOUNCE_MS = 120;
 
 export interface EditorProps {
@@ -140,6 +141,7 @@ export function MarkdownEditor({
   const suppressNextUpdateRef = useRef(0);
   const editorWrapperRef = useRef<HTMLDivElement>(null);
   const serializeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const incrementalSerializerRef = useRef(new IncrementalSerializer());
   // フロントマター変更時に参照するために ref に保持
   const frontMatterYamlRef = useRef(frontMatterYaml);
   frontMatterYamlRef.current = frontMatterYaml;
@@ -386,6 +388,8 @@ export function MarkdownEditor({
       // setContent 起点の update イベントを 1 回だけ抑止し、
       // 親 state との往復更新ループを防ぐ
       suppressNextUpdateRef.current += 1;
+      // 外部からコンテンツが完全に置き換えられるため IncrementalSerializer のキャッシュを無効化
+      incrementalSerializerRef.current.invalidate();
       try {
         editor.commands.setContent(doc as unknown as Record<string, unknown>);
       } catch (error) {
@@ -583,9 +587,11 @@ export function MarkdownEditor({
   useEffect(() => {
     if (!editor) return;
 
-    const emitMarkdown = () => {
+    const emitMarkdown = (useIncremental = false) => {
       const json = editor.getJSON() as unknown as TipTapDoc;
-      const markdown = tiptapToMarkdown(json);
+      const markdown = useIncremental
+        ? incrementalSerializerRef.current.serialize(json)
+        : tiptapToMarkdown(json);
       const fullMarkdown = serializeFrontMatter(frontMatterYamlRef.current, markdown);
       lastEmittedContentRef.current = fullMarkdown;
       // Front Matter を先頭に付けて完全な Markdown として通知
@@ -643,7 +649,7 @@ export function MarkdownEditor({
       }
       serializeTimerRef.current = setTimeout(() => {
         serializeTimerRef.current = null;
-        emitMarkdown();
+        emitMarkdown(true); // デバウンスパスではインクリメンタルシリアライザを使用
       }, LARGE_DOC_SERIALIZE_DEBOUNCE_MS);
     };
 
@@ -1446,7 +1452,7 @@ function EditorToolbar({
       {getMarkdown && mode === 'wysiwyg' && (
         <>
           <ToolbarDivider />
-          <AiCopyButton getMarkdown={getMarkdown} label="✨ AI コピー" />
+          <AiCopyButton getMarkdown={getMarkdown} label="✨ AI向けに清書してコピー" />
         </>
       )}
     </div>

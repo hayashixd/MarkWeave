@@ -1,21 +1,20 @@
 /**
  * AiCopyButton.tsx
  *
- * 「AIコピー」ボタンコンポーネント。
+ * 「AI向けに清書してコピー」ボタンコンポーネント。
  *
  * クリックすると:
- *   1. 現在のMarkdownをAI最適化変換する
- *   2. 最適化済みテキストをクリップボードにコピーする
- *   3. 変更点レポートをポップオーバーで表示する（オプション）
+ *   1. 差分プレビューモーダル（AiDiffPreview）を開く（デフォルト）
+ *   2. ユーザーがビフォー/アフターを確認してからコピー実行
  *
  * ドロップダウンメニュー:
- *   - 最適化してコピー（デフォルト）
- *   - 最適化プレビューを表示してからコピー
+ *   - プレビューなしですぐにコピー（省略モード）
  *   - オプション（各変換のオン/オフ設定）
  */
 
 import React, { useState, useCallback, useRef } from 'react';
-import { optimizeAndCopy, buildReport, type OptimizationResult, type OptimizerOptions } from '../../ai/optimizer/ai-optimizer';
+import { optimizeAndCopy, type OptimizationResult, type OptimizerOptions } from '../../ai/optimizer/ai-optimizer';
+import { AiDiffPreview } from './AiDiffPreview';
 
 // ---------------------------------------------------------------------------
 // 型定義
@@ -37,72 +36,81 @@ interface AiCopyButtonProps {
 // ---------------------------------------------------------------------------
 
 /**
- * AI最適化コピーボタン。
+ * AI清書コピーボタン。
  *
  * @example
  * <AiCopyButton
  *   getMarkdown={() => editorView.state.doc.textContent}
- *   onComplete={(result) => setReport(buildReport(result))}
+ *   onComplete={(result) => console.log(result)}
  * />
  */
 export const AiCopyButton: React.FC<AiCopyButtonProps> = ({
   getMarkdown,
-  label = 'AIコピー',
+  label = 'AI向けに清書してコピー',
   onComplete,
 }) => {
   const [copyState, setCopyState] = useState<CopyState>('idle');
-  const [report, setReport] = useState<string | null>(null);
-  const [showReport, setShowReport] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [options, setOptions] = useState<Partial<OptimizerOptions>>({});
+  const [showDiffPreview, setShowDiffPreview] = useState(false);
+  const [previewMarkdown, setPreviewMarkdown] = useState('');
+  const [lastResult, setLastResult] = useState<OptimizationResult | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // ---------------------------------------------------------------------------
   // ハンドラー
   // ---------------------------------------------------------------------------
 
-  const handleCopy = useCallback(
-    async (previewFirst = false) => {
-      setCopyState('copying');
-      setShowDropdown(false);
+  /** デフォルトアクション: 差分プレビューモーダルを開く */
+  const handleOpenPreview = useCallback(() => {
+    const markdown = getMarkdown();
+    if (!markdown.trim()) return;
+    setPreviewMarkdown(markdown);
+    setShowDiffPreview(true);
+    setShowDropdown(false);
+  }, [getMarkdown]);
 
-      try {
-        const markdown = getMarkdown();
-        if (!markdown.trim()) {
-          setCopyState('idle');
-          return;
-        }
-
-        const result = await optimizeAndCopy(markdown, options);
-        const reportText = buildReport(result);
-        setReport(reportText);
-
-        if (previewFirst) {
-          // プレビューモード: コピー前にレポートを表示
-          setShowReport(true);
-        }
-
-        setCopyState('copied');
-        onComplete?.(result);
-
-        // 2秒後にアイドル状態に戻す
-        setTimeout(() => setCopyState('idle'), 2000);
-      } catch {
-        setCopyState('error');
-        setTimeout(() => setCopyState('idle'), 2000);
+  /** ドロップダウンからの即時コピー（プレビューなし） */
+  const handleQuickCopy = useCallback(async () => {
+    setCopyState('copying');
+    setShowDropdown(false);
+    try {
+      const markdown = getMarkdown();
+      if (!markdown.trim()) {
+        setCopyState('idle');
+        return;
       }
-    },
-    [getMarkdown, options, onComplete]
-  );
+      const result = await optimizeAndCopy(markdown, options);
+      setLastResult(result);
+      setCopyState('copied');
+      onComplete?.(result);
+      setTimeout(() => setCopyState('idle'), 2000);
+    } catch {
+      setCopyState('error');
+      setTimeout(() => setCopyState('idle'), 2000);
+    }
+  }, [getMarkdown, options, onComplete]);
+
+  /** 差分プレビューモーダルからのコピー完了コールバック */
+  const handleDiffCopy = useCallback((result: OptimizationResult) => {
+    setLastResult(result);
+    setShowDiffPreview(false);
+    setCopyState('copied');
+    onComplete?.(result);
+    setTimeout(() => setCopyState('idle'), 2000);
+  }, [onComplete]);
 
   // ---------------------------------------------------------------------------
   // レンダリング
   // ---------------------------------------------------------------------------
 
+  const totalChanges = lastResult?.transforms.reduce((sum, t) => sum + t.count, 0) ?? 0;
+  const copiedLabel = totalChanges > 0 ? `コピー済み ✓ (${totalChanges}件修正)` : 'コピー済み ✓';
+
   const buttonLabel = {
     idle: label,
     copying: '変換中...',
-    copied: 'コピー済み ✓',
+    copied: copiedLabel,
     error: 'エラー',
   }[copyState];
 
@@ -110,12 +118,12 @@ export const AiCopyButton: React.FC<AiCopyButtonProps> = ({
 
   return (
     <div className="ai-copy-button-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
-      {/* メインボタン */}
+      {/* メインボタン: 差分プレビューを開く */}
       <button
         className={`ai-copy-button ai-copy-button--${copyState}`}
-        onClick={() => handleCopy(false)}
+        onClick={handleOpenPreview}
         disabled={buttonDisabled}
-        title="Markdownを最適化してAIに貼りやすい形式でコピー"
+        title="Markdownを清書してAIに貼りやすい形式でコピー（変更点を確認してからコピー）"
       >
         {buttonLabel}
       </button>
@@ -139,24 +147,21 @@ export const AiCopyButton: React.FC<AiCopyButtonProps> = ({
           className="ai-copy-button__dropdown"
           role="menu"
         >
-          <button role="menuitem" onClick={() => handleCopy(false)}>
-            最適化してコピー
-          </button>
-          <button role="menuitem" onClick={() => handleCopy(true)}>
-            最適化プレビューを表示してからコピー
+          <button role="menuitem" onClick={handleQuickCopy}>
+            プレビューなしですぐにコピー
           </button>
           <hr />
           <OptimizerOptionsMenu options={options} onChange={setOptions} />
         </div>
       )}
 
-      {/* レポートポップオーバー */}
-      {showReport && report && (
-        <OptimizationReportPopover
-          report={report}
-          onClose={() => setShowReport(false)}
-        />
-      )}
+      {/* 差分プレビューモーダル */}
+      <AiDiffPreview
+        originalMarkdown={previewMarkdown}
+        open={showDiffPreview}
+        onClose={() => setShowDiffPreview(false)}
+        onCopy={handleDiffCopy}
+      />
     </div>
   );
 };
@@ -197,33 +202,6 @@ const OptimizerOptionsMenu: React.FC<OptimizerOptionsMenuProps> = ({
           {label}
         </label>
       ))}
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// サブコンポーネント: レポートポップオーバー
-// ---------------------------------------------------------------------------
-
-interface OptimizationReportPopoverProps {
-  report: string;
-  onClose: () => void;
-}
-
-const OptimizationReportPopover: React.FC<OptimizationReportPopoverProps> = ({
-  report,
-  onClose,
-}) => {
-  return (
-    <div className="optimization-report-popover" role="dialog" aria-label="最適化レポート">
-      <div className="optimization-report-popover__header">
-        <strong>AIコピー 最適化レポート</strong>
-        <button onClick={onClose} aria-label="閉じる">×</button>
-      </div>
-      <pre className="optimization-report-popover__body">{report}</pre>
-      <div className="optimization-report-popover__footer">
-        <button onClick={onClose}>閉じる</button>
-      </div>
     </div>
   );
 };

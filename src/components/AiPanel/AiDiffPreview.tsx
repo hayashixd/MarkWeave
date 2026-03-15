@@ -18,6 +18,8 @@ interface AiDiffPreviewProps {
   open: boolean;
   /** 閉じるコールバック */
   onClose: () => void;
+  /** コピー完了コールバック（親コンポーネントで状態更新に使用） */
+  onCopy?: (result: OptimizationResult) => void;
 }
 
 /** 行単位のdiff結果 */
@@ -99,6 +101,7 @@ export const AiDiffPreview: React.FC<AiDiffPreviewProps> = ({
   originalMarkdown,
   open,
   onClose,
+  onCopy,
 }) => {
   const [options, setOptions] = useState<Partial<OptimizerOptions>>({});
   const [copied, setCopied] = useState(false);
@@ -118,10 +121,13 @@ export const AiDiffPreview: React.FC<AiDiffPreviewProps> = ({
   const changedCount = diffLines.filter((l) => l.type !== 'same').length;
 
   const handleCopy = useCallback(async () => {
+    const doCopy = () => {
+      setCopied(true);
+      onCopy?.(result);
+    };
     try {
       await navigator.clipboard.writeText(result.optimizedText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      doCopy();
     } catch {
       // フォールバック
       const textarea = document.createElement('textarea');
@@ -132,10 +138,9 @@ export const AiDiffPreview: React.FC<AiDiffPreviewProps> = ({
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      doCopy();
     }
-  }, [result.optimizedText]);
+  }, [result, onCopy]);
 
   const toggleOption = useCallback(
     (key: keyof OptimizerOptions) => {

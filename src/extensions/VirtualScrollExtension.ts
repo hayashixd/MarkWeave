@@ -13,15 +13,11 @@
  *
  * ## インクリメンタル更新戦略
  *
- * スクロール時はビューポート境界を通過するノード（通常 1〜5 個）のみを
- * DecorationSet.remove().add() で差分更新する。
- * これにより O(N log N) の全再構築を回避し O(K log N) に削減する。
- *
- * | イベント          | 処理                     | コスト         |
- * |-------------------|--------------------------|----------------|
- * | docChanged        | 全再構築（必須）           | O(N log N)     |
- * | viewportChanged   | インクリメンタル差分更新   | O(K log N)     |
- * | recalculateHeights| 高さ配列再構築 + 全再構築  | O(N log N)     |
+ * | イベント          | 処理                                      | コスト         |
+ * |-------------------|-------------------------------------------|----------------|
+ * | docChanged        | DecorationSet.map() + heightAccum 差分再構築 | O(N) + O(K log N) |
+ * | viewportChanged   | インクリメンタル差分更新                    | O(K log N)     |
+ * | recalculateHeights| 高さ配列再構築 + 全再構築                   | O(N log N)     |
  */
 
 import { Extension } from '@tiptap/core';
@@ -155,7 +151,8 @@ function createHiddenDecoration(offset: number, nodeSize: number, height: number
 }
 
 /**
- * 全ノードを走査してプラグイン状態を完全再構築する（docChanged 時）。
+ * 全ノードを走査してプラグイン状態を完全再構築する。
+ * 初回構築（init）および recalculateHeights で使用。
  * O(N log N) — DecorationSet.create の B-tree 構築コストを含む。
  */
 function buildFullState(
@@ -191,6 +188,113 @@ function buildFullState(
   return {
     decoSet: DecorationSet.create(state.doc, decorations),
     hiddenDecoMap,
+    heightAccum,
+    viewport,
+  };
+}
+
+/**
+ * docChanged 時の差分更新。
+ *
+ * DecorationSet.map(tr.mapping) でデコレーションの位置をマッピングした後、
+ * heightAccum を新しいドキュメントから再構築し、ビューポート境界の変化に
+ * 対応してデコレーションの追加・削除を行う。
+ *
+ * これにより O(N log N) の DecorationSet.create() を回避し、
+ * O(N) の走査 + O(K log N) の差分操作に削減する。
+ */
+function applyDocChangedUpdate(
+  prevState: VirtualScrollPluginState,
+  tr: Transaction,
+  newState: EditorState,
+  viewport: ViewportRange,
+): VirtualScrollPluginState {
+  invalidateHeightCache();
+
+  // DecorationSet.map() でトランザクションのマッピングを適用
+  // これにより挿入・削除によるオフセット変化がデコレーションに反映される
+  const mappedDecoSet = prevState.decoSet.map(tr.mapping, newState.doc);
+
+  // 新しいドキュメントから heightAccum を再構築
+  const heightAccum: HeightAccumEntry[] = [];
+  let accumulatedHeight = 0;
+
+  // マッピング後の hiddenDecoMap を構築（オフセットを更新）
+  const mappedHiddenOffsets = new Set<number>();
+  for (const oldOffset of prevState.hiddenDecoMap.keys()) {
+    const newOffset = tr.mapping.map(oldOffset);
+    mappedHiddenOffsets.add(newOffset);
+  }
+
+  const toRemove: Decoration[] = [];
+  const toAdd: Decoration[] = [];
+  const newHiddenDecoMap = new Map<number, Decoration>();
+
+  newState.doc.forEach((node, offset) => {
+    const height = getEstimatedHeight(node, offset);
+    const top = accumulatedHeight;
+    const bottom = top + height;
+
+    heightAccum.push({ offset, nodeSize: node.nodeSize, top, height });
+
+    const shouldHide = bottom < viewport.top || top > viewport.bottom;
+    const wasHidden = mappedHiddenOffsets.has(offset);
+
+    if (shouldHide && !wasHidden) {
+      // 新たに非表示になるノード → デコレーションを追加
+      const deco = createHiddenDecoration(offset, node.nodeSize, height);
+      toAdd.push(deco);
+      newHiddenDecoMap.set(offset, deco);
+    } else if (!shouldHide && wasHidden) {
+      // 新たに表示されるノード → マッピング済みデコレーションから該当するものを削除
+      // mappedDecoSet から offset 位置のデコレーションを探す
+      const decos = mappedDecoSet.find(offset, offset + node.nodeSize);
+      for (const d of decos) {
+        if ((d as unknown as { from: number }).from === offset) {
+          toRemove.push(d);
+        }
+      }
+    } else if (shouldHide && wasHidden) {
+      // 引き続き非表示 — mappedDecoSet に既にデコレーションがある
+      // 高さが変わった場合はデコレーションを入れ替える
+      const decos = mappedDecoSet.find(offset, offset + node.nodeSize);
+      let existingDeco: Decoration | null = null;
+      for (const d of decos) {
+        if ((d as unknown as { from: number }).from === offset) {
+          existingDeco = d;
+          break;
+        }
+      }
+      if (existingDeco) {
+        const existingHeight = (existingDeco as unknown as { type: { attrs: Record<string, string> } }).type.attrs['data-estimated-height'];
+        if (existingHeight !== String(height)) {
+          toRemove.push(existingDeco);
+          const deco = createHiddenDecoration(offset, node.nodeSize, height);
+          toAdd.push(deco);
+          newHiddenDecoMap.set(offset, deco);
+        } else {
+          newHiddenDecoMap.set(offset, existingDeco);
+        }
+      } else {
+        // デコレーションが見つからない場合は新規作成
+        const deco = createHiddenDecoration(offset, node.nodeSize, height);
+        toAdd.push(deco);
+        newHiddenDecoMap.set(offset, deco);
+      }
+    }
+    // shouldHide === false && wasHidden === false → 何もしない
+
+    accumulatedHeight += height;
+  });
+
+  let newDecoSet = mappedDecoSet;
+  if (toRemove.length > 0 || toAdd.length > 0) {
+    newDecoSet = mappedDecoSet.remove(toRemove).add(newState.doc, toAdd);
+  }
+
+  return {
+    decoSet: newDecoSet,
+    hiddenDecoMap: newHiddenDecoMap,
     heightAccum,
     viewport,
   };
@@ -369,7 +473,11 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
             const viewport = getViewportRange(scrollContainer);
 
             if (tr.docChanged) {
-              // ドキュメント変更: 高さキャッシュをクリアして全再構築
+              // ドキュメント変更: DecorationSet.map() + heightAccum 差分再構築
+              // 以前の状態がある場合は差分更新、なければフル構築
+              if (oldPluginState.heightAccum) {
+                return applyDocChangedUpdate(oldPluginState, tr, newState, viewport);
+              }
               return buildFullState(newState, viewport, true);
             }
 
@@ -530,12 +638,41 @@ export const VirtualScrollExtension = Extension.create<VirtualScrollOptions>({
 /**
  * ビューポート内の表示されているノードの実測高さをキャッシュする。
  * スクロール終了後に呼ばれ、推定値を実測値で更新する。
+ *
+ * P2 最適化: プラグイン状態の heightAccum を利用してビューポート内のノードのみを
+ * 効率的に特定し、全ノード走査での高さ累積計算を回避する。
  */
 function recalculateVisibleHeights(
   editorView: EditorView,
   scrollContainer: Element | null,
 ): void {
   const viewport = getViewportRange(scrollContainer);
+  const pluginState = pluginKey.getState(editorView.state) as VirtualScrollPluginState | undefined;
+
+  // heightAccum がある場合はそれを利用して全ノード走査を回避
+  if (pluginState?.heightAccum) {
+    for (const { offset, top, height } of pluginState.heightAccum) {
+      const bottom = top + height;
+      // ビューポート外のノードはスキップ
+      if (bottom < viewport.top) continue;
+      if (top > viewport.bottom) break; // heightAccum はソート済みなので早期終了可能
+
+      try {
+        const domNode = editorView.nodeDOM(offset);
+        if (domNode instanceof HTMLElement) {
+          const node = editorView.state.doc.nodeAt(offset);
+          if (node) {
+            updateHeightCache(node, offset, domNode);
+          }
+        }
+      } catch {
+        // nodeDOM が失敗するケースは無視（ノードが破棄済み等）
+      }
+    }
+    return;
+  }
+
+  // フォールバック: heightAccum がない場合は全ノード走査（従来動作）
   const doc = editorView.state.doc;
   let accumulatedHeight = 0;
 
