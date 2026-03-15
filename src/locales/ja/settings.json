@@ -7,7 +7,20 @@
     "writing": "執筆スタイル",
     "templates": "テンプレート",
     "snippets": "スニペット",
-    "plugins": "プラグイン"
+    "plugins": "プラグイン",
+    "license": "ライセンス"
+  },
+  "license": {
+    "title": "ライセンス認証",
+    "description": "Gumroad の購入完了メールに記載されているライセンスキーを入力してください。インターネット接続が必要です。",
+    "keyLabel": "ライセンスキー",
+    "activate": "認証する",
+    "activating": "認証中...",
+    "activated": "✓ ライセンス認証済み",
+    "activatedAt": "認証日",
+    "remove": "このデバイスから削除する",
+    "removeConfirm": "ライセンスをこのデバイスから削除します。別のデバイスで再び使用するにはキーの再入力が必要です。続けますか？",
+    "buyLink": "まだ購入していない方は"
   },
   "sidebar": {
     "showAdvancedTabs": "高度なサイドバータブを表示（Git・グラフ・バックリンク・AI）"

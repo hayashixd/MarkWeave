@@ -223,7 +223,44 @@ function translateAppError(error: AppError): string {
       return `ファイルの保存に失敗しました: ${error.detail?.path ?? ''}`;
     case 'Unknown':
       return error.detail?.message ?? '予期しないエラーが発生しました';
+    case 'LicenseInvalid':
+      return 'ライセンスキーが無効です。メールアドレスとキーを確認してください。';
+    case 'LicenseNotFound':
+      return 'ライセンスが見つかりません。';
     default:
       return '予期しないエラーが発生しました';
+  }
+}
+
+// ---- ライセンス ----
+
+export interface LicenseStatus {
+  activated: boolean;
+  email: string | null;
+  /** Unix エポック秒 */
+  activatedAt: number | null;
+}
+
+export async function activateLicense(key: string): Promise<LicenseStatus> {
+  try {
+    return await invoke<LicenseStatus>('activate_license', { key });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
+export async function getLicenseStatus(): Promise<LicenseStatus> {
+  try {
+    return await invoke<LicenseStatus>('get_license_status');
+  } catch {
+    return { activated: false, email: null, activatedAt: null };
+  }
+}
+
+export async function removeLicense(): Promise<void> {
+  try {
+    await invoke<void>('remove_license');
+  } catch (err) {
+    throw new Error(translateError(err));
   }
 }

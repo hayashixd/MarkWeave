@@ -29,6 +29,12 @@ pub enum AppError {
 
     #[error("Unknown error: {message}")]
     Unknown { message: String },
+
+    #[error("License key is invalid")]
+    LicenseInvalid,
+
+    #[error("License not found")]
+    LicenseNotFound,
 }
 
 impl AppError {

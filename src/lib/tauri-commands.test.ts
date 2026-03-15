@@ -47,4 +47,14 @@ describe('translateError', () => {
   it('handles non-string, non-Error input', () => {
     expect(translateError(42)).toBe('予期しないエラーが発生しました');
   });
+
+  it('translates LicenseInvalid error', () => {
+    const err = JSON.stringify({ kind: 'LicenseInvalid' });
+    expect(translateError(err)).toContain('ライセンスキーが無効');
+  });
+
+  it('translates LicenseNotFound error', () => {
+    const err = JSON.stringify({ kind: 'LicenseNotFound' });
+    expect(translateError(err)).toContain('ライセンスが見つかりません');
+  });
 });

@@ -1,4 +1,5 @@
 pub mod ai_commands;
+pub mod license_commands;
 pub mod db_commands;
 pub mod export_commands;
 pub mod fs_commands;

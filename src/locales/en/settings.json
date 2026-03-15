@@ -7,7 +7,20 @@
     "writing": "Writing Style",
     "templates": "Templates",
     "snippets": "Snippets",
-    "plugins": "Plugins"
+    "plugins": "Plugins",
+    "license": "License"
+  },
+  "license": {
+    "title": "License Activation",
+    "description": "Enter the license key from your Gumroad purchase confirmation email. An internet connection is required.",
+    "keyLabel": "License key",
+    "activate": "Activate",
+    "activating": "Activating...",
+    "activated": "✓ License activated",
+    "activatedAt": "Activated on",
+    "remove": "Remove from this device",
+    "removeConfirm": "This will remove the license from this device. You will need to re-enter your key to use it again. Continue?",
+    "buyLink": "Don't have a license yet?"
   },
   "sidebar": {
     "showAdvancedTabs": "Show advanced sidebar tabs (Git, Graph, Backlinks, AI)"

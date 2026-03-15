@@ -15,17 +15,19 @@ import { WritingTab } from './tabs/WritingTab';
 import { PluginsTab } from './tabs/PluginsTab';
 import { SnippetsTab } from './tabs/SnippetsTab';
 import { TemplatesTab } from './tabs/TemplatesTab';
+import { LicenseTab } from './tabs/LicenseTab';
 import { useTranslation } from '../../i18n';
 
-type TabId = 'appearance' | 'editor' | 'writing' | 'snippets' | 'templates' | 'plugins';
+type TabId = 'appearance' | 'editor' | 'writing' | 'snippets' | 'templates' | 'plugins' | 'license';
 
 interface PreferencesDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: TabId;
 }
 
-export function PreferencesDialog({ isOpen, onClose }: PreferencesDialogProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('appearance');
+export function PreferencesDialog({ isOpen, onClose, initialTab }: PreferencesDialogProps) {
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? 'appearance');
   const { t } = useTranslation('settings');
 
   const TABS: { id: TabId; label: string }[] = [
@@ -35,6 +37,7 @@ export function PreferencesDialog({ isOpen, onClose }: PreferencesDialogProps) {
     { id: 'snippets', label: t('tabs.snippets') },
     { id: 'templates', label: t('tabs.templates') },
     { id: 'plugins', label: t('tabs.plugins') },
+    { id: 'license', label: t('tabs.license') },
   ];
 
   // Escape キーで閉じる
@@ -106,6 +109,7 @@ export function PreferencesDialog({ isOpen, onClose }: PreferencesDialogProps) {
             {activeTab === 'snippets' && <SnippetsTab />}
             {activeTab === 'templates' && <TemplatesTab />}
             {activeTab === 'plugins' && <PluginsTab />}
+            {activeTab === 'license' && <LicenseTab />}
           </div>
         </div>
       </div>

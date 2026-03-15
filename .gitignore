@@ -35,3 +35,9 @@ test-results/
 
 # Logs
 *.log
+
+# Claude Code
+.claude/settings.local.json
+
+# Test recordings
+test-recordings/

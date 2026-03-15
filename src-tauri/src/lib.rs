@@ -6,6 +6,7 @@ mod models;
 mod updater;
 
 use commands::ai_commands;
+use commands::license_commands;
 use commands::db_commands;
 use commands::export_commands;
 use commands::fs_commands;
@@ -96,6 +97,9 @@ pub fn run() {
             image_commands::purge_image_cache,
             search_commands::search_workspace,
             ai_commands::call_ai_api,
+            license_commands::activate_license,
+            license_commands::get_license_status,
+            license_commands::remove_license,
             updater::check_for_updates,
             updater::install_update,
         ])
