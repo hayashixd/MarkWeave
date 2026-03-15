@@ -237,6 +237,9 @@ importers:
       eslint-plugin-react-refresh:
         specifier: ^0.4.20
         version: 0.4.26(eslint@9.39.3(jiti@2.6.1))
+      gif-encoder-2:
+        specifier: ^1.0.5
+        version: 1.0.5
       globals:
         specifier: ^16.1.0
         version: 16.5.0
@@ -2336,6 +2339,9 @@ packages:
   gensync@1.0.0-beta.2:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
     engines: {node: '>=6.9.0'}
+
+  gif-encoder-2@1.0.5:
+    resolution: {integrity: sha512-fsRAKbZuUoZ7FYGjpFElmflTkKwsn/CzAmL/xDl4558aTAgysIDCUF6AXWO8dmai/ApfZACbPVAM+vPezJXlFg==}
 
   github-slugger@2.0.0:
     resolution: {integrity: sha512-IaOQ9puYtjrkq7Y0Ygl9KDZnrf/aiUJYUpVf89y8kyaxbRG7Y1SrX/jaumrv81vc61+kiMempujsM3Yw7w5qcw==}
@@ -5695,6 +5701,8 @@ snapshots:
     optional: true
 
   gensync@1.0.0-beta.2: {}
+
+  gif-encoder-2@1.0.5: {}
 
   github-slugger@2.0.0: {}
 

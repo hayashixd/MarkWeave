@@ -1,0 +1,43 @@
+name: Sync doc-public to MarkWeave-site
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'doc-public/**'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Checkout MarkWeave-site
+        uses: actions/checkout@v4
+        with:
+          repository: hayashixd/MarkWeave-site
+          token: ${{ secrets.SITE_REPO_TOKEN }}
+          path: site-repo
+
+      - name: Copy doc-public to site repo
+        run: |
+          mkdir -p site-repo/doc-public
+          rsync -av --delete doc-public/ site-repo/doc-public/
+
+      - name: Commit and push if changed
+        working-directory: site-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add doc-public/
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "sync: update doc-public from MarkWeave $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push origin main
+          fi

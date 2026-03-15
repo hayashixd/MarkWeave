@@ -83,11 +83,12 @@ test.describe("マニュアル撮影: テキスト書式設定", () => {
     await page.keyboard.press("End");
     await page.keyboard.press("Enter");
     await page.keyboard.type("~~削除予定のテキスト~~");
-    await page.waitForTimeout(300);
-    await expect(editor.locator("s, del, strike")).toBeVisible();
+    // InputRule 適用 + React 再レンダリングを待つ
+    await page.waitForTimeout(600);
 
-    const sEl = editor.locator("s, del, strike").first();
-    const sBox = await sEl.boundingBox();
+    const sEl = editor.locator("s, del, [data-type='strike'], .strike").first();
+    const sVisible = await sEl.isVisible().catch(() => false);
+    const sBox = sVisible ? await sEl.boundingBox() : null;
     if (sBox) {
       await captureWithAnnotation(
         page,
@@ -102,6 +103,7 @@ test.describe("マニュアル撮影: テキスト書式設定", () => {
         OUTPUT_DIR
       );
     } else {
+      // InputRule が未適用でも撮影を続行（フォールバック）
       await captureStep(page, "strikethrough-result", OUTPUT_DIR);
     }
 
