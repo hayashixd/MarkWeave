@@ -49,7 +49,9 @@
       "Bash(git remote:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(gh repo:*)",
+      "Bash(cd:*)"
     ]
   },
   "mcpToolSearch": true
