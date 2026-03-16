@@ -1,3 +1,85 @@
+Write Markdown without thinking about Markdown — a WYSIWYG editor for developers who publish
+
+Typora-style writing experience × one-click export for your platform × 100% local files.
+MarkWeave lets you write with a word-processor feel while keeping everything in clean, standard Markdown. Export directly to dev.to, Hashnode, Zenn, or Qiita with formatting preserved. Your files live on your disk — no cloud, no subscription, no lock-in.
+
+Who is this for?
+
+・Typora users — You love the writing experience, but need a real publishing workflow
+・VS Code users — Switching between editor and preview every few minutes breaks your flow
+・AI power users — Manually cleaning up Markdown before every Claude or ChatGPT paste gets old fast
+・Privacy-first developers — Done with Notion or HackMD owning your files. You want local.
+
+---
+
+What's inside
+
+・✅ Typora-style WYSIWYG (type # for headings, - for lists — rendered as you type)
+・✅ Tables (drag rows to reorder, resize columns, Tab between cells)
+・✅ Code blocks (40+ languages with syntax highlighting)
+・✅ Math (KaTeX) and diagrams (Mermaid — flowcharts, sequence diagrams, and more)
+・✅ YAML Front Matter editor (GUI for title, tags, cover image, and more)
+・✅ Markdown export (optimized for Zenn, Qiita, dev.to, Hashnode)
+・✅ HTML export (Base64-embedded images — fully self-contained, no broken links)
+・✅ PDF, Word, EPUB (via Pandoc)
+・✅ AI Copy (fixes headings and code fences, then copies clean Markdown to clipboard)
+・✅ AI templates (BYOK — bring your own Claude API key)
+・✅ Zen / Focus / Typewriter mode
+・✅ Pomodoro timer and word sprint
+・✅ Workspace with external change detection (works with Dropbox / OneDrive)
+・✅ In-app auto-update
+
+---
+
+What you get
+
+・Windows installer (.msi)
+・Linux AppImage
+・Up to 3 devices
+・All future updates included
+
+---
+
+System requirements
+
+・🪟 Windows 10/11 (x86-64)
+・🐧 Linux (x86-64)
+・🍎 macOS: planned for a future release
+
+---
+
+Pricing
+
+・30-day free trial — full access, no credit card required at install
+・One-time purchase: $24.99 after trial
+・Up to 3 devices · no subscription · yours forever
+・💳 Visa / Mastercard / AmEx and PayPal accepted
+
+FAQ
+
+Q. Is there a free trial?
+ Yes — you get 30 days of full access after installing. When the trial expires, enter your license key under Settings → License.
+
+Q. What payment methods do you accept?
+ Visa, Mastercard, AmEx, and PayPal.
+
+Q. Windows shows a SmartScreen warning during install.
+ The installer isn't Authenticode-signed yet, so Windows flags it. Click "More info → Run anyway" to proceed. Proper code signing is planned for the commercial release.
+
+Q. Is macOS supported?
+ Windows and Linux only for now. macOS support is planned for a future release.
+
+Q. Can I get a refund?
+ Refunds follow Gumroad's standard refund policy. Contact us via Gumroad's message feature after purchase.
+
+---
+
+Manual & product page: https://hayashixd.github.io/MarkWeave/
+GitHub: https://github.com/hayashixd/MarkWeave
+Dev article (Zenn, Japanese): https://zenn.dev/hayashixd/articles/f00eea197f087c
+
+========================================
+
 Markdown を記法なしで書いて、技術記事をそのまま公開できるエディタ
 
 Typora ライクな WYSIWYG 編集 × Zenn / Qiita 向けエクスポート × ローカルファースト。
