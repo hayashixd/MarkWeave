@@ -48,6 +48,7 @@ jobs:
         run: pnpm install
 
       - name: Build Tauri app
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,3 +64,66 @@ jobs:
           prerelease: false
           generateReleaseNotes: true
           args: ${{ matrix.args }}
+
+      - name: Calculate SHA256 hashes
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/hashes"
+          echo '${{ steps.tauri.outputs.artifactPaths }}' | jq -r '.[]' | while IFS= read -r f; do
+            f="${f//\\//}"
+            case "$f" in
+              *.msi|*.AppImage|*.deb)
+                if [ -f "$f" ]; then
+                  HASH=$(sha256sum "$f" | cut -d' ' -f1)
+                  NAME=$(basename "$f")
+                  echo "${HASH}  ${NAME}" >> "$RUNNER_TEMP/hashes/hash.txt"
+                fi
+                ;;
+            esac
+          done
+
+      - name: Upload hash artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hashes-${{ matrix.platform }}
+          path: ${{ runner.temp }}/hashes/hash.txt
+          if-no-files-found: warn
+
+  append-checksums:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download hash artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hashes-*
+          merge-multiple: true
+          path: /tmp/hashes
+
+      - name: Append SHA256 checksums to release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          HASHES=$(sort /tmp/hashes/hash.txt 2>/dev/null)
+          if [ -z "$HASHES" ]; then
+            echo "No hash files found, skipping."
+            exit 0
+          fi
+          CURRENT_BODY=$(gh release view "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --json body -q .body)
+          gh release edit "${{ github.ref_name }}" \
+            --repo "${{ github.repository }}" \
+            --notes "${CURRENT_BODY}
+## SHA256 チェックサム
+
+ダウンロードしたファイルの整合性を確認できます。
+
+\`\`\`
+${HASHES}
+\`\`\`
+
+**Windows:** \`certutil -hashfile MarkWeave_*.msi SHA256\`
+**Linux:** \`sha256sum MarkWeave_*.AppImage\`"
