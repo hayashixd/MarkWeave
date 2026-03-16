@@ -364,3 +364,51 @@ view(editorView) {
 ## マニュアル更新ルール
 
 UI に影響する変更をした場合は `docs/manual/manual-authoring-rules.md` を参照して対応すること。
+
+---
+
+## 🚀 リリース前チェックリスト（必須）
+
+**タグをプッシュする前に、ローカルで以下をすべて通過させること。**
+GitHub Actions でのビルド失敗はリリースを止めるため、事前確認を徹底する。
+
+### 1. TypeScript 型チェック
+```bash
+pnpm build
+```
+- `tsc -b` と `vite build` が両方エラーなしで完了すること
+- テストファイルが型エラーを起こしていないことも確認される
+
+### 2. フロントエンドテスト
+```bash
+pnpm test
+```
+- すべてのテストが PASS すること
+
+### 3. Rust ビルド・テスト
+```bash
+cd src-tauri && cargo build && cargo test
+```
+- コンパイルエラーがないこと
+- ユニットテストがすべて通ること
+
+### 4. バージョン番号の一致確認
+以下の3ファイルのバージョンが一致していること：
+
+| ファイル | 確認箇所 |
+|---------|---------|
+| `package.json` | `"version"` |
+| `src-tauri/Cargo.toml` | `version =` |
+| `src-tauri/tauri.conf.json` | `"version"` |
+
+### 5. タグ・プッシュ
+```bash
+# バージョンコミット
+git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+git commit -m "chore: bump version to vX.Y.Z"
+
+# タグ作成とプッシュ
+git tag vX.Y.Z
+git push origin main
+git push origin vX.Y.Z
+```
