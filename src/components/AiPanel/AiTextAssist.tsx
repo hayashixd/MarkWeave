@@ -58,12 +58,12 @@ function processText(text: string, action: AiAssistAction): string {
       return result;
     }
     case 'translate': {
-      // 日英判定→ヒント付与（実際の翻訳はAPI接続時に実装）
+      // 日英判定
       const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
       if (hasJapanese) {
-        return `[翻訳候補: 日本語→英語]\n\n原文:\n${text}\n\n※ AI API キーを設定すると自動翻訳が利用できます`;
+        return `[翻訳候補: 日本語→英語]\n\n原文:\n${text}`;
       }
-      return `[翻訳候補: English→日本語]\n\n原文:\n${text}\n\n※ AI API キーを設定すると自動翻訳が利用できます`;
+      return `[翻訳候補: English→日本語]\n\n原文:\n${text}`;
     }
     case 'summarize': {
       // 簡易要約: 文分割→先頭文抽出
