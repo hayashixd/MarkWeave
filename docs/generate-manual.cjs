@@ -122,6 +122,24 @@ const imgs = {
   linkInsertDialog: loadImage('front-matter/03_link-insert-dialog.png'),
   wordCountDialog: loadImage('front-matter/04_word-count-dialog.png'),
   extrasOverview: loadImage('front-matter/05_extras-overview.png'),
+  // file-management (新規)
+  recentFilesMenu: loadImage('file-management/01_recent-files-menu.png'),
+  dailyNote: loadImage('file-management/02_daily-note-created.png'),
+  templateDialog: loadImage('file-management/03_template-dialog.png'),
+  saveAsMarkdown: loadImage('file-management/04_save-as-markdown.png'),
+  printDialog: loadImage('file-management/05_print-dialog.png'),
+  // sidebar-panels (新規)
+  backlinksPanel: loadImage('sidebar-panels/01_backlinks-panel.png'),
+  tagsPanel: loadImage('sidebar-panels/02_tags-panel.png'),
+  gitPanel: loadImage('sidebar-panels/03_git-panel.png'),
+  sidebarToggle: loadImage('sidebar-panels/04_sidebar-toggle.png'),
+  // floating-toc (新規)
+  floatingToc: loadImage('floating-toc/01_floating-toc.png'),
+  zoomControls: loadImage('floating-toc/02_zoom-controls.png'),
+  // writing-tools (新規)
+  pomodoroTimer: loadImage('writing-tools/01_pomodoro-timer.png'),
+  wordSprintWidget: loadImage('writing-tools/02_word-sprint-widget.png'),
+  docStatsDialog: loadImage('writing-tools/03_doc-stats-dialog.png'),
 };
 
 function imgTag(src, alt, caption) {
@@ -391,6 +409,10 @@ const html = `<!DOCTYPE html>
     <li><a href="#front-matter">YAML Front Matter・リンク・統計</a></li>
     <li><a href="#ai-copy">AI コピー機能</a></li>
     <li><a href="#ai-template">AI テンプレートパネル</a></li>
+    <li><a href="#file-management">ファイル管理の応用</a></li>
+    <li><a href="#sidebar-panels">サイドバーパネル詳細</a></li>
+    <li><a href="#view-tools">フローティング目次・ズーム</a></li>
+    <li><a href="#writing-tools">執筆ツール</a></li>
     <li><a href="#shortcuts">キーボードショートカット一覧</a></li>
     <li><a href="#faq">FAQ</a></li>
   </ol>
@@ -1081,9 +1103,108 @@ graph TD
     </div>
   </section>
 
-  <!-- 22. キーボードショートカット一覧 -->
+  <!-- 24. ファイル管理の応用 -->
+  <section id="file-management">
+    <h2>24. ファイル管理の応用</h2>
+
+    <h3>最近使ったファイル・最近のワークスペース</h3>
+    <p>メニューバーの「ファイル」→「最近使ったファイル...」から以前開いたファイルを素早く再度開けます。「最近のワークスペース...」では最近使ったフォルダに切り替えられます。</p>
+    ${imgTag(imgs.recentFilesMenu, '最近使ったファイルメニュー', 'ファイルメニューの「最近使ったファイル」一覧')}
+
+    <h3>デイリーノート</h3>
+    <p>メニューバーの「ファイル」→「デイリーノート作成」（<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd>）で、今日の日付名（例: <code>2026-03-16.md</code>）のファイルを作成します。ワークスペース使用時は <code>daily/</code> フォルダに作成されます。</p>
+    ${imgTag(imgs.dailyNote, 'デイリーノート', '日付名で作成されたデイリーノートファイル')}
+
+    <h3>テンプレートから新規作成</h3>
+    <p>メニューバーの「ファイル」→「テンプレートから新規作成...」で定義済みのファイルテンプレートを元に新規ファイルを作成します。</p>
+    ${imgTag(imgs.templateDialog, 'テンプレート選択ダイアログ', 'ファイルテンプレート選択ダイアログ')}
+
+    <h3>別名で保存（形式変換）</h3>
+    <p>「ファイル」→「別名で保存」からファイルを別の形式で保存できます。</p>
+    <ul>
+      <li><strong>Markdown として保存</strong>（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd>）: Zenn / Qiita 投稿用 Markdown ファイルとして保存</li>
+      <li><strong>HTML として保存</strong>（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>）: シンプルな HTML ファイルとして保存</li>
+    </ul>
+    ${imgTag(imgs.saveAsMarkdown, 'Markdownとして保存', 'Markdown として保存ダイアログ')}
+
+    <h3>印刷</h3>
+    <p>メニューバーの「ファイル」→「印刷...」（<kbd>Ctrl</kbd>+<kbd>P</kbd>）で OS 標準の印刷ダイアログを開きます。</p>
+    ${imgTag(imgs.printDialog, '印刷ダイアログ', 'OS 標準の印刷ダイアログ')}
+  </section>
+
+  <!-- 25. サイドバーパネル詳細 -->
+  <section id="sidebar-panels">
+    <h2>25. サイドバーパネル詳細</h2>
+
+    <h3>サイドバーの表示/非表示</h3>
+    <p>メニューバーの「表示」→「サイドバーの表示/非表示」（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>）でサイドバー全体をトグルできます。編集領域を最大化したいときに便利です。</p>
+    ${imgTag(imgs.sidebarToggle, 'サイドバートグル', 'サイドバーが非表示になった状態')}
+
+    <h3>バックリンク</h3>
+    <p>「表示」→「バックリンク」（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd>）で現在のファイルを参照している他のファイルの一覧を表示します。Wikiリンク（<code>[[ファイル名]]</code>）でドキュメントを相互参照している場合に便利です。</p>
+    ${imgTag(imgs.backlinksPanel, 'バックリンクパネル', 'バックリンクパネル — 参照元ファイルの一覧')}
+    <div class="tip">
+      <strong>有効化:</strong> 設定（<kbd>Ctrl</kbd>+<kbd>,</kbd>）→「プラグイン」タブ → バックリンクを有効化してください（デフォルト非表示）。
+    </div>
+
+    <h3>タグビュー</h3>
+    <p>「表示」→「タグビュー」（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>5</kbd>）で YAML Front Matter や本文中の <code>#タグ</code> を収集・一覧表示します。タグをクリックして関連ファイルを絞り込めます。</p>
+    ${imgTag(imgs.tagsPanel, 'タグビューパネル', 'タグビュー — タグ一覧と関連ファイル')}
+    <div class="tip">
+      <strong>有効化:</strong> 設定 →「プラグイン」タブ → タグビューを有効化してください（デフォルト非表示）。
+    </div>
+
+    <h3>Git パネル</h3>
+    <p>「表示」→「Git パネル」（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>7</kbd>）でワークスペースの Git 状態（変更ファイル・ステージング・差分）を表示します。Git のインストールが必要です。</p>
+    ${imgTag(imgs.gitPanel, 'Git パネル', 'Git パネル — 変更ファイルとステージング状態')}
+    <div class="tip">
+      <strong>有効化:</strong> 設定 →「プラグイン」タブ → Git パネルを有効化してください（デフォルト非表示）。
+    </div>
+  </section>
+
+  <!-- 26. フローティング目次・ズーム -->
+  <section id="view-tools">
+    <h2>26. フローティング目次・ズーム</h2>
+
+    <h3>フローティング目次</h3>
+    <p>
+      メニューバーの「表示」→「フローティング目次」（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>）でエディタ内に小さな目次ウィンドウを表示します。
+      アウトラインパネルとは異なり、サイドバーを閉じたままや Zen モード中でも利用できます。
+    </p>
+    ${imgTag(imgs.floatingToc, 'フローティング目次', 'エディタ内に表示されるフローティング目次')}
+
+    <h3>ズーム</h3>
+    <p>メニューバーの「表示」→「拡大 / 縮小 / 実際のサイズ」またはショートカットで表示サイズを調整できます。</p>
+    <table>
+      <thead><tr><th>操作</th><th>ショートカット</th></tr></thead>
+      <tbody>
+        <tr><td>拡大</td><td><kbd>Ctrl</kbd>+<kbd>=</kbd></td></tr>
+        <tr><td>縮小</td><td><kbd>Ctrl</kbd>+<kbd>-</kbd></td></tr>
+        <tr><td>実際のサイズにリセット</td><td><kbd>Ctrl</kbd>+<kbd>0</kbd></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 27. 執筆ツール -->
+  <section id="writing-tools">
+    <h2>27. 執筆ツール</h2>
+
+    <h3>ポモドーロタイマー</h3>
+    <p>画面下部の<strong>ステータスバー</strong>にあるポモドーロアイコンをクリックして起動します。25分作業 + 5分休憩のサイクルで集中時間を管理します。タイマーをクリックして開始・一時停止・リセットができます。</p>
+    ${imgTag(imgs.pomodoroTimer, 'ポモドーロタイマー', 'ステータスバーのポモドーロタイマー')}
+
+    <h3>ワードスプリント</h3>
+    <p>画面下部の<strong>ステータスバー</strong>にあるワードスプリントアイコンをクリックして起動します。時間制限内（例: 10分）で目標文字数を達成するチャレンジ機能です。進捗がリアルタイムで表示されます。</p>
+    ${imgTag(imgs.wordSprintWidget, 'ワードスプリント', 'ステータスバーのワードスプリントウィジェット')}
+
+    <h3>文書統計</h3>
+    <p>メニューバーの「編集」→「文書統計...」でダイアログを開き、文字数・単語数・段落数・推定読了時間・可読性スコアを確認できます。ステータスバーにも文字数と読了時間がリアルタイムで常時表示されています。</p>
+    ${imgTag(imgs.docStatsDialog, '文書統計ダイアログ', '文書統計 — 文字数・単語数・読了時間・可読性スコア')}
+  </section>
+
+  <!-- 28. キーボードショートカット一覧 -->
   <section id="shortcuts">
-    <h2>24. キーボードショートカット一覧</h2>
+    <h2>28. キーボードショートカット一覧</h2>
     <table class="shortcut-table">
       <thead>
         <tr>
@@ -1099,6 +1220,9 @@ graph TD
         <tr><td>フォルダを開く</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></td><td>—</td></tr>
         <tr><td>保存</td><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>—</td></tr>
         <tr><td>名前を付けて保存</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>—</td></tr>
+        <tr><td>Markdown として保存</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>—</td></tr>
+        <tr><td>HTML として保存</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd></td><td>—</td></tr>
+        <tr><td>デイリーノート作成</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd></td><td>—</td></tr>
         <tr><td colspan="3" style="background:#f1f3f5;font-weight:600;color:#495057">テキスト書式</td></tr>
         <tr><td>太字</td><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td><code>**text**</code></td></tr>
         <tr><td>斜体</td><td><kbd>Ctrl</kbd>+<kbd>I</kbd></td><td><code>*text*</code></td></tr>
@@ -1114,6 +1238,12 @@ graph TD
         <tr><td>引用ブロック</td><td>—</td><td><code>&gt; </code>（行頭）</td></tr>
         <tr><td>コードブロック</td><td>—</td><td><code>&#96;&#96;&#96;</code>（行頭）</td></tr>
         <tr><td>水平線</td><td>—</td><td><code>---</code>（行頭）</td></tr>
+        <tr><td colspan="3" style="background:#f1f3f5;font-weight:600;color:#495057">編集</td></tr>
+        <tr><td>元に戻す</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>—</td></tr>
+        <tr><td>やり直し</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>—</td></tr>
+        <tr><td>プレーンテキスト貼り付け</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>—</td></tr>
+        <tr><td>単語補完</td><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>—</td></tr>
+        <tr><td>設定</td><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>—</td></tr>
         <tr><td colspan="3" style="background:#f1f3f5;font-weight:600;color:#495057">ナビゲーション・検索</td></tr>
         <tr><td>検索</td><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>—</td></tr>
         <tr><td>検索・置換</td><td><kbd>Ctrl</kbd>+<kbd>H</kbd></td><td>—</td></tr>
@@ -1121,23 +1251,32 @@ graph TD
         <tr><td>行番号ジャンプ</td><td><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>—</td></tr>
         <tr><td>行ブックマーク設置</td><td><kbd>Ctrl</kbd>+<kbd>F2</kbd></td><td>—</td></tr>
         <tr><td>次のブックマークへ</td><td><kbd>F2</kbd></td><td>—</td></tr>
+        <tr><td>前のブックマークへ</td><td><kbd>Shift</kbd>+<kbd>F2</kbd></td><td>—</td></tr>
         <tr><td colspan="3" style="background:#f1f3f5;font-weight:600;color:#495057">モード・表示</td></tr>
         <tr><td>ソースモード切替</td><td><kbd>Ctrl</kbd>+<kbd>/</kbd></td><td>—</td></tr>
-        <tr><td>フルスクリーン</td><td><kbd>F11</kbd></td><td>—</td></tr>
+        <tr><td>サイドバー 表示/非表示</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd></td><td>—</td></tr>
+        <tr><td>アウトラインパネル</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>1</kbd></td><td>—</td></tr>
+        <tr><td>ファイルパネル</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>2</kbd></td><td>—</td></tr>
+        <tr><td>AI テンプレート</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>3</kbd></td><td>—</td></tr>
+        <tr><td>バックリンク</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd></td><td>—</td></tr>
+        <tr><td>タグビュー</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>5</kbd></td><td>—</td></tr>
+        <tr><td>Git パネル</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>7</kbd></td><td>—</td></tr>
+        <tr><td>フローティング目次</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>—</td></tr>
+        <tr><td>ペイン分割</td><td><kbd>Ctrl</kbd>+<kbd>\</kbd></td><td>—</td></tr>
+        <tr><td>フォーカスモード</td><td><kbd>F8</kbd></td><td>—</td></tr>
+        <tr><td>タイプライターモード</td><td><kbd>F9</kbd></td><td>—</td></tr>
+        <tr><td>Zen モード</td><td><kbd>F11</kbd></td><td>—</td></tr>
+        <tr><td>拡大</td><td><kbd>Ctrl</kbd>+<kbd>=</kbd></td><td>—</td></tr>
+        <tr><td>縮小</td><td><kbd>Ctrl</kbd>+<kbd>-</kbd></td><td>—</td></tr>
+        <tr><td>実際のサイズ</td><td><kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>—</td></tr>
         <tr><td>ペイン間フォーカス移動</td><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←/→</kbd></td><td>—</td></tr>
-        <tr><td colspan="3" style="background:#f1f3f5;font-weight:600;color:#495057">編集</td></tr>
-        <tr><td>元に戻す</td><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>—</td></tr>
-        <tr><td>やり直し</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>—</td></tr>
-        <tr><td>プレーンテキスト貼り付け</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd></td><td>—</td></tr>
-        <tr><td>単語補完</td><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>—</td></tr>
-        <tr><td>設定</td><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>—</td></tr>
       </tbody>
     </table>
   </section>
 
-  <!-- 23. FAQ -->
+  <!-- 29. FAQ -->
   <section id="faq">
-    <h2>25. FAQ</h2>
+    <h2>29. FAQ</h2>
     <dl>
       <div class="faq-item">
         <dt>Q1. Markdown 記法を知らなくても使えますか？</dt>
