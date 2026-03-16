@@ -114,21 +114,16 @@ jobs:
           CURRENT_BODY=$(gh release view "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
             --json body -q .body)
-          export CURRENT_BODY HASHES
-          python3 - <<'PYEOF'
-import os
-current = os.environ['CURRENT_BODY']
-hashes = os.environ['HASHES']
-with open('/tmp/release_notes.md', 'w') as f:
-    f.write(
-        current + '\n'
-        '## SHA256 チェックサム\n\n'
-        'ダウンロードしたファイルの整合性を確認できます。\n\n'
-        '```\n' + hashes + '\n```\n\n'
-        '**Windows:** `certutil -hashfile MarkWeave_*.msi SHA256`\n'
-        '**Linux:** `sha256sum MarkWeave_*.AppImage`'
-    )
-PYEOF
+          {
+            printf '%s\n' "$CURRENT_BODY"
+            printf '\n## SHA256 チェックサム\n\n'
+            printf 'ダウンロードしたファイルの整合性を確認できます。\n\n'
+            printf '```\n'
+            printf '%s\n' "$HASHES"
+            printf '```\n\n'
+            printf '**Windows:** `certutil -hashfile MarkWeave_*.msi SHA256`\n'
+            printf '**Linux:** `sha256sum MarkWeave_*.AppImage`\n'
+          } > /tmp/release_notes.md
           gh release edit "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \
             --notes-file /tmp/release_notes.md
