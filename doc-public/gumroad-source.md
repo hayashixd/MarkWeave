@@ -6,8 +6,9 @@
   ## 更新手順
   1. このファイルを編集する
   2. `pnpm gumroad:build` を実行する
-  3. 生成された `gumroad-description.html` の内容を
-     Gumroad ダッシュボード → 商品編集 → Description の HTML モードに貼り付けて保存
+  3. 生成された `gumroad-description.txt` の内容を
+     Gumroad ダッシュボード → 商品編集 → Description に貼り付け、
+     ツールバーで見出し・リストを手動整形して保存
 
   ## 他ファイルとの同期が必要なセクション
   このファイルのみ更新しても、以下のファイルには自動反映されません。

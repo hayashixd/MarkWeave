@@ -308,9 +308,10 @@ function main() {
   console.log('✓ gumroad-description.html を生成しました');
   console.log('✓ gumroad-description.txt  を生成しました');
   console.log('');
-  console.log('次の手順:');
-  console.log('  Gumroad ダッシュボード → 商品編集 → Description → HTML モード');
-  console.log('  gumroad-description.html の内容を全選択して貼り付け → 保存');
+  console.log('Gumroad への貼り付け手順:');
+  console.log('  1. Gumroad ダッシュボード → 商品編集 → Description');
+  console.log('  2. gumroad-description.txt の内容をコピー');
+  console.log('  3. Gumroad エディタに貼り付け → ツールバーで見出し・リストを手動整形 → 保存');
 
   // 同期が必要なファイルのリマインダー
   const syncWarnings = [
