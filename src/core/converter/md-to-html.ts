@@ -140,7 +140,7 @@ export function injectIntoTemplate(
   options: MdToHtmlOptions
 ): string {
   const themeCss = loadThemeCss(options.theme);
-  const highlightCss = options.highlight ? loadHighlightCss() : '';
+  const highlightCss = options.highlight ? loadHighlightCss(options.theme) : '';
   const katexCss = options.math ? loadKatexCss() : '';
 
   // TOC 生成
