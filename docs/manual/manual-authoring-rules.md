@@ -43,8 +43,31 @@
 - 画像だけ更新して手順本文を放置しない
 - 実装と不整合な操作手順を掲載しない
 
-## 7. 参照リンク
+## 7. 活用事例ページ
+
+| ファイル | 役割 |
+|---------|------|
+| `doc-public/use-cases.html` | 活用事例ページ（手作り版・既存 GIF 参照） |
+| `docs/generate-use-cases.cjs` | スクリーンショット埋め込み版を生成するスクリプト |
+| `docs/use-case-screenshots/` | 新規撮影したスクリーンショット / GIF の配置先 |
+
+### 活用事例の画像追加フロー
+
+```
+1. docs/use-case-screenshots/{scenario}/ に GIF / PNG を配置
+   - s1-frontmatter/front-matter-edit.gif
+   - s3-zen/zen-pomodoro.gif
+   - s4-workspace/workspace-filetree.gif
+   - s4-workspace/external-change.gif
+
+2. node docs/generate-use-cases.cjs を実行
+   → doc-public/use-cases.html が画像埋め込み版に更新される
+```
+
+## 8. 参照リンク
 
 - マニュアル管理トップ: [README.md](./README.md)
 - 既存の生成スクリプト: [../generate-manual.cjs](../generate-manual.cjs)
+- 活用事例生成スクリプト: [../generate-use-cases.cjs](../generate-use-cases.cjs)
 - 生成マニュアル HTML: [../../doc-public/manuals/user-manual.html](../../doc-public/manuals/user-manual.html)
+- 活用事例 HTML: [../../doc-public/use-cases.html](../../doc-public/use-cases.html)

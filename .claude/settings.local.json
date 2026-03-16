@@ -91,7 +91,11 @@
       "Bash(gh run:*)",
       "Bash(gh release:*)",
       "Bash(pnpm tsc:*)",
-      "Bash(cd src-tauri:*)"
+      "Bash(cd src-tauri:*)",
+      "Bash(git pull:*)",
+      "Bash(git clone:*)",
+      "Read(//c/work/MarkWeave-zenn/**)",
+      "Bash(npx zenn:*)"
     ]
   },
   "mcpToolSearch": true

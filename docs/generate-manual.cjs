@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const screenshotBase = path.join(__dirname, 'manual-screenshots');
-const outputPath = path.join(__dirname, '..', 'doc-public', 'manuals', 'user-manual.html');
+const outputPath = path.join(__dirname, '..', 'doc-public', 'manuals', 'user-manual-full.html');
 
 function loadImage(relPath) {
   const fullPath = path.join(screenshotBase, relPath);
@@ -137,188 +137,233 @@ const html = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ユーザーマニュアル - MarkWeave</title>
+<title>全機能リファレンス — MarkWeave</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --border: #334155;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    --accent: #818cf8;
+    --success: #34d399;
+  }
+  html { scroll-behavior: smooth; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", sans-serif;
-    background: #f8f9fa;
-    color: #212529;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
     line-height: 1.7;
+    font-size: 16px;
   }
-  header {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    color: #fff;
-    padding: 48px 32px 40px;
-    text-align: center;
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(15,23,42,0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.5rem; height: 56px;
+    display: flex; align-items: center; justify-content: space-between;
   }
-  header h1 { font-size: 2.2rem; font-weight: 700; margin-bottom: 8px; }
-  header p { opacity: 0.8; font-size: 1rem; }
+  .nav-logo { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-decoration: none; }
+  .nav-links { display: flex; gap: 1.25rem; align-items: center; list-style: none; }
+  .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; }
+  .nav-links a:hover { color: var(--text); }
+  .btn-nav {
+    background: var(--accent); color: #0f172a !important; font-weight: 700;
+    padding: 0.4rem 1.1rem; border-radius: 6px; font-size: 0.85rem !important;
+  }
+  .btn-nav:hover { background: #a5b4fc !important; }
+  .manual-hero {
+    padding: 4rem 1.5rem 3rem;
+    border-bottom: 1px solid var(--border);
+    background: radial-gradient(ellipse at 20% -20%, rgba(79,70,229,0.18) 0%, transparent 55%);
+  }
+  .manual-hero .inner { max-width: 960px; margin: 0 auto; }
+  .manual-hero .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 0.5rem; }
+  .manual-hero h1 { font-size: clamp(1.75rem,4vw,2.5rem); font-weight: 800; letter-spacing: -0.04em; margin-bottom: 0.5rem; }
+  .manual-hero p { color: var(--text-muted); font-size: 1rem; }
   .toc {
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 24px 32px;
-    max-width: 900px;
-    margin: 32px auto 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem 2rem;
+    max-width: 960px;
+    margin: 2rem auto 0;
   }
-  .toc h2 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; color: #495057; text-transform: uppercase; letter-spacing: 0.05em; }
-  .toc ol { padding-left: 20px; columns: 2; }
-  .toc li { margin-bottom: 6px; break-inside: avoid; }
-  .toc a { color: #0d6efd; text-decoration: none; }
-  .toc a:hover { text-decoration: underline; }
-  main { max-width: 900px; margin: 0 auto; padding: 32px 16px 64px; }
+  .toc h2 { font-size: 0.72rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+  .toc ol { padding-left: 1.25rem; columns: 2; column-gap: 2rem; }
+  .toc li { margin-bottom: 0.35rem; break-inside: avoid; font-size: 0.875rem; }
+  .toc a { color: var(--text-muted); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  main { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
   section {
-    background: #fff;
+    background: var(--bg-card);
     border-radius: 12px;
-    border: 1px solid #dee2e6;
-    padding: 36px 40px;
-    margin-bottom: 32px;
+    border: 1px solid var(--border);
+    padding: 2.25rem 2.5rem;
+    margin-bottom: 2rem;
   }
   section h2 {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     font-weight: 700;
-    color: #1a1a2e;
-    border-bottom: 3px solid #0d6efd;
-    padding-bottom: 10px;
-    margin-bottom: 24px;
+    color: var(--text);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.025em;
   }
   section h3 {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
-    color: #343a40;
-    margin: 28px 0 12px;
+    color: var(--text);
+    margin: 1.5rem 0 0.6rem;
   }
-  p { margin-bottom: 12px; }
-  ul, ol { padding-left: 24px; margin-bottom: 12px; }
-  li { margin-bottom: 6px; }
-  figure {
-    margin: 20px 0;
-    text-align: center;
-  }
+  p { margin-bottom: 0.75rem; color: var(--text-muted); font-size: 0.9rem; }
+  ul, ol { padding-left: 1.5rem; margin-bottom: 0.75rem; }
+  li { margin-bottom: 0.3rem; color: var(--text-muted); font-size: 0.9rem; }
+  figure { margin: 1.25rem 0; text-align: center; }
   figure img {
     max-width: 100%;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   }
-  figcaption {
-    margin-top: 8px;
-    font-size: 0.85rem;
-    color: #6c757d;
-    font-style: italic;
-  }
+  figcaption { margin-top: 0.5rem; font-size: 0.82rem; color: var(--text-dim); font-style: italic; }
   .img-missing {
-    background: #f8d7da;
-    border: 1px solid #f5c2c7;
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.25);
     border-radius: 6px;
-    padding: 12px;
-    color: #842029;
-    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+    color: #fca5a5;
+    font-size: 0.875rem;
   }
-  .steps {
-    counter-reset: step;
-    list-style: none;
-    padding: 0;
-  }
+  .steps { counter-reset: step; list-style: none; padding: 0; }
   .steps li {
     counter-increment: step;
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
-    align-items: flex-start;
+    display: flex; gap: 1rem; margin-bottom: 1rem; align-items: flex-start;
   }
   .steps li::before {
     content: counter(step);
-    background: #0d6efd;
-    color: #fff;
-    border-radius: 50%;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-    margin-top: 2px;
+    background: var(--accent); color: #0f172a;
+    border-radius: 50%; width: 26px; height: 26px; min-width: 26px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.8rem; margin-top: 2px;
   }
   kbd {
     display: inline-block;
-    background: #f8f9fa;
-    border: 1px solid #adb5bd;
-    border-bottom: 3px solid #6c757d;
-    border-radius: 4px;
-    padding: 2px 8px;
-    font-family: monospace;
-    font-size: 0.85em;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-bottom: 3px solid var(--text-dim);
+    border-radius: 5px;
+    padding: 0.1em 0.5em;
+    font-family: "Consolas", monospace;
+    font-size: 0.82em;
+    color: var(--text-muted);
   }
   code {
-    background: #f1f3f5;
+    font-family: "Consolas", "Courier New", monospace;
+    background: rgba(129,140,248,0.12);
+    color: var(--accent);
+    padding: 0.1em 0.4em;
     border-radius: 4px;
-    padding: 2px 6px;
-    font-family: "Courier New", monospace;
-    font-size: 0.9em;
-    color: #d63384;
+    font-size: 0.875em;
   }
   .tip {
-    background: #cff4fc;
-    border-left: 4px solid #0dcaf0;
+    background: rgba(52,211,153,0.06);
+    border-left: 3px solid var(--success);
     border-radius: 0 6px 6px 0;
-    padding: 12px 16px;
-    margin: 16px 0;
-    font-size: 0.95rem;
+    padding: 0.75rem 1rem;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
   }
-  .tip strong { color: #055160; }
+  .tip strong { color: var(--success); }
   .shortcut-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 16px;
+    margin-top: 1rem;
   }
   .shortcut-table th {
-    background: #e9ecef;
-    padding: 10px 16px;
+    background: var(--bg);
+    padding: 0.6rem 1rem;
     text-align: left;
     font-weight: 600;
-    font-size: 0.9rem;
-    border-bottom: 2px solid #dee2e6;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
   }
   .shortcut-table td {
-    padding: 10px 16px;
-    border-bottom: 1px solid #f1f3f5;
-    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid rgba(51,65,85,0.5);
+    font-size: 0.875rem;
+    color: var(--text-muted);
   }
-  .shortcut-table tr:hover td { background: #f8f9fa; }
-  .faq-item { margin-bottom: 20px; }
-  .faq-item dt { font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
-  .faq-item dd { padding-left: 16px; color: #495057; }
+  .shortcut-table tr:last-child td { border-bottom: none; }
+  .shortcut-table tr:hover td { background: rgba(129,140,248,0.03); }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 1rem 0; }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-item dt { font-weight: 600; color: var(--text); margin-bottom: 0.35rem; font-size: 0.9rem; }
+  .faq-item dd { padding-left: 1rem; color: var(--text-muted); font-size: 0.875rem; }
   footer {
+    border-top: 1px solid var(--border);
     text-align: center;
-    padding: 24px;
-    color: #6c757d;
-    font-size: 0.85rem;
+    padding: 1.75rem 1.5rem;
+    color: var(--text-dim);
+    font-size: 0.82rem;
   }
+  footer a { color: var(--text-muted); text-decoration: none; padding: 0.25rem 0.75rem; }
+  footer a:hover { color: var(--text); }
   .feature-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin: 16px 0;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
   }
   .feature-card {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 12px 16px;
+    padding: 0.9rem 1rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
   }
-  .feature-card strong { color: #0d6efd; }
+  .feature-card strong { color: var(--accent); display: block; margin-bottom: 0.2rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+  th {
+    background: var(--bg); color: var(--text-muted); font-weight: 600; font-size: 0.78rem;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 0.6rem 1rem;
+    text-align: left; border-bottom: 1px solid var(--border);
+  }
+  td { padding: 0.6rem 1rem; border-bottom: 1px solid rgba(51,65,85,0.5); color: var(--text-muted); }
+  td:first-child { color: var(--text); font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>ユーザーマニュアル</h1>
-  <p>MarkWeave — 全機能リファレンス</p>
-</header>
+<nav>
+  <a href="../index.html" class="nav-logo">MarkWeave</a>
+  <ul class="nav-links">
+    <li><a href="../index.html#solutions">機能</a></li>
+    <li><a href="../index.html#pricing">価格</a></li>
+    <li><a href="user-manual.html">クイックガイド</a></li>
+    <li><a href="https://github.com/hayashixd/MarkWeave/releases/latest" class="btn-nav">無料で試す</a></li>
+  </ul>
+</nav>
+
+<div class="manual-hero">
+  <div class="inner">
+    <p class="label">Full Reference</p>
+    <h1>全機能リファレンス</h1>
+    <p>MarkWeave のすべての機能を網羅した詳細マニュアルです。</p>
+  </div>
+</div>
 
 <div class="toc">
   <h2>目次</h2>
@@ -1132,7 +1177,10 @@ graph TD
 </main>
 
 <footer>
-  <p>MarkWeave &mdash; ユーザーマニュアル &mdash; 自動生成 (2026-03-14)</p>
+  <a href="../index.html">Home</a>
+  <a href="user-manual.html">クイックガイド</a>
+  <a href="https://github.com/hayashixd/MarkWeave">GitHub</a>
+  <p style="margin-top:0.75rem;">© 2024–2026 MarkWeave · MIT License</p>
 </footer>
 
 </body>
