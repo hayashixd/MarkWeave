@@ -402,13 +402,29 @@ cd src-tauri && cargo build && cargo test
 | `src-tauri/tauri.conf.json` | `"version"` |
 
 ### 5. タグ・プッシュ
+
+**Claude Code にリリースを依頼する場合（推奨）:**
+
+「vX.Y.Z をリリースして」と依頼すると、Claude Code が以下を自動で実行する：
+
+1. `git log <前タグ>..HEAD` から変更点を収集・整形してユーザーに提示
+2. 確認後、バージョンファイル3点を更新してコミット
+3. アノテーション付きタグに変更点を埋め込んで作成
+4. `git push origin main && git push origin vX.Y.Z` を実行
+5. GitHub Actions がビルド→リリース作成（タグ本文がリリースノートになる）→SHA256チェックサム追記
+
+**手動で行う場合:**
 ```bash
 # バージョンコミット
 git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
 git commit -m "chore: bump version to vX.Y.Z"
 
-# タグ作成とプッシュ
-git tag vX.Y.Z
+# アノテーション付きタグで変更点を埋め込む（-m に変更点を記述）
+git tag -a vX.Y.Z -m "## 変更点
+
+- feat: ...
+- fix: ..."
+
 git push origin main
 git push origin vX.Y.Z
 ```
