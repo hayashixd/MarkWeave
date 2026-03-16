@@ -8,21 +8,25 @@
 import { useState, useEffect } from 'react';
 import {
   getLicenseStatus,
+  getTrialStatus,
   activateLicense,
   removeLicense,
   type LicenseStatus,
+  type TrialStatus,
 } from '../../../lib/tauri-commands';
 import { useTranslation } from '../../../i18n';
 
 export function LicenseTab() {
   const { t } = useTranslation('settings');
   const [status, setStatus] = useState<LicenseStatus | null>(null);
+  const [trial, setTrial] = useState<TrialStatus | null>(null);
   const [key, setKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getLicenseStatus().then(setStatus);
+    getTrialStatus().then(setTrial);
   }, []);
 
   async function handleActivate(e: React.FormEvent) {
@@ -96,8 +100,21 @@ export function LicenseTab() {
           </button>
         </div>
       ) : (
-        // 未認証: 入力フォーム
+        // 未認証: 試用期間バッジ + 入力フォーム
         <form onSubmit={handleActivate} className="space-y-3">
+          {trial && (
+            trial.isExpired ? (
+              <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3">
+                <p className="text-sm font-medium text-red-800">{t('trial.expiredBadge')}</p>
+              </div>
+            ) : (
+              <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3">
+                <p className="text-sm font-medium text-amber-800">
+                  {t('trial.remainingDays', { count: trial.daysRemaining })}
+                </p>
+              </div>
+            )
+          )}
           <p className="text-xs text-gray-500">{t('license.description')}</p>
 
           <label className="block text-xs text-gray-700">

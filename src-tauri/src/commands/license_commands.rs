@@ -225,6 +225,68 @@ pub fn remove_license(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ---- 試用期間 ----
+
+const TRIAL_DAYS: i64 = 30;
+
+/// 試用期間データ（app_data_dir/trial.json）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct TrialData {
+    /// 初回起動時の Unix エポック秒
+    pub first_launch: u64,
+}
+
+/// フロントエンドに返す試用期間状態
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrialStatus {
+    /// 残り日数（0 以下なら期限切れ）
+    pub days_remaining: i64,
+    pub is_expired: bool,
+}
+
+fn trial_file_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e: tauri::Error| AppError::Unknown { message: e.to_string() })?;
+    Ok(data_dir.join("trial.json"))
+}
+
+/// 試用期間状態を返す。初回呼び出し時に trial.json を作成して起算日を記録する。
+#[tauri::command]
+pub fn get_trial_status(app: AppHandle) -> TrialStatus {
+    let Ok(path) = trial_file_path(&app) else {
+        // パス取得失敗時は未期限扱いにしてアプリを止めない
+        return TrialStatus { days_remaining: TRIAL_DAYS, is_expired: false };
+    };
+
+    let first_launch = if path.exists() {
+        let json = std::fs::read_to_string(&path).unwrap_or_default();
+        serde_json::from_str::<TrialData>(&json)
+            .ok()
+            .map(|d| d.first_launch)
+            .unwrap_or_else(now_unix_secs)
+    } else {
+        // 初回起動: trial.json を作成
+        let now = now_unix_secs();
+        let data = TrialData { first_launch: now };
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(&data) {
+            let _ = std::fs::write(&path, json);
+        }
+        now
+    };
+
+    let now = now_unix_secs();
+    let elapsed_days = now.saturating_sub(first_launch) / 86400;
+    let days_remaining = (TRIAL_DAYS - elapsed_days as i64).max(0);
+
+    TrialStatus { days_remaining, is_expired: elapsed_days as i64 >= TRIAL_DAYS }
+}
+
 // ---- テスト ----
 
 #[cfg(test)]

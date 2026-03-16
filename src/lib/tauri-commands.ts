@@ -232,7 +232,21 @@ function translateAppError(error: AppError): string {
   }
 }
 
-// ---- ライセンス ----
+// ---- ライセンス / 試用期間 ----
+
+export interface TrialStatus {
+  daysRemaining: number;
+  isExpired: boolean;
+}
+
+export async function getTrialStatus(): Promise<TrialStatus> {
+  const fallback: TrialStatus = { daysRemaining: 30, isExpired: false };
+  try {
+    return (await invoke<TrialStatus>('get_trial_status')) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export interface LicenseStatus {
   activated: boolean;

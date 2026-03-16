@@ -100,6 +100,7 @@ pub fn run() {
             license_commands::activate_license,
             license_commands::get_license_status,
             license_commands::remove_license,
+            license_commands::get_trial_status,
             updater::check_for_updates,
             updater::install_update,
         ])

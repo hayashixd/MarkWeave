@@ -22,11 +22,13 @@ vi.mock('../../../lib/tauri-commands', () => ({
   getLicenseStatus: vi.fn(),
   activateLicense: vi.fn(),
   removeLicense: vi.fn(),
+  getTrialStatus: vi.fn(),
 }));
 
 const mockGetLicenseStatus = vi.mocked(tauriCommands.getLicenseStatus);
 const mockActivateLicense = vi.mocked(tauriCommands.activateLicense);
 const mockRemoveLicense = vi.mocked(tauriCommands.removeLicense);
+const mockGetTrialStatus = vi.mocked(tauriCommands.getTrialStatus);
 
 // ---- ヘルパー ----
 
@@ -41,6 +43,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   // デフォルト: 未認証
   mockGetLicenseStatus.mockResolvedValue(NOT_ACTIVATED);
+  // デフォルト: 試用期間中（残り30日）
+  mockGetTrialStatus.mockResolvedValue({ daysRemaining: 30, isExpired: false });
   // confirm ダイアログをデフォルトで承認
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });

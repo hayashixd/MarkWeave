@@ -43,7 +43,8 @@ import { useAutoSave } from '../../hooks/useAutoSave';
 import { useWindowState } from '../../hooks/useWindowState';
 import { useDropListener } from '../../hooks/useDropListener';
 import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
-import { writeFile, checkForUpdates, installUpdate } from '../../lib/tauri-commands';
+import { writeFile, checkForUpdates, installUpdate, getTrialStatus, getLicenseStatus, type LicenseStatus } from '../../lib/tauri-commands';
+import { TrialExpiredDialog } from '../TrialExpiredDialog';
 import { useToastStore } from '../../store/toastStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
 import { ExportDialog } from '../Export/ExportDialog';
@@ -75,6 +76,8 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('outline');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
+  const [preferencesInitialTab, setPreferencesInitialTab] = useState<'license' | undefined>(undefined);
+  const [trialExpiredVisible, setTrialExpiredVisible] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [pdfExportDialogOpen, setPdfExportDialogOpen] = useState(false);
   const [pandocExportDialogOpen, setPandocExportDialogOpen] = useState(false);
@@ -96,6 +99,15 @@ export function AppShell() {
   useEffect(() => {
     loadRecentFiles();
   }, [loadRecentFiles]);
+
+  // 試用期間チェック: 30日経過 + ライセンス未認証 → ブロッキングダイアログを表示
+  useEffect(() => {
+    Promise.all([getTrialStatus(), getLicenseStatus()]).then(([trial, license]) => {
+      if (trial.isExpired && !license.activated) {
+        setTrialExpiredVisible(true);
+      }
+    });
+  }, []);
   // タブストアの購読を分離:
   // - tabIds: タブ一覧の ID のみ（ペイン同期用）。content 変更では再レンダリングしない。
   // - activeTabId: アクティブタブ ID
@@ -795,7 +807,7 @@ export function AppShell() {
     edit_text_stats: () => {
       window.dispatchEvent(new CustomEvent('menu-text-stats'));
     },
-    edit_preferences: () => setPreferencesOpen(true),
+    edit_preferences: () => { setPreferencesInitialTab(undefined); setPreferencesOpen(true); },
     view_mode_wysiwyg: () => {
       window.dispatchEvent(new CustomEvent('menu-editor-mode', { detail: { mode: 'wysiwyg' } }));
     },
@@ -933,8 +945,16 @@ export function AppShell() {
       {/* プリファレンスダイアログ */}
       <PreferencesDialog
         isOpen={preferencesOpen}
-        onClose={() => setPreferencesOpen(false)}
+        onClose={() => { setPreferencesOpen(false); setPreferencesInitialTab(undefined); }}
+        initialTab={preferencesInitialTab}
       />
+
+      {/* 試用期間終了ダイアログ（ブロッキング） */}
+      {trialExpiredVisible && (
+        <TrialExpiredDialog
+          onActivated={(_status: LicenseStatus) => setTrialExpiredVisible(false)}
+        />
+      )}
 
       {/* HTML エクスポートダイアログ */}
       {exportDialogOpen && activeTab && (
