@@ -144,7 +144,7 @@ const imgs = {
 
 function imgTag(src, alt, caption) {
   if (!src) return `<p class="img-missing">[画像: ${alt}]</p>`;
-  let html = `<figure><img src="${src}" alt="${alt}" loading="lazy">`;
+  let html = `<figure><img src="${src}" alt="${alt}">`;
   if (caption) html += `<figcaption>${caption}</figcaption>`;
   html += `</figure>`;
   return html;
@@ -168,7 +168,7 @@ const html = `<!DOCTYPE html>
     --accent: #818cf8;
     --success: #34d399;
   }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
     background: var(--bg);
