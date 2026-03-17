@@ -422,22 +422,12 @@
     .footer-links a:hover { color: var(--text); }
     .footer-copy { font-size: 0.75rem; color: var(--text-dim); }
   </style>
+  <script src="nav.js" data-root=""></script>
 </head>
 <body>
 
 <!-- ── Nav ── -->
-<nav>
-  <a href="#" class="nav-logo">MarkWeave</a>
-  <ul class="nav-links">
-    <li class="hide-mobile"><a href="#solutions" data-i18n="nav.features">機能</a></li>
-    <li class="hide-mobile"><a href="#pricing" data-i18n="nav.pricing">価格</a></li>
-    <li class="hide-mobile"><a href="use-cases.html" data-i18n="nav.usecases">活用事例</a></li>
-    <li class="hide-mobile"><a href="manuals/user-manual.html" data-i18n="nav.manual">マニュアル</a></li>
-    <li class="hide-mobile"><a href="demo/" data-i18n="nav.demo">デモ</a></li>
-    <li><a href="https://github.com/hayashixd/MarkWeave/releases/latest" class="btn-nav" data-i18n="nav.buy">無料で試す</a></li>
-    <li><button id="lang-toggle" class="lang-btn" onclick="toggleLang()">EN</button></li>
-  </ul>
-</nav>
+<nav id="site-nav"></nav>
 
 <!-- ── Hero ── -->
 <section id="hero">
@@ -500,7 +490,7 @@
 <section id="solutions">
   <div class="container">
     <p class="section-label" data-i18n="solutions.label">Features</p>
-    <h2 data-i18n="solutions.h2">4 つの解決策</h2>
+    <h2 data-i18n="solutions.h2">6 つの解決策</h2>
 
     <div class="solution-solo">
       <div class="solution-text">
@@ -548,6 +538,24 @@
         <img src="demo-gifs/prose-lint.gif" alt="Prose Lint デモ">
       </div>
     </div>
+
+    <div class="solution">
+      <div class="solution-text">
+        <h3 data-i18n="solutions.sol6.h3">6. Zenn と Qiita を同時に運用できる</h3>
+        <p data-i18n="solutions.sol6.p">プロファイルを「Zenn」に切り替えると <code>:::message</code> や <code>@[youtube]</code> などの専用記法がパレットから挿入できる。「⇄ Qiita 用に変換してコピー」ボタン1クリックで、Zenn 固有記法を自動除去して <code>topics → tags</code> 変換した Markdown をクリップボードへ。Qiita の記事エディタにそのまま貼り付けるだけ。</p>
+      </div>
+      <div class="solution-img">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1.5rem;font-size:0.82rem;color:var(--text-muted);">
+          <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:0.75rem;">Qiita 変換の例</p>
+          <p style="margin-bottom:0.5rem;"><span style="color:#fca5a5;">✗ Zenn</span> &nbsp;<code style="font-size:0.78rem;">:::message\n注意書き\n:::</code></p>
+          <p style="margin-bottom:0.5rem;"><span style="color:#fca5a5;">✗ Zenn</span> &nbsp;<code style="font-size:0.78rem;">@[youtube](id)</code></p>
+          <p style="margin-bottom:0.5rem;"><span style="color:#fca5a5;">✗ Zenn</span> &nbsp;<code style="font-size:0.78rem;">topics: ["ts", "react"]</code></p>
+          <p style="margin:1rem 0 0.5rem;border-top:1px solid var(--border);padding-top:0.75rem;"><span style="color:var(--success);">✓ Qiita</span> &nbsp;注意書き（記法除去・内容保持）</p>
+          <p style="margin-bottom:0.5rem;"><span style="color:var(--success);">✓ Qiita</span> &nbsp;（行削除）</p>
+          <p><span style="color:var(--success);">✓ Qiita</span> &nbsp;<code style="font-size:0.78rem;">tags:\n  - name: ts</code></p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -571,6 +579,7 @@
           <li data-i18n="features.group1.li9">フォーカス / タイプライター / Zen モード</li>
           <li data-i18n="features.group1.li10">ポモドーロ / ワードスプリント</li>
           <li data-i18n="features.group1.li11">文章スタイル Lint — 冗長表現・文体混在を AI 不要でチェック</li>
+          <li data-i18n="features.group1.li12">Zenn 記法パレット（:::message / @[youtube] 等のワンクリック挿入）</li>
         </ul>
       </div>
       <div class="features-group">
@@ -586,6 +595,8 @@
           <li data-i18n="features.group2.li8">外部変更検知（Dropbox / OneDrive 対応）</li>
           <li data-i18n="features.group2.li9">ローカルファースト（データは自分の PC に）</li>
           <li data-i18n="features.group2.li10">アプリ内自動アップデート</li>
+          <li data-i18n="features.group2.li11">Zenn → Qiita ワンクリック変換コピー</li>
+          <li data-i18n="features.group2.li12">プラットフォーム別構文警告（Qiita 非対応記法の自動検出）</li>
         </ul>
       </div>
     </div>
@@ -645,7 +656,7 @@
       </div>
       <div class="faq-item">
         <p class="faq-q" data-i18n="faq.q4">Windows でインストール時に SmartScreen の警告が出ます。</p>
-        <p class="faq-a" data-i18n="faq.a4">新しいアプリのため Windows 側の評判データが未蓄積で、警告が表示されることがあります。「詳細情報 → 実行」でインストールできます。悪意あるソフトウェアではありません。各リリースの SHA256 チェックサムを GitHub Releases ページに掲載しています。</p>
+        <p class="faq-a" data-i18n-html="faq.a4">現在 <a href="https://signpath.org/" target="_blank">SignPath Foundation</a> への Authenticode 署名申請を進めています。署名が有効化されるまでの間、新しいアプリのため評判データが未蓄積で警告が表示されることがありますが、「詳細情報 → 実行」でインストールできます。各リリースの SHA256 チェックサムを GitHub Releases ページに掲載しています。詳細は <a href="https://github.com/hayashixd/MarkWeave/blob/main/SIGNING_POLICY.md" target="_blank">SIGNING_POLICY.md</a> を参照してください。</p>
       </div>
       <div class="faq-item">
         <p class="faq-q" data-i18n="faq.q5">macOS には対応していますか？</p>
@@ -696,6 +707,7 @@
     <a href="use-cases.html" data-i18n="footer.usecases">活用事例</a>
     <a href="manuals/user-manual.html" data-i18n="footer.manual">マニュアル</a>
     <a href="https://xdhyskh.gumroad.com/l/qwctrq" data-i18n="footer.buy">購入する</a>
+    <a href="https://github.com/hayashixd/MarkWeave/blob/main/SIGNING_POLICY.md" target="_blank" data-i18n="footer.signing">コード署名ポリシー</a>
   </div>
   <p class="footer-copy">© 2024–2026 MarkWeave · MIT License</p>
 </footer>
@@ -792,7 +804,7 @@
       'faq.q3': '返金はできますか？',
       'faq.a3': '返金ポリシーの詳細は <a href="https://github.com/hayashixd/MarkWeave/blob/main/SUPPORT.md" target="_blank">SUPPORT.md</a> をご確認ください。',
       'faq.q4': 'Windows でインストール時に SmartScreen の警告が出ます。',
-      'faq.a4': '現在 Authenticode 署名がないため警告が表示されます。「詳細情報 → 実行」でインストールできます。正式販売版では署名を整備予定です。',
+      'faq.a4': '現在 <a href="https://signpath.org/" target="_blank">SignPath Foundation</a> への Authenticode 署名申請を進めています。署名が有効化されるまでの間、新しいアプリのため評判データが未蓄積で警告が表示されることがありますが、「詳細情報 → 実行」でインストールできます。各リリースの SHA256 チェックサムを GitHub Releases ページに掲載しています。詳細は <a href="https://github.com/hayashixd/MarkWeave/blob/main/SIGNING_POLICY.md" target="_blank">SIGNING_POLICY.md</a> を参照してください。',
       'faq.q5': 'macOS には対応していますか？',
       'faq.a5': '現在は Windows・Linux のみ対応です。macOS は将来対応予定です。',
       'finalcta.h2': 'まず無料で試して、<br>気に入ったら購入しよう。',
@@ -807,6 +819,7 @@
       'footer.usecases': '活用事例',
       'footer.manual': 'マニュアル',
       'footer.buy': '購入する',
+      'footer.signing': 'コード署名ポリシー',
     },
     en: {
       'page.title': 'MarkWeave — Markdown WYSIWYG Editor for Technical Writers',
@@ -900,7 +913,7 @@
       'faq.q3': 'Can I get a refund?',
       'faq.a3': 'See <a href="https://github.com/hayashixd/MarkWeave/blob/main/SUPPORT.md" target="_blank">SUPPORT.md</a> for refund policy details.',
       'faq.q4': 'SmartScreen warning appears on Windows install.',
-      'faq.a4': 'This warning appears because MarkWeave is a new app and has not yet built up enough reputation data with Windows. It is not malware. Click "More info → Run anyway" to install. SHA256 checksums for each release are published on the GitHub Releases page.',
+      'faq.a4': 'Authenticode code signing via <a href="https://signpath.org/" target="_blank">SignPath Foundation</a> is currently being applied for. Until signing is active, a SmartScreen warning may appear because the app has not yet built up reputation data. Click "More info → Run anyway" to install. SHA256 checksums are published on the GitHub Releases page. See <a href="https://github.com/hayashixd/MarkWeave/blob/main/SIGNING_POLICY.md" target="_blank">SIGNING_POLICY.md</a> for details.',
       'faq.q5': 'Is macOS supported?',
       'faq.a5': 'Currently Windows and Linux only. macOS support is planned for the future.',
       'finalcta.h2': 'Try it free.<br>Buy if you love it.',
@@ -915,6 +928,7 @@
       'footer.usecases': 'Use Cases',
       'footer.manual': 'Manual',
       'footer.buy': 'Buy',
+      'footer.signing': 'Code Signing Policy',
     }
   };
 
@@ -946,10 +960,7 @@
     localStorage.setItem('mw-lang', lang);
   }
 
-  function toggleLang() {
-    const current = localStorage.getItem('mw-lang') || detectInitialLang();
-    applyLang(current === 'ja' ? 'en' : 'ja');
-  }
+  document.addEventListener('mw-lang-change', function (e) { applyLang(e.detail); });
 
   applyLang(detectInitialLang());
 </script>

@@ -351,19 +351,12 @@
     }
     .advanced-banner a { color: var(--accent); }
   </style>
+  <script src="../nav.js" data-root="../"></script>
 </head>
 <body>
 
 <!-- ── Nav ── -->
-<nav>
-  <a href="../index.html" class="nav-logo">MarkWeave</a>
-  <ul class="nav-links">
-    <li class="hide-mobile"><a href="../index.html#solutions" data-i18n="nav.features">機能</a></li>
-    <li class="hide-mobile"><a href="../index.html#pricing" data-i18n="nav.pricing">価格</a></li>
-    <li><a href="https://github.com/hayashixd/MarkWeave/releases/latest" class="btn-nav" data-i18n="nav.download">無料で試す</a></li>
-    <li><button id="lang-toggle" class="lang-btn" onclick="toggleLang()">EN</button></li>
-  </ul>
-</nav>
+<nav id="site-nav"></nav>
 
 <!-- ── Hero ── -->
 <div class="manual-hero">
@@ -1059,10 +1052,7 @@
     localStorage.setItem('mw-lang', lang);
   }
 
-  function toggleLang() {
-    const current = localStorage.getItem('mw-lang') || detectInitialLang();
-    applyLang(current === 'ja' ? 'en' : 'ja');
-  }
+  document.addEventListener('mw-lang-change', function (e) { applyLang(e.detail); });
 
   applyLang(detectInitialLang());
 </script>
