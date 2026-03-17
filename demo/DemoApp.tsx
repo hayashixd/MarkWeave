@@ -22,8 +22,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'nav.demo': 'デモ',
     'nav.buy': '購入する — $24.99',
     'hero.badge': 'ブラウザで試せる インタラクティブデモ',
-    'hero.h1': '実際に触って確かめよう',
-    'hero.sub': '行頭で / を入力するとコマンドメニューが開きます。コードブロック・テーブル・リストもその場でレンダリングされます。インストール不要。',
+    'hero.tagline': 'Markdown を WYSIWYG で書けるローカルエディタ',
+    'hero.h1': 'スラッシュコマンドを試してみよう',
+    'hero.sub': '↓ のエディタはそのまま編集できます。行頭で / を入力するとコマンドメニューが開き、見出し・リスト・テーブルをキーボードだけで素早く挿入できます。',
+    'editor.invite': '✏ クリックして自由に編集できます',
     'toolbar.export': 'HTML エクスポート',
     'toolbar.lockedTitle': 'デスクトップ版で利用できます',
     'toolbar.lockedLink': 'ダウンロード版で利用可能',
@@ -70,8 +72,10 @@ const translations: Record<Lang, Record<string, string>> = {
     'nav.demo': 'Demo',
     'nav.buy': 'Try Free',
     'hero.badge': 'Interactive browser demo — no install needed',
-    'hero.h1': 'Try it yourself',
-    'hero.sub': 'Type / at the start of a line to open the command menu. Code blocks, tables, and lists render inline. No install required.',
+    'hero.tagline': 'A local WYSIWYG Markdown editor for writing and publishing',
+    'hero.h1': 'Try the slash command',
+    'hero.sub': '↓ The editor below is live — just click and type. Press / at the start of a line to open the command menu and insert headings, lists, or tables.',
+    'editor.invite': '✏ Click anywhere to start editing',
     'toolbar.export': 'HTML Export',
     'toolbar.lockedTitle': 'Available in the desktop app',
     'toolbar.lockedLink': 'Available in download',
@@ -184,12 +188,14 @@ export default function DemoApp() {
       {/* ── Hero ── */}
       <section className="demo-hero">
         <div className="demo-badge">{t('hero.badge')}</div>
+        <p className="hero-tagline">{t('hero.tagline')}</p>
         <h1>{t('hero.h1')}</h1>
         <p className="sub">{t('hero.sub')}</p>
       </section>
 
       {/* ── インタラクティブエディタ ── */}
       <section className="demo-editor-section">
+        <p className="editor-invite">{t('editor.invite')}</p>
         <DemoEditor lang={lang} t={t} downloadUrl={DOWNLOAD_URL} />
       </section>
 
