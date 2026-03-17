@@ -31,6 +31,61 @@ import rehypeStringify from 'rehype-stringify';
 import juice from 'juice';
 import { type ExportTheme, loadThemeCss, loadHighlightCss, loadKatexCss } from './theme-loader';
 
+// ---------------------------------------------------------------------------
+// セキュリティ: 危険な URL スキームの除去
+// ---------------------------------------------------------------------------
+
+/** javascript: / vbscript: にマッチする正規表現（先頭の空白・null バイトを考慮） */
+const DANGEROUS_URL_SCHEME = /^[\s\u0000]*(?:javascript|vbscript):/i;
+
+/**
+ * rehype プラグイン: hast ツリーを再帰的に走査し、
+ * リンク・画像・フォームの href / src / action 属性から
+ * javascript: / vbscript: スキームを除去する。
+ *
+ * remark-rehype の allowDangerousHtml:false は raw HTML ブロックの除去のみを
+ * 行い、リンク href の URL スキームは検査しない。このプラグインでその欠を補う。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rehypeSanitizeUrls(): (tree: any) => void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function visit(node: any): void {
+    if (node.type === 'element' && node.properties) {
+      for (const attr of ['href', 'src', 'action', 'formAction']) {
+        if (
+          typeof node.properties[attr] === 'string' &&
+          DANGEROUS_URL_SCHEME.test(node.properties[attr] as string)
+        ) {
+          delete node.properties[attr];
+        }
+      }
+    }
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) {
+        visit(child);
+      }
+    }
+  }
+  return visit;
+}
+
+/**
+ * rehype-stringify 出力の属性値内に含まれる未エスケープの `<` / `>` を
+ * `&lt;` / `&gt;` に変換する後処理。
+ *
+ * hast-util-to-html は HTML5 仕様に従い双引用符内の `<` `>` をエスケープしない。
+ * XML 互換性と後段の文字列処理の安全のためにここで変換する。
+ */
+function encodeAngleBracketsInAttributes(html: string): string {
+  // ="..." にマッチし、値内の < > を文字参照に置換する
+  // 双引用符内の " は rehype-stringify が &quot; に変換済みのため
+  // [^"]* は安全にマッチできる
+  return html.replace(/="([^"]*)"/g, (_match, value: string) => {
+    if (!value.includes('<') && !value.includes('>')) return _match;
+    return '="' + value.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '"';
+  });
+}
+
 export interface MdToHtmlOptions {
   /** エクスポート用テーマ名 */
   theme: ExportTheme;
@@ -101,6 +156,7 @@ export async function convertMdToHtml(
 
   pipeline = pipeline
     .use(remarkRehype, { allowDangerousHtml: false })
+    .use(rehypeSanitizeUrls)  // javascript: / vbscript: を href/src から除去
     .use(rehypeSlug);
 
   if (opts.highlight) pipeline = pipeline.use(rehypeHighlight, { detect: true });
@@ -110,7 +166,8 @@ export async function convertMdToHtml(
 
   // Markdown → HTML コンテンツ変換
   const result = await pipeline.process(processedMarkdown);
-  const contentHtml = String(result);
+  // 属性値内の未エスケープ < / > を後処理でエスケープ（XML互換性）
+  const contentHtml = encodeAngleBracketsInAttributes(String(result));
 
   // HTML テンプレートに注入
   const fullHtml = injectIntoTemplate(contentHtml, opts);
