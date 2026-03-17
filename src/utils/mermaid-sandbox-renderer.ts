@@ -59,6 +59,15 @@ function ensureSandbox(): Promise<void> {
 
       clearTimeout(timeout);
       window.removeEventListener('message', onReady);
+
+      if (event.data.error) {
+        iframe.remove();
+        sandboxIframe = null;
+        readyPromise = null;
+        reject(new Error(event.data.error));
+        return;
+      }
+
       sandboxReady = true;
       resolve();
     };

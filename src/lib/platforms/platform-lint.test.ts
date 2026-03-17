@@ -78,5 +78,59 @@ describe('lintPlatformBody', () => {
       const body = '# Title\n\nParagraph.\n\n```typescript\nconst x = 1;\n```\n';
       expect(lintPlatformBody(body, 'qiita')).toEqual([]);
     });
+
+    it('複数の Mermaid ブロックがあっても警告は 1 件だけ返す', () => {
+      const body = [
+        '```mermaid',
+        'graph TD; A-->B',
+        '```',
+        '',
+        '```mermaid',
+        'sequenceDiagram',
+        'Alice->>Bob: Hi',
+        '```',
+        '',
+      ].join('\n');
+      const issues = lintPlatformBody(body, 'qiita');
+      const mermaidIssues = issues.filter((i) => i.message.includes('Mermaid'));
+      expect(mermaidIssues).toHaveLength(1);
+    });
+
+    it('大文字の ```MERMAID は Mermaid 警告の検出対象にならない（大文字小文字区別）', () => {
+      // 現在の正規表現 /^```mermaid\b/m は大文字を区別するため MERMAID は非検出
+      const body = '```MERMAID\ngraph TD; A-->B\n```\n';
+      const issues = lintPlatformBody(body, 'qiita');
+      const mermaidIssues = issues.filter((i) => i.message.includes('Mermaid'));
+      expect(mermaidIssues).toHaveLength(0);
+    });
+
+    it('```mermaid の後ろにスペースが続いても検出される', () => {
+      const body = '```mermaid \ngraph TD; A-->B\n```\n';
+      const issues = lintPlatformBody(body, 'qiita');
+      const mermaidIssues = issues.filter((i) => i.message.includes('Mermaid'));
+      expect(mermaidIssues).toHaveLength(1);
+    });
+  });
+
+  describe('zenn プラットフォーム + Mermaid', () => {
+    it('Zenn では Mermaid ブロックがあっても警告なし', () => {
+      const body = '```mermaid\ngraph TD;\n  A-->B;\n```\n';
+      expect(lintPlatformBody(body, 'zenn')).toEqual([]);
+    });
+
+    it('Zenn では複数の Mermaid ブロックがあっても警告なし', () => {
+      const body = [
+        '```mermaid',
+        'graph TD; A-->B',
+        '```',
+        '',
+        '```mermaid',
+        'sequenceDiagram',
+        'Alice->>Bob: Hi',
+        '```',
+        '',
+      ].join('\n');
+      expect(lintPlatformBody(body, 'zenn')).toEqual([]);
+    });
   });
 });

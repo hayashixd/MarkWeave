@@ -1,5 +1,203 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: classDiagram（クラス図） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "classDiagram
+  class Animal {
+    +String name
+    +makeSound()
+  }
+  class Dog {
+    +fetch()
+  }
+  Animal <|-- Dog",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: erDiagram（ER図） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  ORDER ||--|{ LINE-ITEM : contains",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: flowchart LR（左→右向き） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "graph LR
+  A[開始] --> B{条件}
+  B -->|Yes| C[処理]
+  B -->|No| D[終了]",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: flowchart TD（既存の基本ケース） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "graph TD;
+  A-->B;",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: gantt（ガントチャート） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "gantt
+  title プロジェクト計画
+  dateFormat YYYY-MM-DD
+  section フェーズ1
+  設計 :a1, 2024-01-01, 7d
+  実装 :after a1, 14d",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: pie chart（円グラフ） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "pie title 割合
+  "A" : 40
+  "B" : 35
+  "C" : 25",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: sequenceDiagram（シーケンス図） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "sequenceDiagram
+  Alice->>Bob: Hello
+  Bob-->>Alice: Hi!
+  Alice->>Bob: How are you?",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: stateDiagram-v2（状態遷移図） 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "stateDiagram-v2
+  [*] --> Idle
+  Idle --> Processing : start
+  Processing --> Done : finish
+  Done --> [*]",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: 空の mermaid ブロック 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "code": "",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
+exports[`roundtrip: Mermaid ダイアグラム > snapshot: 複数の Mermaid ブロックが文書内に混在する 1`] = `
+{
+  "content": [
+    {
+      "attrs": {
+        "level": 1,
+      },
+      "content": [
+        {
+          "text": "設計書",
+          "type": "text",
+        },
+      ],
+      "type": "heading",
+    },
+    {
+      "attrs": {
+        "code": "graph TD
+  A --> B",
+      },
+      "type": "mermaidBlock",
+    },
+    {
+      "content": [
+        {
+          "text": "中間のテキスト。",
+          "type": "text",
+        },
+      ],
+      "type": "paragraph",
+    },
+    {
+      "attrs": {
+        "code": "sequenceDiagram
+  Alice->>Bob: Ping",
+      },
+      "type": "mermaidBlock",
+    },
+  ],
+  "type": "doc",
+}
+`;
+
 exports[`roundtrip: code blocks > snapshot: code block with language 1`] = `
 {
   "content": [

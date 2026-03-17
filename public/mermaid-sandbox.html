@@ -6,46 +6,64 @@
   主 WebView の CSP を汚染しないため、Mermaid はこの sandbox iframe 内で実行する。
   iframe は sandbox="allow-scripts" のみ（allow-same-origin は付与しない）で読み込まれる。
   postMessage でのみ親ウィンドウと通信する。
+
+  セキュリティモデル:
+  - sandbox="allow-scripts" が主防衛。allow-same-origin がないため null origin となり
+    親 WebView の DOM・Cookie・LocalStorage にアクセス不可。
+  - meta CSP タグは null origin サンドボックス内では 'self' が外部スクリプトに一致しないため
+    外部スクリプト読み込みをブロックしてしまう。sandbox 属性で十分に隔離されているため除去。
+  - mermaid.min.js は Vite プラグイン (vite.config.ts: copyMermaidForSandboxPlugin) が
+    pnpm install 後に public/vendor/ へコピーする。ESM import は使わない。
 -->
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'unsafe-inline'">
   <title>Mermaid Sandbox</title>
 </head>
 <body>
   <div id="graph"></div>
-  <script type="module">
-    import mermaid from '/node_modules/mermaid/dist/mermaid.esm.min.mjs';
+  <!-- mermaid.min.js は globalThis.mermaid にエクスポートする単一バンドルファイル -->
+  <script src="/vendor/mermaid.min.js"></script>
+  <script>
+    var mermaid = globalThis.mermaid;
 
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme: 'default',
-    });
+    if (!mermaid) {
+      window.parent.postMessage({
+        type: 'mermaid-sandbox-ready',
+        error: 'Mermaid ライブラリの読み込みに失敗しました (/vendor/mermaid.min.js)',
+      }, '*');
+    } else {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'default',
+      });
 
-    let idCounter = 0;
+      var idCounter = 0;
 
-    window.addEventListener('message', async (event) => {
-      const data = event.data;
-      if (data?.type !== 'render') return;
+      window.addEventListener('message', async function(event) {
+        var data = event.data;
+        if (data?.type !== 'render') return;
 
-      const id = `mermaid-sandbox-${++idCounter}`;
-      try {
-        const { svg } = await mermaid.render(id, data.definition);
-        window.parent.postMessage({ type: 'mermaid-result', svg, requestId: data.requestId }, '*');
-      } catch (error) {
-        window.parent.postMessage({
-          type: 'mermaid-result',
-          error: error instanceof Error ? error.message : String(error),
-          requestId: data.requestId,
-        }, '*');
-      }
-    });
+        var id = 'mermaid-sandbox-' + (++idCounter);
+        try {
+          var result = await mermaid.render(id, data.definition);
+          window.parent.postMessage(
+            { type: 'mermaid-result', svg: result.svg, requestId: data.requestId },
+            '*'
+          );
+        } catch (error) {
+          window.parent.postMessage({
+            type: 'mermaid-result',
+            error: error instanceof Error ? error.message : String(error),
+            requestId: data.requestId,
+          }, '*');
+        }
+      });
 
-    // 準備完了を親に通知
-    window.parent.postMessage({ type: 'mermaid-sandbox-ready' }, '*');
+      // 準備完了を親に通知
+      window.parent.postMessage({ type: 'mermaid-sandbox-ready' }, '*');
+    }
   </script>
 </body>
 </html>

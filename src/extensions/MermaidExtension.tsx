@@ -11,7 +11,7 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { renderMermaidInSandbox } from '../utils/mermaid-sandbox-renderer';
+import { renderMermaidInSandbox, destroyMermaidSandbox } from '../utils/mermaid-sandbox-renderer';
 
 export const MermaidBlock = Node.create({
   name: 'mermaidBlock',
@@ -65,6 +65,7 @@ function MermaidEditPopup({
   const [localCode, setLocalCode] = useState(code);
   const [previewSvg, setPreviewSvg] = useState('');
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -79,14 +80,17 @@ function MermaidEditPopup({
       return;
     }
     const timer = setTimeout(() => {
+      setPreviewLoading(true);
       renderMermaidInSandbox(localCode)
         .then((svg) => {
           setPreviewSvg(svg);
           setPreviewError(null);
+          setPreviewLoading(false);
         })
         .catch((err) => {
           setPreviewSvg('');
           setPreviewError(err instanceof Error ? err.message : String(err));
+          setPreviewLoading(false);
         });
     }, 300);
     return () => clearTimeout(timer);
@@ -137,7 +141,12 @@ function MermaidEditPopup({
           <div className="flex-1 flex flex-col">
             <div className="text-xs text-gray-400 px-3 py-1 bg-gray-50">プレビュー</div>
             <div className="flex-1 overflow-auto p-3 flex items-center justify-center">
-              {previewError ? (
+              {previewLoading ? (
+                <div className="mermaid-popup-loading">
+                  <span className="mermaid-block-loading__spinner" />
+                  <span className="text-gray-400 text-sm">レンダリング中...</span>
+                </div>
+              ) : previewError ? (
                 <div className="text-red-500 text-xs">{previewError}</div>
               ) : previewSvg ? (
                 <div dangerouslySetInnerHTML={{ __html: previewSvg }} />
@@ -157,6 +166,8 @@ function MermaidEditPopup({
   );
 }
 
+const CANCEL_MESSAGE = 'Mermaid sandbox が破棄されました';
+
 function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
   const [editing, setEditing] = useState(false);
   const [popupOpen, setPopupOpen] = useState(false);
@@ -164,6 +175,8 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
   const [svgHtml, setSvgHtml] = useState<string>('');
   const [renderError, setRenderError] = useState<string | null>(null);
   const [renderReady, setRenderReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const code = node.attrs.code as string;
@@ -186,18 +199,34 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
     }
 
     setRenderReady(false);
+    setRenderError(null);
+    setIsLoading(true);
     renderMermaidInSandbox(code)
       .then((svg) => {
         setSvgHtml(svg);
         setRenderError(null);
         setRenderReady(true);
+        setIsLoading(false);
       })
       .catch((err) => {
         setSvgHtml('');
-        setRenderError(err instanceof Error ? err.message : String(err));
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg !== CANCEL_MESSAGE) {
+          setRenderError(msg);
+        }
         setRenderReady(false);
+        setIsLoading(false);
       });
-  }, [code, editing]);
+  }, [code, editing, retryCount]);
+
+  const handleCancel = useCallback(() => {
+    destroyMermaidSandbox();
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setRenderError(null);
+    setRetryCount((c) => c + 1);
+  }, []);
 
   const startEditing = useCallback(() => {
     setEditing(true);
@@ -286,10 +315,27 @@ function MermaidBlockView({ node, updateAttributes, selected }: NodeViewProps) {
           tabIndex={-1}
           aria-label="Mermaid 図表（ダブルクリックでポップアップ編集）"
         >
-          {renderError ? (
+          {isLoading ? (
+            <div className="mermaid-block-loading">
+              <span className="mermaid-block-loading__spinner" />
+              <span className="mermaid-block-loading__text">読み込み中...</span>
+              <button
+                className="mermaid-block-loading__cancel"
+                onClick={(e) => { e.stopPropagation(); handleCancel(); }}
+              >
+                キャンセル
+              </button>
+            </div>
+          ) : renderError ? (
             <div className="mermaid-block-error">
               <span className="mermaid-block-error__icon">⚠</span>
               <span className="mermaid-block-error__text">{renderError}</span>
+              <button
+                className="mermaid-block-error__retry"
+                onClick={(e) => { e.stopPropagation(); handleRetry(); }}
+              >
+                再試行
+              </button>
             </div>
           ) : svgHtml ? (
             <div dangerouslySetInnerHTML={{ __html: svgHtml }} />

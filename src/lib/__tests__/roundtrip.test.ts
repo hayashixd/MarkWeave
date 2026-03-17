@@ -254,6 +254,126 @@ describe('roundtrip: composite documents', () => {
   }
 });
 
+// ── 7. Mermaid ダイアグラム各種 ───────────────────────
+describe('roundtrip: Mermaid ダイアグラム', () => {
+  // 基本的なダイアグラム種別
+  const diagramCases = [
+    {
+      name: 'flowchart TD（既存の基本ケース）',
+      md: '```mermaid\ngraph TD;\n  A-->B;\n```\n',
+    },
+    {
+      name: 'flowchart LR（左→右向き）',
+      md: '```mermaid\ngraph LR\n  A[開始] --> B{条件}\n  B -->|Yes| C[処理]\n  B -->|No| D[終了]\n```\n',
+    },
+    {
+      name: 'sequenceDiagram（シーケンス図）',
+      md: '```mermaid\nsequenceDiagram\n  Alice->>Bob: Hello\n  Bob-->>Alice: Hi!\n  Alice->>Bob: How are you?\n```\n',
+    },
+    {
+      name: 'classDiagram（クラス図）',
+      md: '```mermaid\nclassDiagram\n  class Animal {\n    +String name\n    +makeSound()\n  }\n  class Dog {\n    +fetch()\n  }\n  Animal <|-- Dog\n```\n',
+    },
+    {
+      name: 'stateDiagram-v2（状態遷移図）',
+      md: '```mermaid\nstateDiagram-v2\n  [*] --> Idle\n  Idle --> Processing : start\n  Processing --> Done : finish\n  Done --> [*]\n```\n',
+    },
+    {
+      name: 'gantt（ガントチャート）',
+      md: '```mermaid\ngantt\n  title プロジェクト計画\n  dateFormat YYYY-MM-DD\n  section フェーズ1\n  設計 :a1, 2024-01-01, 7d\n  実装 :after a1, 14d\n```\n',
+    },
+    {
+      name: 'erDiagram（ER図）',
+      md: '```mermaid\nerDiagram\n  CUSTOMER ||--o{ ORDER : places\n  ORDER ||--|{ LINE-ITEM : contains\n```\n',
+    },
+    {
+      name: 'pie chart（円グラフ）',
+      md: '```mermaid\npie title 割合\n  "A" : 40\n  "B" : 35\n  "C" : 25\n```\n',
+    },
+  ];
+
+  for (const { name, md } of diagramCases) {
+    it(`roundtrips: ${name}`, () => expectRoundtrip(md));
+    it(`snapshot: ${name}`, () => expectSnapshot(md));
+  }
+
+  // エッジケース
+  it('roundtrips: 空の mermaid ブロック', () => {
+    expectRoundtrip('```mermaid\n\n```\n');
+  });
+
+  it('snapshot: 空の mermaid ブロック', () => {
+    expectSnapshot('```mermaid\n\n```\n');
+  });
+
+  it('roundtrips: 日本語ラベルを含む mermaid', () => {
+    expectRoundtrip('```mermaid\ngraph TD\n  A[開始] --> B[処理中] --> C[完了]\n```\n');
+  });
+
+  it('roundtrips: コメントを含む mermaid', () => {
+    expectRoundtrip('```mermaid\ngraph TD\n  %% これはコメント\n  A --> B\n```\n');
+  });
+
+  // 複合ドキュメント内の Mermaid
+  it('roundtrips: 見出し + 本文 + Mermaid + 続く本文', () => {
+    const md = [
+      '## アーキテクチャ',
+      '',
+      'システムの構成を以下に示す。',
+      '',
+      '```mermaid',
+      'graph LR',
+      '  Client --> Server',
+      '  Server --> DB',
+      '```',
+      '',
+      '上図のとおり、3層構成になっている。',
+      '',
+    ].join('\n');
+    expectRoundtrip(md);
+  });
+
+  it('roundtrips: 複数の Mermaid ブロックが文書内に混在する', () => {
+    const md = [
+      '# 設計書',
+      '',
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+      '中間のテキスト。',
+      '',
+      '```mermaid',
+      'sequenceDiagram',
+      '  Alice->>Bob: Ping',
+      '```',
+      '',
+    ].join('\n');
+    expectRoundtrip(md);
+  });
+
+  it('snapshot: 複数の Mermaid ブロックが文書内に混在する', () => {
+    const md = [
+      '# 設計書',
+      '',
+      '```mermaid',
+      'graph TD',
+      '  A --> B',
+      '```',
+      '',
+      '中間のテキスト。',
+      '',
+      '```mermaid',
+      'sequenceDiagram',
+      '  Alice->>Bob: Ping',
+      '```',
+      '',
+    ].join('\n');
+    expectSnapshot(md);
+  });
+});
+
 // ── Zenn 固有記法 ────────────────────────────────────
 describe('roundtrip: Zenn固有記法', () => {
   it('コードブロック lang:filename（ファイル名指定）', () => {

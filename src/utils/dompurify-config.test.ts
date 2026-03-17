@@ -288,4 +288,124 @@ describe('sanitizeMermaidSvg', () => {
   it('空文字列を処理できる', () => {
     expect(sanitizeMermaidSvg('')).toBe('');
   });
+
+  // ---------------------------------------------------------------------------
+  // SVG 固有の XSS ベクター（Mermaid 出力で発生しうるもの）
+  // ---------------------------------------------------------------------------
+  describe('SVG 固有 XSS ベクター', () => {
+    it('<animate> タグを除去する（SVG アニメーション経由の XSS）', () => {
+      const svg =
+        '<svg><rect width="100" height="100">' +
+        '<animate attributeName="onmouseover" values="alert(1)"/>' +
+        '</rect></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).not.toContain('<animate');
+    });
+
+    it('<set> タグを除去する（属性書き換えによる XSS）', () => {
+      const svg =
+        '<svg><rect width="100" height="100">' +
+        '<set attributeName="onmouseover" to="alert(1)"/>' +
+        '</rect></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).not.toContain('<set');
+    });
+
+    it('SVG 要素の onmouseenter を除去する', () => {
+      const svg = '<svg><rect onmouseenter="alert(1)" width="50" height="50"/></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).not.toContain('onmouseenter');
+    });
+
+    it('SVG 要素の onanimationend を除去する', () => {
+      const svg = '<svg><g onanimationend="exfil()"><circle cx="50" cy="50" r="40"/></g></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).not.toContain('onanimationend');
+    });
+
+    it('<use> 要素の href="javascript:..." を除去する', () => {
+      const svg = '<svg><use href="javascript:alert(1)"/></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).not.toContain('javascript:');
+    });
+
+    it('<use> 要素の xlink:href="javascript:..." を除去する', () => {
+      // DOMPurify は xlink:href の javascript: プロトコルを除去する
+      const svg = '<svg><use xlink:href="javascript:alert(1)"/></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).not.toContain('javascript:');
+    });
+
+    it('SVG の style 属性は保持される（Mermaid のレンダリングに必要なため）', () => {
+      // DOMPurify は SVG プロファイルで style 属性を許可する。
+      // expression() は IE 固有の CSS injection であり現代ブラウザでは無害。
+      // DOMPurify は現代ブラウザでの XSS に特化しているため除去対象外となる。
+      const svg = '<svg><rect style="fill: blue; stroke: black;" width="50" height="50"/></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).toContain('<rect');
+      expect(result).toContain('fill: blue');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Mermaid が実際に出力する SVG 要素の保持確認
+  // ---------------------------------------------------------------------------
+  describe('Mermaid 出力に含まれる SVG 要素の保持', () => {
+    it('text / tspan 要素（ノードラベル）を保持する', () => {
+      const svg =
+        '<svg><g><text x="50" y="20" text-anchor="middle">' +
+        '<tspan>Node A</tspan></text></g></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).toContain('<text');
+      expect(result).toContain('Node A');
+    });
+
+    it('linearGradient / stop 要素を保持する', () => {
+      const svg =
+        '<svg><defs>' +
+        '<linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%">' +
+        '<stop offset="0%" style="stop-color:rgb(255,255,0)"/>' +
+        '<stop offset="100%" style="stop-color:rgb(255,0,0)"/>' +
+        '</linearGradient></defs>' +
+        '<rect fill="url(#g1)" width="200" height="50"/></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).toContain('<linearGradient');
+      expect(result).toContain('<stop');
+    });
+
+    it('clipPath 要素を保持する', () => {
+      const svg =
+        '<svg><defs><clipPath id="clip"><rect width="100" height="100"/></clipPath></defs>' +
+        '<g clip-path="url(#clip)"><circle cx="50" cy="50" r="80"/></g></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).toContain('<clipPath');
+    });
+
+    it('SVG の transform 属性を保持する', () => {
+      const svg =
+        '<svg><g transform="translate(10,20) rotate(45)">' +
+        '<rect width="50" height="50"/></g></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).toContain('transform');
+      expect(result).toContain('translate');
+    });
+
+    it('marker-end 属性（矢印）を保持する', () => {
+      const svg =
+        '<svg><defs><marker id="arrow" markerWidth="10" markerHeight="7" orient="auto">' +
+        '<path d="M0,0 L10,3.5 L0,7 Z"/></marker></defs>' +
+        '<line x1="0" y1="0" x2="100" y2="100" marker-end="url(#arrow)"/></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).toContain('marker-end');
+    });
+
+    it('opacity / font-size / text-anchor 属性を保持する', () => {
+      const svg =
+        '<svg><text x="50" y="50" opacity="0.8" font-size="14" text-anchor="middle">Label</text></svg>';
+      const result = sanitizeMermaidSvg(svg);
+      expect(result).toContain('opacity');
+      expect(result).toContain('font-size');
+      expect(result).toContain('text-anchor');
+    });
+  });
 });

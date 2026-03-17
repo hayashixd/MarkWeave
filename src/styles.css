@@ -792,6 +792,72 @@
   padding: 1rem;
 }
 
+.mermaid-block-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-subtle);
+}
+
+.mermaid-block-loading__spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent, #3b82f6);
+  border-radius: 50%;
+  animation: mermaid-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes mermaid-spin {
+  to { transform: rotate(360deg); }
+}
+
+.mermaid-block-loading__text {
+  flex: 1;
+}
+
+.mermaid-block-loading__cancel {
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  color: var(--color-text-subtle);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.mermaid-block-loading__cancel:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.mermaid-block-error__retry {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  color: var(--color-danger);
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.mermaid-block-error__retry:hover {
+  background: #fef2f2;
+}
+
+.mermaid-popup-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ===== クイックオープン（Phase 3: Ctrl+P） ===== */
 
 .quick-open-backdrop {
