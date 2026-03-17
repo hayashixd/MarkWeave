@@ -44,6 +44,7 @@ export interface MenuActions {
   view_backlinks: () => void;
   view_tags: () => void;
   view_git: () => void;
+  view_lint: () => void;
   view_floating_toc: () => void;
   view_split_pane: () => void;
   view_focus_mode: () => void;

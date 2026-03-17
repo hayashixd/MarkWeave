@@ -60,6 +60,7 @@
 | バックリンク | Ctrl+Shift+4 |
 | タグビュー | Ctrl+Shift+5 |
 | Git パネル | Ctrl+Shift+7 |
+| Lint パネル | Ctrl+Shift+8 |
 | フローティング目次 | Ctrl+Shift+T |
 | ペイン分割 | Ctrl+\ |
 | フォーカスモード | F8 |
@@ -223,6 +224,7 @@
 | タグビュー | 設定 → 表示 | YAML FM の tags を横断収集・フィルタ |
 | SQLite メタデータクエリ | 設定 → 拡張機能 | ` ```query ``` ` ブロックでワークスペースをクエリ |
 | Markdown Lint パネル | 設定 → 表示 | 見出しレベル飛び・リンク切れ等を検査 |
+| 文章スタイル Lint（Prose Lint） | 設定 → 表示 | 文の長さ・文体混在・冗長表現・助詞の重複を検出し修正案を提示。メニュー: 表示 → Lint パネル（Ctrl+Shift+8） |
 | HTML メタデータ編集パネル | 設定 → 表示 | `<title>` / `<meta>` / CSS・JS リンク管理（HTML ファイル限定） |
 
 ### HTML 編集モード
@@ -330,6 +332,7 @@
 | バックリンクパネル | Ctrl+Shift+4 |
 | タグビュー | Ctrl+Shift+5 |
 | Git パネル | Ctrl+Shift+7 |
+| Lint パネル | Ctrl+Shift+8 |
 | フローティング目次 | Ctrl+Shift+T |
 | 拡大 | Ctrl+= |
 | 縮小 | Ctrl+- |

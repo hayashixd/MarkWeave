@@ -133,6 +133,7 @@ const imgs = {
   tagsPanel: loadImage('sidebar-panels/02_tags-panel.png'),
   gitPanel: loadImage('sidebar-panels/03_git-panel.png'),
   sidebarToggle: loadImage('sidebar-panels/04_sidebar-toggle.png'),
+  lintPanel: loadImage('sidebar-panels/05_lint-panel.png'),
   // floating-toc (新規)
   floatingToc: loadImage('floating-toc/01_floating-toc.png'),
   zoomControls: loadImage('floating-toc/02_zoom-controls.png'),
@@ -410,7 +411,7 @@ const html = `<!DOCTYPE html>
     <li><a href="#ai-copy">AI コピー機能</a></li>
     <li><a href="#ai-template">AI テンプレートパネル</a></li>
     <li><a href="#file-management">ファイル管理の応用</a></li>
-    <li><a href="#sidebar-panels">サイドバーパネル詳細</a></li>
+    <li><a href="#sidebar-panels">サイドバーパネル詳細（バックリンク・タグ・Git・Lint）</a></li>
     <li><a href="#view-tools">フローティング目次・ズーム</a></li>
     <li><a href="#writing-tools">執筆ツール</a></li>
     <li><a href="#shortcuts">キーボードショートカット一覧</a></li>
@@ -1172,6 +1173,27 @@ graph TD
     <div class="tip">
       <strong>有効化:</strong> 設定 →「プラグイン」タブ → Git パネルを有効化してください（デフォルト非表示）。
     </div>
+
+    <h3>Lint パネル（文章スタイルチェック）</h3>
+    <p>「表示」→「Lint パネル」（<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>8</kbd>）でサイドバーに Lint タブを開きます。</p>
+    <p>Lint パネルは 2 つのチェッカーで構成されています。</p>
+    <ul>
+      <li><strong>Markdown Lint</strong> — 見出しレベル飛び・リンク切れ・空行不足など、Markdown 構造上の問題を検出します。</li>
+      <li><strong>文章スタイル Lint（Prose Lint）</strong> — AI を使わずにローカルで文章品質を分析します。
+        <ul>
+          <li><strong>SENT001: 文の長さ</strong> — 100 文字を超える長い文を警告。読みにくい長文を短く分割するよう促します。</li>
+          <li><strong>STYLE001: 文体混在</strong> — ですます調とだ・である調が混在している場合に少数派の文を指摘。</li>
+          <li><strong>STYLE002: 弱い表現</strong> — 「〜と思います」「〜かもしれません」など曖昧な表現を情報として提示。</li>
+          <li><strong>STYLE003: 冗長表現</strong> — 「〜することができる」→「〜できる」のような簡潔な書き換え案を提示。</li>
+          <li><strong>STYLE004: 助詞の重複</strong> — 同一文中で「を」が重複している箇所を指摘。</li>
+        </ul>
+      </li>
+    </ul>
+    <p>指摘箇所をクリックすると、エディタが該当行にジャンプします。コードブロックと YAML Front Matter 内のテキストは検査対象外です。</p>
+    ${imgTag(imgs.lintPanel, 'Lint パネル', 'Lint パネル — 文章スタイルの問題と修正案を一覧表示')}
+    <div class="tip">
+      <strong>有効化:</strong> 設定 →「表示」タブ →「詳細パネルを表示」をオンにしてください（デフォルト非表示）。
+    </div>
   </section>
 
   <!-- 26. フローティング目次・ズーム -->
@@ -1273,6 +1295,7 @@ graph TD
         <tr><td>バックリンク</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd></td><td>—</td></tr>
         <tr><td>タグビュー</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>5</kbd></td><td>—</td></tr>
         <tr><td>Git パネル</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>7</kbd></td><td>—</td></tr>
+        <tr><td>Lint パネル</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>8</kbd></td><td>—</td></tr>
         <tr><td>フローティング目次</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>—</td></tr>
         <tr><td>ペイン分割</td><td><kbd>Ctrl</kbd>+<kbd>\</kbd></td><td>—</td></tr>
         <tr><td>フォーカスモード</td><td><kbd>F8</kbd></td><td>—</td></tr>

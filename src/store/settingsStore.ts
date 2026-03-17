@@ -78,3 +78,9 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
   },
 }));
+
+// DEV 環境のみ: Playwright デモ GIF 撮影時に設定ストアを操作できるよう window に公開
+if (import.meta.env.DEV) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).__markweaveSettingsStore = useSettingsStore;
+}

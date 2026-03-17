@@ -58,6 +58,7 @@ mod ids {
     pub const VIEW_BACKLINKS: &str = "view_backlinks";
     pub const VIEW_TAGS: &str = "view_tags";
     pub const VIEW_GIT: &str = "view_git";
+    pub const VIEW_LINT: &str = "view_lint";
     pub const VIEW_FLOATING_TOC: &str = "view_floating_toc";
     pub const VIEW_SPLIT_PANE: &str = "view_split_pane";
     pub const VIEW_FOCUS_MODE: &str = "view_focus_mode";
@@ -321,6 +322,11 @@ pub fn build_menu(app: &AppHandle<Wry>, lang: Lang) -> Result<(), Box<dyn std::e
         .item(
             &MenuItemBuilder::with_id(ids::VIEW_GIT, l(lang, "Git パネル", "Git Panel"))
                 .accelerator("CmdOrCtrl+Shift+7")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id(ids::VIEW_LINT, l(lang, "Lint パネル", "Lint Panel"))
+                .accelerator("CmdOrCtrl+Shift+8")
                 .build(app)?,
         )
         .separator()

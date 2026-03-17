@@ -57,6 +57,7 @@
     "tabBacklinks": "Backlinks",
     "tabTags": "Tags",
     "tabGraph": "Graph",
-    "tabGit": "Git"
+    "tabGit": "Git",
+    "tabLint": "Lint"
   }
 }

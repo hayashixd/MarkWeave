@@ -558,6 +558,14 @@ export function AppShell() {
         return;
       }
 
+      // Ctrl+Shift+8: Lint パネル表示
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '*' || e.key === '8')) {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setSidebarTab('lint');
+        return;
+      }
+
       // Ctrl+Shift+T: フローティング TOC パネル表示/非表示トグル
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'T') {
         e.preventDefault();
@@ -821,6 +829,7 @@ export function AppShell() {
     view_backlinks: () => { setSidebarOpen(true); setSidebarTab('backlinks'); },
     view_tags: () => { setSidebarOpen(true); setSidebarTab('tags'); },
     view_git: () => { setSidebarOpen(true); setSidebarTab('git'); },
+    view_lint: () => { setSidebarOpen(true); setSidebarTab('lint'); },
     view_floating_toc: () => setFloatingTocOpen((v) => !v),
     view_split_pane: () => {
       const tab = getActiveTab();

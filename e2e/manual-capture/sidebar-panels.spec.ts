@@ -145,5 +145,38 @@ test.describe("マニュアル撮影: サイドバーパネル詳細", () => {
     // サイドバーを元に戻す
     await page.keyboard.press("Control+Shift+l");
     await page.waitForTimeout(300);
+
+    // ── Step 5: Lint パネル ──
+    // Ctrl+Shift+8 で Lint パネルを開く（詳細パネル有効化が必要）
+    await page.keyboard.press("Control+Shift+8");
+    await page.waitForTimeout(800); // Lint 計算待ち
+
+    const lintPanel = page
+      .locator("[class*='prose-lint'], [class*='ProseLint'], [class*='lint-panel'], [data-panel='lint']")
+      .first();
+    const lintVisible = await lintPanel.isVisible().catch(() => false);
+
+    if (lintVisible) {
+      const box = await lintPanel.boundingBox();
+      if (box) {
+        await captureWithAnnotation(
+          page,
+          "lint-panel",
+          [
+            {
+              rect: { x: box.x, y: box.y, width: box.width, height: box.height },
+              label: "Lint パネル — 文章スタイルの問題と修正案",
+              color: "red",
+            },
+          ],
+          OUTPUT_DIR
+        );
+      } else {
+        await captureStep(page, "lint-panel", OUTPUT_DIR);
+      }
+    } else {
+      // Lint タブ全体を撮影
+      await captureStep(page, "lint-panel", OUTPUT_DIR);
+    }
   });
 });

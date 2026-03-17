@@ -21,8 +21,12 @@
  * - グラフビュータブ（知識管理者: Wikiリンク関係の可視化）
  *
  * A-2 (Phase A):
- * - sidebar.showAdvancedTabs 設定が false のとき ai/backlinks/tags/graph/git タブを非表示
+ * - sidebar.showAdvancedTabs 設定が false のとき ai/backlinks/tags/graph/git/lint タブを非表示
  * - アクティブタブが非表示になった場合は outline にフォールバック
+ *
+ * Lint タブ追加:
+ * - lint タブ（Markdown 構造 + 文章スタイルの一括チェック）
+ * - コンテンツは LintSidebarContent が tabStore から直接購読（500ms デバウンス）
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -34,12 +38,41 @@ import { BacklinksPanel } from './BacklinksPanel';
 import { TagViewPanel } from './TagViewPanel';
 import { GraphViewPanel } from './GraphViewPanel';
 import { GitPanel } from './GitPanel';
+import { MarkdownLintPanel } from '../MarkdownLint/MarkdownLintPanel';
+import { ProseLintPanel } from '../ProseLint/ProseLintPanel';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useTabStore } from '../../store/tabStore';
 import { useTranslation } from '../../i18n';
 
-export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks' | 'tags' | 'graph' | 'git';
+export type SidebarTab = 'outline' | 'files' | 'ai' | 'backlinks' | 'tags' | 'graph' | 'git' | 'lint';
 
-const ADVANCED_TABS: SidebarTab[] = ['ai', 'backlinks', 'tags', 'graph', 'git'];
+const ADVANCED_TABS: SidebarTab[] = ['ai', 'backlinks', 'tags', 'graph', 'git', 'lint'];
+
+/**
+ * Lint タブのコンテンツ。
+ * tabStore から現在のアクティブタブの内容を購読し、
+ * 500ms デバウンスで MarkdownLintPanel と ProseLintPanel に渡す。
+ * lint タブがアクティブなときのみレンダリングされるためスコープは限定的。
+ */
+function LintSidebarContent({ onGoToLine }: { onGoToLine?: (line: number) => void }) {
+  const rawContent = useTabStore(
+    (s) => s.tabs.find((t) => t.id === s.activeTabId)?.content ?? '',
+  );
+
+  // 500ms デバウンス: 高速タイピング中に毎キーストロークでlintを走らせない
+  const [content, setContent] = useState(rawContent);
+  useEffect(() => {
+    const timer = setTimeout(() => setContent(rawContent), 500);
+    return () => clearTimeout(timer);
+  }, [rawContent]);
+
+  return (
+    <div className="flex flex-col divide-y divide-gray-100">
+      <MarkdownLintPanel markdown={content} onGoToLine={onGoToLine} />
+      <ProseLintPanel markdown={content} onGoToLine={onGoToLine} />
+    </div>
+  );
+}
 
 interface SidebarProps {
   isOpen: boolean;
@@ -201,6 +234,17 @@ export function Sidebar({
               >
                 ⎇ {t('sidebar.tabGit')}
               </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'lint'}
+                aria-controls="sidebar-panel-lint"
+                className={`sidebar-tab ${activeTab === 'lint' ? 'sidebar-tab--active' : ''} whitespace-nowrap`}
+                onClick={() => setActiveTab('lint')}
+                title={`${t('sidebar.tabLint')} (Ctrl+Shift+8)`}
+              >
+                ✔ {t('sidebar.tabLint')}
+              </button>
             </>
           )}
         </div>
@@ -290,6 +334,15 @@ export function Sidebar({
             className="h-full"
           >
             <GitPanel workspaceRoot={workspaceRoot} />
+          </div>
+        )}
+        {showAdvancedTabs && activeTab === 'lint' && (
+          <div
+            id="sidebar-panel-lint"
+            role="tabpanel"
+            aria-labelledby="tab-lint"
+          >
+            <LintSidebarContent />
           </div>
         )}
       </div>
