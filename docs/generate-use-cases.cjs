@@ -18,9 +18,10 @@
 const fs   = require('fs');
 const path = require('path');
 
-const screenshotBase = path.join(__dirname, 'use-case-screenshots');
-const demoGifBase    = path.join(__dirname, '..', 'doc-public', 'demo-gifs');
-const outputPath     = path.join(__dirname, '..', 'doc-public', 'use-cases.html');
+const screenshotBase  = path.join(__dirname, 'use-case-screenshots');
+const manualSsBase    = path.join(__dirname, 'manual-screenshots');
+const demoGifBase     = path.join(__dirname, '..', 'doc-public', 'demo-gifs');
+const outputPath      = path.join(__dirname, '..', 'doc-public', 'use-cases.html');
 
 // ──────────────────────────────────────────────────────────
 // ヘルパー: ファイルを base64 Data URI に変換
@@ -60,6 +61,16 @@ function ucImg(dir, name) {
   return null;
 }
 
+/** マニュアルスクリーンショット（manual-screenshots/{dir}/{file}） */
+function manualImg(dir, name) {
+  for (const ext of ['.png', '.gif', '.jpg']) {
+    const p = path.join(manualSsBase, dir, name + ext);
+    const uri = toDataUri(p);
+    if (uri) return uri;
+  }
+  return null;
+}
+
 // ──────────────────────────────────────────────────────────
 // <figure> HTML を生成するヘルパー
 // ──────────────────────────────────────────────────────────
@@ -81,18 +92,24 @@ function fig(src, alt, captionKey) {
 // 画像を全部読み込む
 // ──────────────────────────────────────────────────────────
 const imgs = {
-  // ─ Scenario 1 ─
-  wysiwyg:      demoGif('wysiwyg-formatting'),
-  frontMatter:  ucImg('s1-frontmatter', 'front-matter-edit'),
+  // ─ Scenario 1: Zenn / Qiita ─
+  wysiwyg:           demoGif('wysiwyg-formatting'),
+  frontMatter:       ucImg('s1-frontmatter', 'front-matter-edit'),
+  profileSelector:   manualImg('platform-profile', '01_profile-selector'),
+  zennForm:          manualImg('platform-profile', '02_zenn-form'),
+  qiitaForm:         manualImg('platform-profile', '03_qiita-form'),
+  platformWarnings:  manualImg('platform-profile', '04_warnings'),
+  zennPalette:       manualImg('platform-profile', '05_zenn-palette'),
+  copyButtons:       manualImg('platform-profile', '06_copy-buttons'),
   // ─ Scenario 2 ─
-  codeExport:   demoGif('code-block-export'),
-  aiCopy:       demoGif('ai-copy'),
+  codeExport:        demoGif('code-block-export'),
+  aiCopy:            demoGif('ai-copy'),
   // ─ Scenario 3 ─
-  focusMode:    demoGif('focus-mode'),
-  zenPomodoro:  ucImg('s3-zen', 'zen-pomodoro'),
+  focusMode:         demoGif('focus-mode'),
+  zenPomodoro:       ucImg('s3-zen', 'zen-pomodoro'),
   // ─ Scenario 4 ─
-  workspace:    ucImg('s4-workspace', 'workspace-filetree'),
-  extChange:    ucImg('s4-workspace', 'external-change'),
+  workspace:         ucImg('s4-workspace', 'workspace-filetree'),
+  extChange:         ucImg('s4-workspace', 'external-change'),
 };
 
 // ──────────────────────────────────────────────────────────
@@ -243,7 +260,7 @@ const html = `<!DOCTYPE html>
     <h1 data-i18n="hero.h1">実際の使い方</h1>
     <p data-i18n="hero.desc">「自分のワークフローに合うか？」を確認するためのシナリオ別ガイド。MarkWeave がどんな場面で、どう役立つかを具体的な手順で紹介します。</p>
     <div class="scenario-jumps">
-      <a href="#scenario-1" class="scenario-jump"><span class="scenario-num">01</span> <span data-i18n="hero.jump1">Zenn / Qiita 記事執筆</span></a>
+      <a href="#scenario-1" class="scenario-jump"><span class="scenario-num">01</span> <span data-i18n="hero.jump1">Zenn / Qiita 記事執筆・クロスポスト</span></a>
       <a href="#scenario-2" class="scenario-jump"><span class="scenario-num">02</span> <span data-i18n="hero.jump2">コードスニペット + AI レビュー</span></a>
       <a href="#scenario-3" class="scenario-jump"><span class="scenario-num">03</span> <span data-i18n="hero.jump3">集中して長文を書く</span></a>
       <a href="#scenario-4" class="scenario-jump"><span class="scenario-num">04</span> <span data-i18n="hero.jump4">既存 .md ファイルを引き継ぐ</span></a>
@@ -256,7 +273,7 @@ const html = `<!DOCTYPE html>
   <div class="scenario-inner">
     <div class="scenario-text">
       <p class="scenario-num-badge" data-i18n="s1.badge">Scenario 01 — Zenn / Qiita</p>
-      <h2 data-i18n="s1.h2">Zenn / Qiita に週1本記事を書く</h2>
+      <h2 data-i18n="s1.h2">Zenn / Qiita に週1本記事を書いてクロスポスト</h2>
       <div class="before-card"><p class="label">Before</p><p data-i18n="s1.before"></p></div>
       <div class="after-card"><p class="label">After</p><p data-i18n="s1.after"></p></div>
       <ol class="workflow">
@@ -275,8 +292,9 @@ const html = `<!DOCTYPE html>
     </div>
     <div class="scenario-media">
       <div class="media-stack">
-        ${fig(imgs.wysiwyg,     'WYSIWYG 編集デモ',          's1.cap1')}
-        ${fig(imgs.frontMatter, 'YAML Front Matter GUI編集', 's1.cap2')}
+        ${fig(imgs.profileSelector, 'プロファイルセレクター（汎用 / Zenn / Qiita）', 's1.cap1')}
+        ${fig(imgs.zennForm,        'Zenn プロファイルフォーム',                       's1.cap2')}
+        ${fig(imgs.zennPalette,     'Zenn 記法パレット',                               's1.cap3')}
       </div>
     </div>
   </div>
@@ -406,18 +424,18 @@ const html = `<!DOCTYPE html>
       'nav.features': '機能', 'nav.pricing': '価格', 'nav.manual': 'マニュアル', 'nav.download': '無料で試す',
       'hero.label': 'Use Cases', 'hero.h1': '実際の使い方',
       'hero.desc': '「自分のワークフローに合うか？」を確認するためのシナリオ別ガイド。MarkWeave がどんな場面で、どう役立つかを具体的な手順で紹介します。',
-      'hero.jump1': 'Zenn / Qiita 記事執筆', 'hero.jump2': 'コードスニペット + AI レビュー',
+      'hero.jump1': 'Zenn / Qiita 記事執筆・クロスポスト', 'hero.jump2': 'コードスニペット + AI レビュー',
       'hero.jump3': '集中して長文を書く', 'hero.jump4': '既存 .md ファイルを引き継ぐ',
-      's1.badge': 'Scenario 01 — Zenn / Qiita', 's1.h2': 'Zenn / Qiita に週1本記事を書く',
-      's1.before': 'VS Code のプレビューとエディタを行き来するたびに書くリズムが崩れる。Markdown の記法が邪魔に感じる。',
-      's1.after': '1ウィンドウで書きながらレンダリング確認。コードブロックも数式も即座に表示。YAML メタデータの GUI 編集で Front Matter を記法なしで管理。',
-      's1.step1': 'Ctrl+N で新規ファイルを作成',
-      's1.step2': '先頭の --- ブロックでタイトル・タグ・emoji を GUI 入力',
-      's1.step3': '# で見出し、- でリスト。記法を入力すると即レンダリング',
-      's1.step4': '「ファイル → エクスポート → Markdown」でZenn/Qiita向けに最適化して書き出し',
-      's1.step5': '書き出した .md を Zenn / Qiita のエディタにそのまま貼り付けて公開',
-      's1.pill1': 'WYSIWYG 編集', 's1.pill2': 'YAML Front Matter GUI', 's1.pill3': 'Markdown エクスポート', 's1.pill4': 'コードブロック',
-      's1.cap1': '記法を入力した瞬間にレンダリングされる', 's1.cap2': 'Front Matter を記法なしで GUI 編集',
+      's1.badge': 'Scenario 01 — Zenn / Qiita', 's1.h2': 'Zenn / Qiita に週1本記事を書いてクロスポスト',
+      's1.before': 'VS Code のプレビューとエディタを行き来するたびに書くリズムが崩れる。Zenn で書いた :::message や @[youtube] を Qiita 向けに手作業で書き直すのが面倒。',
+      's1.after': 'プロファイルを「Zenn」に設定して書くだけ。Qiita 非対応記法があればリアルタイム警告。「⇄ Qiita 用に変換してコピー」で変換済み Markdown がクリップボードに入り、そのまま Qiita に貼り付け完了。',
+      's1.step1': 'Ctrl+N で新規ファイルを作成し、Front Matter パネルでプロファイルを「Zenn」に切り替え',
+      's1.step2': 'title / emoji / type / topics を GUI フォームで入力。YAML を直接書かなくてよい',
+      's1.step3': 'Zenn 記法パレットから :::message や @[youtube] をワンクリック挿入しながら執筆',
+      's1.step4': 'Front Matter パネルの「📋 Markdown をコピー」で Zenn 向け完全 Markdown をクリップボードへ → Zenn に貼り付けて公開',
+      's1.step5': '「⇄ Qiita 用に変換してコピー」をクリック。Zenn 固有記法を自動除去した Markdown を Qiita に貼り付けてクロスポスト完了',
+      's1.pill1': 'プラットフォームプロファイル', 's1.pill2': 'Zenn 記法パレット', 's1.pill3': '構文警告', 's1.pill4': 'Qiita 変換コピー',
+      's1.cap1': 'プロファイルセレクター — 汎用 / Zenn / Qiita を1クリックで切り替え', 's1.cap2': 'Zenn プロファイル — emoji・type・topics を GUI で入力', 's1.cap3': 'Zenn 記法パレット — :::message や @[youtube] をワンクリック挿入',
       's2.badge': 'Scenario 02 — AI Copy', 's2.h2': 'コードスニペット入り記事を AI にレビューしてもらう',
       's2.before': 'Claude / ChatGPT に記事を貼るたびに手作業で整形。見出しのレベルがズレたり、コードブロックの言語タグが抜けていたり。',
       's2.after': '「AI コピー」ボタン1クリックで見出し補正・言語タグ付け・余分な空行削除を自動処理。クリップボードをそのまま貼り付けるだけ。',
@@ -458,18 +476,18 @@ const html = `<!DOCTYPE html>
       'nav.features': 'Features', 'nav.pricing': 'Pricing', 'nav.manual': 'Manual', 'nav.download': 'Try Free',
       'hero.label': 'Use Cases', 'hero.h1': 'How People Use MarkWeave',
       'hero.desc': 'Wondering if it fits your workflow? Here are four concrete scenarios showing how MarkWeave helps — with step-by-step walkthroughs.',
-      'hero.jump1': 'Zenn / Qiita articles', 'hero.jump2': 'Code snippets + AI review',
+      'hero.jump1': 'Zenn / Qiita articles & cross-posting', 'hero.jump2': 'Code snippets + AI review',
       'hero.jump3': 'Long-form focus writing', 'hero.jump4': 'Inheriting existing .md files',
-      's1.badge': 'Scenario 01 — Zenn / Qiita', 's1.h2': 'Writing a weekly article for Zenn or Qiita',
-      's1.before': "Constantly switching between VS Code's editor and preview breaks the writing flow. Markdown syntax feels like noise.",
-      's1.after': 'Write and see rendered output in one window. Code blocks, math, and diagrams render instantly inline. Manage YAML Front Matter without touching syntax.',
-      's1.step1': 'Create a new file with Ctrl+N',
-      's1.step2': 'Fill in title, tags, and emoji via the GUI Front Matter panel at the top',
-      's1.step3': 'Type # for headings, - for lists — syntax renders as you type',
-      's1.step4': 'Export via File → Export → Markdown, optimized for Zenn / Qiita',
-      's1.step5': 'Paste the exported .md directly into Zenn or Qiita and publish',
-      's1.pill1': 'WYSIWYG editing', 's1.pill2': 'YAML Front Matter GUI', 's1.pill3': 'Markdown export', 's1.pill4': 'Code blocks',
-      's1.cap1': 'Syntax renders the instant you type it', 's1.cap2': 'Edit Front Matter via GUI — no syntax needed',
+      's1.badge': 'Scenario 01 — Zenn / Qiita', 's1.h2': 'Writing weekly articles for Zenn and cross-posting to Qiita',
+      's1.before': "Constantly switching between VS Code's editor and preview breaks the writing flow. Cleaning up Zenn-specific syntax like :::message and @[youtube] by hand before posting to Qiita is tedious.",
+      's1.after': 'Set the profile to "Zenn" and write. Real-time warnings flag Qiita-incompatible syntax. One click on "⇄ Convert & Copy for Qiita" strips Zenn-specific markup and puts Qiita-ready Markdown on your clipboard.',
+      's1.step1': 'Create a new file with Ctrl+N and switch the Front Matter panel profile to "Zenn"',
+      's1.step2': 'Fill in title, emoji, type, and topics via the GUI form — no YAML syntax needed',
+      's1.step3': 'Use the Zenn syntax palette to insert :::message or @[youtube] with one click while writing',
+      's1.step4': 'Click "📋 Copy Markdown" in the Front Matter panel to copy complete Zenn-ready Markdown → paste into Zenn and publish',
+      's1.step5': 'Click "⇄ Convert & Copy for Qiita" — Zenn-specific markup is stripped automatically, paste into Qiita to cross-post',
+      's1.pill1': 'Platform profile', 's1.pill2': 'Zenn syntax palette', 's1.pill3': 'Syntax warnings', 's1.pill4': 'Qiita conversion copy',
+      's1.cap1': 'Profile selector — switch between Generic / Zenn / Qiita with one click', 's1.cap2': 'Zenn profile — fill in emoji, type, and topics via GUI', 's1.cap3': 'Zenn syntax palette — insert :::message or @[youtube] with one click',
       's2.badge': 'Scenario 02 — AI Copy', 's2.h2': 'Getting AI to review a code-heavy article',
       's2.before': 'Every time you paste an article into Claude or ChatGPT, you have to manually fix broken heading levels and missing language tags on code blocks.',
       's2.after': 'One click on [AI Copy] auto-fixes heading levels, adds language tags to code blocks, and strips extra blank lines — then copies to clipboard. Just paste.',
