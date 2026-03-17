@@ -95,7 +95,18 @@
       "Bash(git pull:*)",
       "Bash(git clone:*)",
       "Read(//c/work/MarkWeave-zenn/**)",
-      "Bash(npx zenn:*)"
+      "Bash(npx zenn:*)",
+      "mcp__test-automation__manual_capture",
+      "Bash(git:*)",
+      "WebFetch(domain:signpath.org)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:signpath.io)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm test:*)",
+      "Bash(gh api:*)",
+      "Bash(gh.exe api:*)",
+      "WebFetch(domain:api.github.com)",
+      "Read(//c/Users/xdhys/AppData/Local/Temp/markweave-zenn/**)"
     ]
   },
   "mcpToolSearch": true
