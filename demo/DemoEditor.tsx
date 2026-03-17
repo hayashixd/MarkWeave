@@ -171,51 +171,45 @@ function createSlashCommandsExtension(
 
 // ── プリセットコンテンツ ───────────────────────────────────────
 
-const PRESET_HTML_JA = `<h1>Rust で作る HTTP サーバー</h1>
-<p>今日は <strong>Tokio</strong> と <em>Hyper</em> を使って、シンプルな HTTP サーバーを構築してみましょう。</p>
-<h2>セットアップ</h2>
-<p><code>Cargo.toml</code> に依存関係を追加します:</p>
-<pre><code class="language-toml">[dependencies]
-tokio = { version = "1", features = ["full"] }
-hyper = { version = "1", features = ["full"] }</code></pre>
-<h2>基本実装</h2>
-<pre><code class="language-rust">use hyper::{Request, Response, Body};
-use std::convert::Infallible;
+const PRESET_HTML_JA = `<h1>技術記事を速く・楽しく書く3つのコツ</h1>
+<p><strong>「ネタはあるのに、なかなか書けない」</strong> ——そんな経験はありませんか？<em>書く環境</em>を整えるだけで、アウトプットの速さと質は大きく変わります。</p>
+<h2>① 書く前に構成を1行で決める</h2>
+<p>記事を開く前に、<code>1文で言えること</code> をメモします。言えないなら、まだ整理が足りないサインです。</p>
+<h2>② Markdown の記法を「見ないで書く」</h2>
+<p>WYSIWYG エディタなら、<strong># を打つだけで見出しに変わります</strong>。記法を覚える必要がなく、<em>書くことだけ</em>に集中できます。</p>
+<pre><code class="language-markdown"># 記事タイトル
 
-async fn handle(_req: Request&lt;Body&gt;) -&gt; Result&lt;Response&lt;Body&gt;, Infallible&gt; {
-    Ok(Response::new("Hello, MarkWeave!".into()))
-}</code></pre>
-<h2>チェックリスト</h2>
+## はじめに（なぜ書くのか）
+## 本論（具体的な内容）
+## まとめ（読者へのアクション）</code></pre>
+<h2>公開前チェックリスト</h2>
 <ul data-type="taskList">
-  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>プロジェクトの初期化</p></div></label></li>
-  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>依存関係の追加</p></div></label></li>
-  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>ルーティングの実装</p></div></label></li>
-  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>エラーハンドリング</p></div></label></li>
+  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>タイトルに数字か具体性を入れた</p></div></label></li>
+  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>導入文で「誰向けか」を明示した</p></div></label></li>
+  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>コードブロックの動作を確認した</p></div></label></li>
+  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>Zenn / Qiita 向けにエクスポートした</p></div></label></li>
 </ul>
-<blockquote><p><strong>ヒント:</strong> 行頭で <code>/</code> を入力するとコマンドメニューが開きます。試してみてください！</p></blockquote>`;
+<blockquote><p><strong>試してみよう:</strong> 行頭で <code>/</code> を入力するとコマンドメニューが開きます。見出し・リスト・テーブルをキーボードだけで挿入できます。</p></blockquote>`;
 
-const PRESET_HTML_EN = `<h1>Building an HTTP Server in Rust</h1>
-<p>Today we'll build a simple HTTP server using <strong>Tokio</strong> and <em>Hyper</em>.</p>
-<h2>Setup</h2>
-<p>Add dependencies to <code>Cargo.toml</code>:</p>
-<pre><code class="language-toml">[dependencies]
-tokio = { version = "1", features = ["full"] }
-hyper = { version = "1", features = ["full"] }</code></pre>
-<h2>Basic Implementation</h2>
-<pre><code class="language-rust">use hyper::{Request, Response, Body};
-use std::convert::Infallible;
+const PRESET_HTML_EN = `<h1>3 Tips for Writing Tech Articles Faster</h1>
+<p><strong>"I have ideas, but I just can't get them written"</strong> — sound familiar? Setting up the <em>right writing environment</em> can dramatically improve both your speed and quality.</p>
+<h2>① Decide your structure in one sentence first</h2>
+<p>Before you open your editor, write down <code>what you want to say in one line</code>. If you can't, it means you're still organising your thoughts.</p>
+<h2>② Write Markdown without thinking about syntax</h2>
+<p>With a WYSIWYG editor, <strong>typing # instantly becomes a heading</strong>. No need to memorise syntax — you can focus entirely on <em>writing</em>.</p>
+<pre><code class="language-markdown"># Article Title
 
-async fn handle(_req: Request&lt;Body&gt;) -&gt; Result&lt;Response&lt;Body&gt;, Infallible&gt; {
-    Ok(Response::new("Hello, MarkWeave!".into()))
-}</code></pre>
-<h2>Checklist</h2>
+## Introduction (why you're writing this)
+## Main Content (the actual details)
+## Wrap-up (action for the reader)</code></pre>
+<h2>Pre-publish checklist</h2>
 <ul data-type="taskList">
-  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>Initialize project</p></div></label></li>
-  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>Add dependencies</p></div></label></li>
-  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>Implement routing</p></div></label></li>
-  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>Error handling</p></div></label></li>
+  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>Title includes a number or concrete detail</p></div></label></li>
+  <li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked /><div><p>Introduction says clearly who this is for</p></div></label></li>
+  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>Verified all code blocks run correctly</p></div></label></li>
+  <li data-type="taskItem" data-checked="false"><label><input type="checkbox" /><div><p>Exported for Zenn / dev.to / Hashnode</p></div></label></li>
 </ul>
-<blockquote><p><strong>Tip:</strong> Type <code>/</code> at the start of a line to open the command menu!</p></blockquote>`;
+<blockquote><p><strong>Try it:</strong> Type <code>/</code> at the start of a line to open the command menu — insert headings, lists, and tables with just your keyboard.</p></blockquote>`;
 
 // ── エディタコンポーネント ─────────────────────────────────────
 
