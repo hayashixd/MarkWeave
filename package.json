@@ -22,7 +22,9 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "version:bump": "node scripts/bump-version.mjs",
-    "manual:capture": "playwright test e2e/manual-capture/ --headed"
+    "manual:capture": "playwright test e2e/manual-capture/ --headed",
+    "build:demo": "vite build --config vite.config.demo.ts",
+    "capture:slash-gif": "playwright test e2e/demo-capture/slash-commands.spec.ts --headed"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.0",
