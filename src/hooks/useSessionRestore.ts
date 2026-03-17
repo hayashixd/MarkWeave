@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useTabStore } from '../store/tabStore';
 import { useToastStore } from '../store/toastStore';
 import { usePaneStore } from '../store/paneStore';
@@ -94,8 +95,10 @@ export function useSessionRestore() {
       try {
         const session = await loadSession();
         if (!session || session.openFiles.length === 0) {
-          // セッションが無い場合は空タブを開く（AppShell 側の初回起動と同様）
-          if (tabs.length === 0) {
+          // CLI 引数でファイルが指定されている場合は空タブを作らない。
+          // useFileOpenListener が後続で get_startup_file_paths を呼んで開く。
+          const hasStartupFiles = await invoke<boolean>('has_startup_files');
+          if (!hasStartupFiles && tabs.length === 0) {
             addTab({
               filePath: null,
               fileName: 'Untitled',
@@ -179,9 +182,10 @@ export function useSessionRestore() {
           show('warning', `セッション復元: ${failCount}個のファイルを開けませんでした`);
         }
       } catch {
-        // セッション復元失敗 → 空タブで開始
+        // セッション復元失敗 → CLI 引数がなければ空タブで開始
         show('warning', 'セッションの復元に失敗しました。新規ファイルで開始します。');
-        if (tabs.length === 0) {
+        const hasStartupFiles = await invoke<boolean>('has_startup_files').catch(() => false);
+        if (!hasStartupFiles && tabs.length === 0) {
           addTab({
             filePath: null,
             fileName: 'Untitled',

@@ -20,6 +20,25 @@ use commands::window_commands;
 use commands::window_sync;
 use tauri::{Emitter, Manager};
 
+/// 起動時に CLI 引数で渡されたファイルパス一覧を保持する。
+/// フロントエンドの listen 登録前に emit すると競合するため、
+/// フロントエンドが準備完了後に invoke で取得する方式をとる。
+/// 複数ファイルを一括対応（例: markweave a.md b.md c.md）。
+struct StartupFilePaths(std::sync::Mutex<Vec<String>>);
+
+/// CLI 引数ファイルが存在するかだけを確認する（消費しない）。
+/// useSessionRestore が空タブ作成をスキップするかの判断に使用する。
+#[tauri::command]
+fn has_startup_files(state: tauri::State<'_, StartupFilePaths>) -> bool {
+    !state.0.lock().unwrap().is_empty()
+}
+
+/// CLI 引数ファイルパス一覧を取得し、リストを消費する（1 回限り）。
+#[tauri::command]
+fn get_startup_file_paths(state: tauri::State<'_, StartupFilePaths>) -> Vec<String> {
+    state.0.lock().unwrap().drain(..).collect()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -29,10 +48,15 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::PendingUpdate(std::sync::Mutex::new(None)))
+        .manage(StartupFilePaths(std::sync::Mutex::new(
+            // args().skip(1) で実行ファイルパス以外の全引数をファイルパスとして収集
+            std::env::args().skip(1).collect(),
+        )))
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // 2つ目の起動試行時に呼ばれる
-            // argv = ["app_path", "/path/to/file.md", ...]
-            if let Some(path) = argv.get(1) {
+            // argv = ["app_path", "file1.md", "file2.md", ...]
+            // 複数ファイルを個別に emit（フロントエンドの listen が各イベントを受け取る）
+            for path in argv.iter().skip(1) {
                 let _ = app.emit("open-file-request", path.as_str());
             }
             // 既存ウィンドウをフォアグラウンドに表示
@@ -103,6 +127,8 @@ pub fn run() {
             license_commands::get_trial_status,
             updater::check_for_updates,
             updater::install_update,
+            has_startup_files,
+            get_startup_file_paths,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -134,9 +160,27 @@ pub fn run() {
             }
         })
         .setup(|app| {
-            // ネイティブメニューバーを構築 (app-shell-design.md §2)
+            // 設定ファイルから言語を読み取ってネイティブメニューを構築 (app-shell-design.md §2)
+            let lang = {
+                let try_read = || -> Option<menu::native_menu::Lang> {
+                    let dir = app.path().app_data_dir().ok()?;
+                    let content = std::fs::read_to_string(dir.join("settings.json")).ok()?;
+                    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+                    let language = json
+                        .get("settings")?
+                        .get("appearance")?
+                        .get("language")?
+                        .as_str()?;
+                    if language == "en" {
+                        Some(menu::native_menu::Lang::En)
+                    } else {
+                        None
+                    }
+                };
+                try_read().unwrap_or(menu::native_menu::Lang::Ja)
+            };
             let handle = app.handle().clone();
-            if let Err(e) = menu::native_menu::build_menu(&handle) {
+            if let Err(e) = menu::native_menu::build_menu(&handle, lang) {
                 log::error!("Failed to build native menu: {}", e);
             }
             menu::native_menu::setup_menu_event_handler(&handle);
@@ -147,11 +191,8 @@ pub fn run() {
                 updater::background_check(update_handle).await;
             });
 
-            // 初回起動時のコマンドライン引数からファイルパスを処理
-            let args: Vec<String> = std::env::args().collect();
-            if let Some(path) = args.get(1) {
-                let _ = app.emit("open-file-request", path.as_str());
-            }
+            // 初回起動時のコマンドライン引数は StartupFilePath に保存済み。
+            // フロントエンドが listen 登録後に get_startup_file_path で取得する。
             Ok(())
         })
         .run(tauri::generate_context!())
