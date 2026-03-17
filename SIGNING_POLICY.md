@@ -51,10 +51,13 @@ author before merge. No unsigned or unreviewed code is included in a release.
 
 ---
 
-## Privacy
+## Privacy & Support
 
 No telemetry or usage data is collected by the application.
 All user data is stored locally on the user's machine.
+
+For support, refund policy, and known limitations, see
+[SUPPORT.md](./SUPPORT.md).
 
 ---
 

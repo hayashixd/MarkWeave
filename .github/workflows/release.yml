@@ -8,19 +8,10 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  release-linux:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'ubuntu-22.04'
-            args: ''
-          - platform: 'windows-latest'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +46,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
@@ -76,7 +66,6 @@ jobs:
           releaseBody: ${{ steps.tag_notes.outputs.notes }}
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
 
       - name: Calculate SHA256 hashes
         shell: bash
@@ -85,7 +74,7 @@ jobs:
           echo '${{ steps.tauri.outputs.artifactPaths }}' | jq -r '.[]' | while IFS= read -r f; do
             f="${f//\\//}"
             case "$f" in
-              *.msi|*.AppImage|*.deb)
+              *.AppImage|*.deb)
                 if [ -f "$f" ]; then
                   HASH=$(sha256sum "$f" | cut -d' ' -f1)
                   NAME=$(basename "$f")
@@ -98,12 +87,78 @@ jobs:
       - name: Upload hash artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hashes-${{ matrix.platform }}
+          name: hashes-ubuntu-22.04
+          path: ${{ runner.temp }}/hashes/hash.txt
+          if-no-files-found: warn
+
+  # Linux ビルド完了後に実行。tauri-action が既存リリースの latest.json に
+  # Windows エントリをマージするため、必ず needs で直列化する。
+  release-windows:
+    needs: [release-linux]
+    permissions:
+      contents: write
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build Tauri app
+        id: tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'v__VERSION__'
+          releaseDraft: false
+          prerelease: false
+
+      - name: Calculate SHA256 hashes
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/hashes"
+          echo '${{ steps.tauri.outputs.artifactPaths }}' | jq -r '.[]' | while IFS= read -r f; do
+            f="${f//\\//}"
+            case "$f" in
+              *.msi)
+                if [ -f "$f" ]; then
+                  HASH=$(sha256sum "$f" | cut -d' ' -f1)
+                  NAME=$(basename "$f")
+                  echo "${HASH}  ${NAME}" >> "$RUNNER_TEMP/hashes/hash.txt"
+                fi
+                ;;
+            esac
+          done
+
+      - name: Upload hash artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hashes-windows-latest
           path: ${{ runner.temp }}/hashes/hash.txt
           if-no-files-found: warn
 
   append-checksums:
-    needs: release
+    needs: [release-linux, release-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -136,6 +191,8 @@ jobs:
             printf '```\n\n'
             printf '**Windows:** `certutil -hashfile MarkWeave_*.msi SHA256`\n'
             printf '**Linux:** `sha256sum MarkWeave_*.AppImage`\n'
+            printf '\n---\n\n'
+            printf '🔏 [Code Signing Policy / コード署名ポリシー](https://github.com/hayashixd/MarkWeave/blob/main/SIGNING_POLICY.md)\n'
           } > /tmp/release_notes.md
           gh release edit "${{ github.ref_name }}" \
             --repo "${{ github.repository }}" \

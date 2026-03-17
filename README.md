@@ -106,7 +106,7 @@ Claude API キー不要。すべてローカルで動く。
 `.msi` を実行すると「**Windows によって PC が保護されました**」という警告が表示されることがあります。
 
 **これは MarkWeave が危険なソフトウェアだからではありません。**
-個人開発の新しいアプリのため、Windows 側の実績データがまだ蓄積されていない段階で表示される警告です（コード署名は導入済みですが、評判の蓄積には時間がかかります）。
+個人開発の新しいアプリのため、Windows 側の実績データがまだ蓄積されていない段階で表示される警告です。現在 [SignPath Foundation](https://signpath.org/) への Authenticode 署名申請を進めており、署名が有効化され次第この警告は軽減される予定です。
 
 **インストールを続ける手順:**
 
@@ -122,6 +122,14 @@ Claude API キー不要。すべてローカルで動く。
 ```powershell
 certutil -hashfile MarkWeave_x.y.z_x64_en-US.msi SHA256
 ```
+
+---
+
+## コード署名ポリシー
+
+Windows 版インストーラー（`.msi`）のコード署名は [SignPath Foundation](https://signpath.org/) が提供する OSS 向け無償サービスへ申請中です。署名が有効化され次第、配布バイナリに適用されます。
+
+詳細は **[SIGNING_POLICY.md](./SIGNING_POLICY.md)** を参照してください。
 
 ---
 
