@@ -62,7 +62,7 @@
       --success: #34d399;
     }
 
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 
     body {
       background: var(--bg);
@@ -514,7 +514,7 @@
         <p data-i18n="solutions.sol2.p">シンタックスハイライト・数式・Mermaid 図表を含む記事を、スタンドアロン HTML としてそのまま出力。画像は Base64 で埋め込まれるのでリンク切れゼロ。Zenn / Qiita 向けに最適化された Markdown エクスポートにも対応。</p>
       </div>
       <div class="solution-img">
-        <img src="demo-gifs/code-block-export.gif" alt="コードブロック HTML 書き出しデモ" loading="lazy">
+        <img src="demo-gifs/code-block-export.gif" alt="コードブロック HTML 書き出しデモ">
       </div>
     </div>
 
@@ -524,7 +524,7 @@
         <p data-i18n-html="solutions.sol3.p"><strong>[AI コピー]</strong> ボタン一つで、見出し階層の補正・コードブロックへの言語タグ付け・余分な空行の削除を自動処理してクリップボードへコピー。そのまま Claude / ChatGPT に貼れる。</p>
       </div>
       <div class="solution-img">
-        <img src="demo-gifs/ai-copy.gif" alt="AI コピーデモ" loading="lazy">
+        <img src="demo-gifs/ai-copy.gif" alt="AI コピーデモ">
       </div>
     </div>
 
@@ -534,7 +534,17 @@
         <p data-i18n="solutions.sol4.p">フォーカスモード・タイプライターモード・Zen モードで、ツールの存在を消せる。ポモドーロタイマーとワードスプリントで執筆セッションを管理。</p>
       </div>
       <div class="solution-img">
-        <img src="demo-gifs/focus-mode.gif" alt="フォーカスモードデモ" loading="lazy">
+        <img src="demo-gifs/focus-mode.gif" alt="フォーカスモードデモ">
+      </div>
+    </div>
+
+    <div class="solution reverse">
+      <div class="solution-text">
+        <h3 data-i18n="solutions.sol5.h3">5. AI なしで文章を磨ける（Prose Lint）</h3>
+        <p data-i18n="solutions.sol5.p">冗長な表現・ですます/だ混在・100 文字超の長文を自動検出。修正候補をその場で提示するので、推敲の手間を減らせる。Claude API キー不要。すべてローカルで動く。</p>
+      </div>
+      <div class="solution-img">
+        <img src="demo-gifs/prose-lint.gif" alt="Prose Lint デモ">
       </div>
     </div>
   </div>
@@ -559,6 +569,7 @@
           <li data-i18n="features.group1.li8">スラッシュコマンド</li>
           <li data-i18n="features.group1.li9">フォーカス / タイプライター / Zen モード</li>
           <li data-i18n="features.group1.li10">ポモドーロ / ワードスプリント</li>
+          <li data-i18n="features.group1.li11">文章スタイル Lint — 冗長表現・文体混在を AI 不要でチェック</li>
         </ul>
       </div>
       <div class="features-group">
@@ -727,6 +738,8 @@
       'solutions.sol3.p': '<strong>[AI コピー]</strong> ボタン一つで、見出し階層の補正・コードブロックへの言語タグ付け・余分な空行の削除を自動処理してクリップボードへコピー。そのまま Claude / ChatGPT に貼れる。',
       'solutions.sol4.h3': '4. 書くことだけに集中できる',
       'solutions.sol4.p': 'フォーカスモード・タイプライターモード・Zen モードで、ツールの存在を消せる。ポモドーロタイマーとワードスプリントで執筆セッションを管理。',
+      'solutions.sol5.h3': '5. AI なしで文章を磨ける（Prose Lint）',
+      'solutions.sol5.p': '冗長な表現・ですます/だ混在・100 文字超の長文を自動検出。修正候補をその場で提示するので、推敲の手間を減らせる。Claude API キー不要。すべてローカルで動く。',
       'features.label': 'All Features',
       'features.h2': '主な機能',
       'features.group1.h4': '執筆',
@@ -740,6 +753,7 @@
       'features.group1.li8': 'スラッシュコマンド',
       'features.group1.li9': 'フォーカス / タイプライター / Zen モード',
       'features.group1.li10': 'ポモドーロ / ワードスプリント',
+      'features.group1.li11': '文章スタイル Lint — 冗長表現・文体混在を AI 不要でチェック',
       'features.group2.h4': 'エクスポート・連携',
       'features.group2.li1': 'Markdown（Zenn / Qiita 向け最適化）',
       'features.group2.li2': 'HTML（画像 Base64 埋め込み済み）',
@@ -831,6 +845,8 @@
       'solutions.sol3.p': 'One click of the <strong>[AI Copy]</strong> button auto-fixes heading levels, adds language tags to code blocks, and removes extra blank lines — then copies to clipboard. Paste directly into Claude or ChatGPT.',
       'solutions.sol4.h3': '4. Focus on writing, nothing else',
       'solutions.sol4.p': 'Focus mode, Typewriter mode, and Zen mode make the app disappear. Pomodoro timer and Word Sprint manage your writing sessions.',
+      'solutions.sol5.h3': '5. Polish your writing without AI (Prose Lint)',
+      'solutions.sol5.p': 'Auto-detects wordy phrases, mixed writing styles, and sentences over 100 characters. Shows fix suggestions inline. No Claude API key required — runs entirely offline.',
       'features.label': 'All Features',
       'features.h2': 'Key Features',
       'features.group1.h4': 'Writing',
@@ -844,6 +860,7 @@
       'features.group1.li8': 'Slash commands',
       'features.group1.li9': 'Focus / Typewriter / Zen mode',
       'features.group1.li10': 'Pomodoro / Word Sprint',
+      'features.group1.li11': 'Prose Lint — detect wordy phrases & style issues, no AI needed',
       'features.group2.h4': 'Export & Integration',
       'features.group2.li1': 'Markdown (optimized for Zenn / Qiita)',
       'features.group2.li2': 'HTML (Base64 image embed)',
