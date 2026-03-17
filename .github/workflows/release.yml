@@ -163,6 +163,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download hash artifacts
         uses: actions/download-artifact@v4
         with:
@@ -179,11 +183,12 @@ jobs:
             echo "No hash files found, skipping."
             exit 0
           fi
-          CURRENT_BODY=$(gh release view "${{ github.ref_name }}" \
-            --repo "${{ github.repository }}" \
-            --json body -q .body)
+          NOTES=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
+          if [ -z "$NOTES" ]; then
+            NOTES="このリリースの変更点は git log を参照してください。"
+          fi
           {
-            printf '%s\n' "$CURRENT_BODY"
+            printf '%s\n' "$NOTES"
             printf '\n## SHA256 チェックサム\n\n'
             printf 'ダウンロードしたファイルの整合性を確認できます。\n\n'
             printf '```\n'
