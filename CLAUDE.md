@@ -428,3 +428,22 @@ git tag -a vX.Y.Z -m "## 変更点
 git push origin main
 git push origin vX.Y.Z
 ```
+
+---
+
+## 🤖 エージェント活用方針
+
+`~/.claude/agents/` に専門エージェントが配置されている（agency-agents より導入済み）。
+
+- ユーザーが明示しなくても、タスクの内容に応じて最適なエージェントを自動選択すること
+- 単純なファイル編集・検索は直接処理する（エージェント委譲は不要）
+- 複雑・多ステップ・専門ドメインのタスクには積極的に専門エージェントを活用する
+
+| タスク例 | 使用エージェント |
+|---------|----------------|
+| コードレビュー | `Code Reviewer` |
+| セキュリティ調査 | `Security Engineer` |
+| テスト作成・分析 | `API Tester` / `Test Results Analyzer` |
+| システム設計 | `Software Architect` / `Backend Architect` |
+| ドキュメント作成 | `Technical Writer` |
+| パフォーマンス改善 | `Performance Benchmarker` |
