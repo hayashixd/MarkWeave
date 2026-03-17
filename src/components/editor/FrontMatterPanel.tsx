@@ -7,18 +7,36 @@
  * - 展開状態: <textarea> で生 YAML を直接編集
  * - 空 Front Matter の場合は「追加」ボタンを表示
  *
- * ペルソナ対応:
- * - テクニカルライター/開発者: ドキュメントメタデータ（title, date, author）管理
- * - 一般ライター/ブロガー: ブログ記事の title / tags / draft 設定
- * - 知識管理者: ノートのメタデータ（tags, aliases 等）管理
+ * プラットフォームプロファイル:
+ * - YAML の自動検出（detectPlatform）に加え、手動で Generic / Zenn / Qiita を選択可能
+ * - 選択状態は tabProfileStore に保存（タブ単位・永続化なし）
+ * - プラットフォーム切り替え時は YAML を自動変換して補完する
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getYamlSummary } from '../../lib/frontmatter';
+import { detectPlatform } from '../../lib/platform-detector';
+import type { Platform } from '../../lib/platform-detector';
+import { PlatformFrontMatterForm } from './PlatformFrontMatterForm';
+import { useTabProfileStore } from '../../store/tabProfileStore';
+import {
+  parseZennFrontmatter,
+  serializeZennFrontmatter,
+  ZENN_DEFAULTS,
+} from '../../lib/platforms/zenn';
+import {
+  parseQiitaFrontmatter,
+  serializeQiitaFrontmatter,
+  QIITA_DEFAULTS,
+} from '../../lib/platforms/qiita';
 
 interface FrontMatterPanelProps {
   yaml: string;
   onChange: (newYaml: string) => void;
+  /** 本文 Markdown を取得するコールバック（コピー操作・警告表示に使用） */
+  getBodyMarkdown?: () => string;
+  /** タブID（プロファイルオーバーライドの保存に使用） */
+  tabId?: string;
 }
 
 const PLACEHOLDER = `title: 記事タイトル
@@ -26,23 +44,46 @@ date: ${new Date().toISOString().slice(0, 10)}
 tags: [markdown, editor]
 draft: false`;
 
-export function FrontMatterPanel({ yaml, onChange }: FrontMatterPanelProps) {
+const PLATFORM_LABELS: Record<Platform, string> = {
+  generic: '汎用',
+  zenn: 'Zenn',
+  qiita: 'Qiita',
+};
+
+export function FrontMatterPanel({ yaml, onChange, getBodyMarkdown, tabId }: FrontMatterPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const [localYaml, setLocalYaml] = useState(yaml);
+  const [liveBodyMarkdown, setLiveBodyMarkdown] = useState<string | undefined>(undefined);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasYaml = yaml.trim().length > 0;
+
+  // プラットフォームオーバーライド（tabProfileStore）
+  const platformOverride = useTabProfileStore((s) =>
+    tabId ? s.overrides[tabId] : undefined,
+  );
+  const setOverride = useTabProfileStore((s) => s.setOverride);
+  const clearOverride = useTabProfileStore((s) => s.clearOverride);
+
+  const autoPlatform = detectPlatform(yaml);
+  const effectivePlatform: Platform = platformOverride ?? autoPlatform;
 
   // 親から yaml が変わった時（タブ切り替え等）にローカル状態を同期
   useEffect(() => {
     setLocalYaml(yaml);
   }, [yaml]);
 
-  // 展開時にテキストエリアを自動フォーカス・高さ調整
+  // 展開時: テキストエリア自動フォーカス（generic のみ）& 最新本文を取得
   useEffect(() => {
-    if (expanded && textareaRef.current) {
-      textareaRef.current.focus();
-      adjustHeight(textareaRef.current);
+    if (expanded) {
+      if (effectivePlatform === 'generic' && textareaRef.current) {
+        textareaRef.current.focus();
+        adjustHeight(textareaRef.current);
+      }
+      if (getBodyMarkdown) {
+        setLiveBodyMarkdown(getBodyMarkdown());
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded]);
 
   const adjustHeight = (el: HTMLTextAreaElement) => {
@@ -76,6 +117,62 @@ export function FrontMatterPanel({ yaml, onChange }: FrontMatterPanelProps) {
       setExpanded(false);
     },
     [onChange],
+  );
+
+  /** プラットフォームプロファイルを手動切り替えし、必要に応じて YAML を変換する */
+  const handlePlatformChange = useCallback(
+    (newPlatform: Platform) => {
+      if (!tabId) return;
+      if (newPlatform === effectivePlatform) return;
+
+      if (newPlatform === 'generic') {
+        clearOverride(tabId);
+        return;
+      }
+
+      setOverride(tabId, newPlatform);
+
+      if (newPlatform === 'zenn') {
+        if (!localYaml.trim()) {
+          const newYaml = serializeZennFrontmatter(ZENN_DEFAULTS);
+          setLocalYaml(newYaml);
+          onChange(newYaml);
+        } else if (effectivePlatform === 'qiita') {
+          const qiitaFm = parseQiitaFrontmatter(localYaml);
+          const newYaml = serializeZennFrontmatter({
+            ...ZENN_DEFAULTS,
+            title: qiitaFm.title,
+            topics: qiitaFm.tags.slice(0, 5),
+          });
+          setLocalYaml(newYaml);
+          onChange(newYaml);
+        } else if (effectivePlatform === 'generic') {
+          const newYaml = serializeZennFrontmatter(ZENN_DEFAULTS);
+          setLocalYaml(newYaml);
+          onChange(newYaml);
+        }
+      } else if (newPlatform === 'qiita') {
+        if (!localYaml.trim()) {
+          const newYaml = serializeQiitaFrontmatter(QIITA_DEFAULTS);
+          setLocalYaml(newYaml);
+          onChange(newYaml);
+        } else if (effectivePlatform === 'zenn') {
+          const zennFm = parseZennFrontmatter(localYaml);
+          const newYaml = serializeQiitaFrontmatter({
+            ...QIITA_DEFAULTS,
+            title: zennFm.title,
+            tags: zennFm.topics.slice(0, 5),
+          });
+          setLocalYaml(newYaml);
+          onChange(newYaml);
+        } else if (effectivePlatform === 'generic') {
+          const newYaml = serializeQiitaFrontmatter(QIITA_DEFAULTS);
+          setLocalYaml(newYaml);
+          onChange(newYaml);
+        }
+      }
+    },
+    [tabId, effectivePlatform, localYaml, clearOverride, setOverride, onChange],
   );
 
   // Front Matter がない場合: 薄い「追加」ボタン
@@ -115,6 +212,12 @@ export function FrontMatterPanel({ yaml, onChange }: FrontMatterPanelProps) {
           </svg>
         </span>
         <span className="front-matter-panel__label">Front Matter</span>
+        {effectivePlatform !== 'generic' && (
+          <span className={`front-matter-panel__platform-badge front-matter-panel__platform-badge--${effectivePlatform}`}>
+            {effectivePlatform === 'zenn' ? 'Zenn' : 'Qiita'}
+            {platformOverride && <span className="front-matter-panel__platform-manual"> ✎</span>}
+          </span>
+        )}
         {!expanded && (
           <span className="front-matter-panel__summary">{summary}</span>
         )}
@@ -140,19 +243,50 @@ export function FrontMatterPanel({ yaml, onChange }: FrontMatterPanelProps) {
         )}
       </button>
 
-      {/* 展開時: YAML テキストエリア */}
+      {/* 展開時: プロファイルセレクター + プラットフォームフォーム or YAML テキストエリア */}
       {expanded && (
         <div className="front-matter-panel__body">
           <div className="front-matter-panel__delimiter">---</div>
-          <textarea
-            ref={textareaRef}
-            className="front-matter-panel__textarea"
-            value={localYaml}
-            onChange={handleChange}
-            placeholder={PLACEHOLDER}
-            spellCheck={false}
-            aria-label="YAML Front Matter を編集"
-          />
+
+          {/* プラットフォームプロファイルセレクター（tabId がある時のみ表示） */}
+          {tabId && (
+            <div className="front-matter-panel__profile-selector">
+              <span className="front-matter-panel__profile-label">プロファイル:</span>
+              {(['generic', 'zenn', 'qiita'] as Platform[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => handlePlatformChange(p)}
+                  className={`front-matter-panel__profile-btn${effectivePlatform === p ? ' front-matter-panel__profile-btn--active' : ''}`}
+                >
+                  {PLATFORM_LABELS[p]}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {effectivePlatform !== 'generic' ? (
+            <PlatformFrontMatterForm
+              platform={effectivePlatform}
+              yaml={localYaml}
+              onChange={(newYaml) => {
+                setLocalYaml(newYaml);
+                onChange(newYaml);
+              }}
+              bodyMarkdown={liveBodyMarkdown}
+              getBodyMarkdown={getBodyMarkdown}
+            />
+          ) : (
+            <textarea
+              ref={textareaRef}
+              className="front-matter-panel__textarea"
+              value={localYaml}
+              onChange={handleChange}
+              placeholder={PLACEHOLDER}
+              spellCheck={false}
+              aria-label="YAML Front Matter を編集"
+            />
+          )}
           <div className="front-matter-panel__delimiter">---</div>
         </div>
       )}

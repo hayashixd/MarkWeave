@@ -253,3 +253,46 @@ describe('roundtrip: composite documents', () => {
     it(`snapshot: ${name}`, () => expectSnapshot(md));
   }
 });
+
+// ── Zenn 固有記法 ────────────────────────────────────
+describe('roundtrip: Zenn固有記法', () => {
+  it('コードブロック lang:filename（ファイル名指定）', () => {
+    expectRoundtrip('```typescript:example.ts\nconst x = 1;\n```\n');
+  });
+
+  it('コードブロック diff meta（diff 表示）', () => {
+    expectRoundtrip('```diff typescript\n+ const added = 1;\n- const removed = 2;\n```\n');
+  });
+
+  it('コードブロック meta なし（通常）', () => {
+    expectRoundtrip('```typescript\nconst x = 1;\n```\n');
+  });
+
+  it('脚注参照と脚注定義のラウンドトリップ', () => {
+    expectRoundtrip('本文に脚注[^1]が含まれています。\n\n[^1]: 脚注の説明文\n');
+  });
+
+  it('複数の脚注参照', () => {
+    expectRoundtrip('最初の脚注[^1]と二番目の脚注[^2]。\n\n[^1]: 一番目\n\n[^2]: 二番目\n');
+  });
+
+  it(':::message ブロック（テキストとして保持）', () => {
+    expectRoundtrip(':::message\nこれはメッセージです。\n:::\n');
+  });
+
+  it(':::message alert ブロック', () => {
+    expectRoundtrip(':::message alert\n警告メッセージです。\n:::\n');
+  });
+
+  it(':::details アコーディオン', () => {
+    expectRoundtrip(':::details タイトル\n折りたたみ内容\n:::\n');
+  });
+
+  it('@[youtube] 埋め込み', () => {
+    expectRoundtrip('@[youtube](dQw4w9WgXcQ)\n');
+  });
+
+  it('@[tweet] 埋め込み', () => {
+    expectRoundtrip('@[tweet](https://twitter.com/user/status/123)\n');
+  });
+});

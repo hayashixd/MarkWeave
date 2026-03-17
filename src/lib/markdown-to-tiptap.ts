@@ -156,10 +156,18 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
           },
         ];
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const codeMeta = (node as any).meta as string | null | undefined;
       return [
         {
           type: 'codeBlock',
-          attrs: { language: node.lang ?? null },
+          attrs: {
+            language: node.lang ?? null,
+            // remark はスペース区切りの info string を lang/meta に分割する。
+            // 例: ```diff typescript → lang="diff", meta="typescript"
+            // Zenn の diff 表示や他ツールの拡張記法を保持するため meta を保存する。
+            ...(codeMeta ? { meta: codeMeta } : {}),
+          },
           content: node.value ? [{ type: 'text', text: node.value }] : [],
         },
       ];
@@ -221,6 +229,28 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
       );
 
       return [{ type: 'table', content: tiptapRows }];
+    }
+
+    case 'footnoteDefinition': {
+      // 脚注定義 [^id]: content をプレーンテキスト段落として保持する。
+      // WYSIWYG では "[^1]: 内容" というテキストとして表示され、
+      // シリアライズ時に remark が再度 footnoteDefinition として認識する。
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const defNode = node as any;
+      const id = defNode.identifier ?? '';
+      const prefix = `[^${id}]: `;
+      const contentNodes: TipTapNode[] = [];
+      for (const child of (defNode.children ?? []) as RootContent[]) {
+        if (child.type === 'paragraph') {
+          contentNodes.push(...convertInlineNodes(child.children));
+        }
+      }
+      if (contentNodes.length > 0 && contentNodes[0]!.type === 'text') {
+        contentNodes[0] = { ...contentNodes[0]!, text: prefix + (contentNodes[0]!.text ?? '') };
+      } else {
+        contentNodes.unshift({ type: 'text', text: prefix });
+      }
+      return [{ type: 'paragraph', content: contentNodes }];
     }
 
     default:
@@ -364,6 +394,18 @@ function convertInlineNodes(
           type: 'mathInline',
           attrs: { latex: mathNode.value ?? '' },
         });
+        break;
+      }
+
+      case 'footnoteReference': {
+        // 脚注参照 [^id] をテキストとして保持する。
+        // シリアライズ時に remark が再度 footnoteReference として認識する。
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const refNode = node as any;
+        const id = refNode.identifier ?? '';
+        const refText: TipTapNode = { type: 'text', text: `[^${id}]` };
+        if (parentMarks.length > 0) refText.marks = [...parentMarks];
+        result.push(refText);
         break;
       }
 

@@ -141,6 +141,13 @@ const imgs = {
   pomodoroTimer: loadImage('writing-tools/01_pomodoro-timer.png'),
   wordSprintWidget: loadImage('writing-tools/02_word-sprint-widget.png'),
   docStatsDialog: loadImage('writing-tools/03_doc-stats-dialog.png'),
+  // platform-profile (新規)
+  platformProfileSelector: loadImage('platform-profile/01_profile-selector.png'),
+  platformProfileZenn: loadImage('platform-profile/02_zenn-form.png'),
+  platformProfileQiita: loadImage('platform-profile/03_qiita-form.png'),
+  platformWarnings: loadImage('platform-profile/04_warnings.png'),
+  zennPalette: loadImage('platform-profile/05_zenn-palette.png'),
+  copyButtons: loadImage('platform-profile/06_copy-buttons.png'),
 };
 
 function imgTag(src, alt, caption) {
@@ -407,7 +414,7 @@ const html = `<!DOCTYPE html>
     <li><a href="#focus-zen">フォーカス・タイプライター・Zenモード</a></li>
     <li><a href="#export">エクスポート</a></li>
     <li><a href="#settings">設定</a></li>
-    <li><a href="#front-matter">YAML Front Matter・リンク・統計</a></li>
+    <li><a href="#front-matter">YAML Front Matter・プラットフォームプロファイル・コピー</a></li>
     <li><a href="#ai-copy">AI コピー機能</a></li>
     <li><a href="#ai-template">AI テンプレートパネル</a></li>
     <li><a href="#file-management">ファイル管理の応用</a></li>
@@ -983,28 +990,114 @@ graph TD
     ${imgTag(imgs.settingsPluginsTab, 'プラグイン設定', 'プラグインタブ — プラグイン管理')}
   </section>
 
-  <!-- 21. YAML Front Matter・リンク・統計 -->
+  <!-- 21. YAML Front Matter・プラットフォームプロファイル・コピー -->
   <section id="front-matter">
-    <h2>21. YAML Front Matter・リンク・文書統計</h2>
+    <h2>21. YAML Front Matter・プラットフォームプロファイル・コピー</h2>
 
-    <h3>YAML Front Matter</h3>
+    <h3>21.1 YAML Front Matter パネル</h3>
     <p>
-      ドキュメントの先頭に YAML メタデータ（タイトル・日付・タグなど）を記述できます。
-      エディタ上部の FM パネルをクリックして展開します。
+      ドキュメントの先頭に YAML メタデータ（タイトル・タグなど）を記述できます。
+      エディタ上部の FM パネルをクリックして展開します。折りたたんだ状態でも現在のプラットフォームバッジが表示されます。
     </p>
     ${imgTag(imgs.frontMatterPanel, 'Front Matterパネル', 'YAML Front Matter パネル — 折りたたんだ状態')}
     ${imgTag(imgs.frontMatterExpanded, 'Front Matter展開', 'YAML Front Matter パネル — 展開した状態')}
 
-    <h3>リンクの挿入</h3>
+    <h3>21.2 プラットフォームプロファイル</h3>
+    <p>
+      FM パネルの上部に <strong>プラットフォームセレクター</strong>（汎用 / Zenn / Qiita の3択トグル）が表示されます。
+      公開先に合わせて切り替えることで、Front Matter フォームと構文チェックが切り替わります。
+    </p>
+    ${imgTag(imgs.platformProfileSelector, 'プロファイルセレクター', 'プラットフォームセレクター — 汎用 / Zenn / Qiita の 3 択')}
+
+    <table>
+      <thead><tr><th>プロファイル</th><th>Front Matter フォーム</th><th>備考</th></tr></thead>
+      <tbody>
+        <tr><td>汎用</td><td>自由な YAML 編集（テキストエリア）</td><td>デフォルト</td></tr>
+        <tr><td>Zenn</td><td>title / emoji / type / topics / published の専用フォーム</td><td>Zenn CLI 形式</td></tr>
+        <tr><td>Qiita</td><td>title / tags / private の専用フォーム</td><td>Qiita CLI 形式</td></tr>
+      </tbody>
+    </table>
+
+    ${imgTag(imgs.platformProfileZenn, 'Zenn プロファイル', 'Zenn プロファイル — emoji / type / topics フォーム')}
+    ${imgTag(imgs.platformProfileQiita, 'Qiita プロファイル', 'Qiita プロファイル — tags / private フォーム')}
+
+    <div class="tip">
+      <strong>手動設定時の ✎ マーク:</strong> プロファイルを手動で切り替えた場合、バッジに <strong>✎</strong> が付きます。
+      YAML の内容から自動検出されたプロファイルとの区別に使えます。
+    </div>
+
+    <h3>21.3 プロファイル切り替え時の YAML 自動変換</h3>
+    <p>プロファイルを切り替えると、YAML が新しいプロファイルの形式に自動変換されます。</p>
+    <ul>
+      <li><strong>汎用 → Zenn:</strong> Zenn デフォルト YAML（title / emoji / type / topics / published）を生成</li>
+      <li><strong>汎用 → Qiita:</strong> Qiita デフォルト YAML（title / tags / private）を生成</li>
+      <li><strong>Zenn → Qiita:</strong> title を引き継ぎ、topics → tags に変換（最大5件）</li>
+      <li><strong>Qiita → Zenn:</strong> title を引き継ぎ、tags → topics に変換</li>
+    </ul>
+
+    <h3>21.4 プラットフォーム別構文警告</h3>
+    <p>
+      Qiita プロファイルのとき、Qiita で表示されない Zenn 固有記法が本文に含まれていると、FM パネルに警告が表示されます。
+    </p>
+    ${imgTag(imgs.platformWarnings, '構文警告', 'Qiita プロファイル時のプラットフォーム別構文警告')}
+
+    <table>
+      <thead><tr><th>アイコン</th><th>重大度</th><th>検出内容</th></tr></thead>
+      <tbody>
+        <tr><td>⚠</td><td>警告</td><td><code>:::message</code> / <code>:::message alert</code> ブロック</td></tr>
+        <tr><td>⚠</td><td>警告</td><td><code>:::details</code> アコーディオン</td></tr>
+        <tr><td>⚠</td><td>警告</td><td><code>@[youtube]</code> / <code>@[tweet]</code> / <code>@[speakerdeck]</code> / <code>@[codesandbox]</code> 埋め込み</td></tr>
+        <tr><td>⚠</td><td>警告</td><td>Mermaid コードブロック（<code>\`\`\`mermaid</code>）</td></tr>
+        <tr><td>ℹ</td><td>情報</td><td>脚注（<code>[^1]</code> 形式）— Qiita 非対応</td></tr>
+      </tbody>
+    </table>
+
+    <h3>21.5 Zenn 記法パレット</h3>
+    <p>
+      <strong>Zenn プロファイル</strong>のとき、ツールバー直下に <strong>Zenn 記法パレット</strong>が表示されます。
+      ボタンをクリックすると対応するブロックがカーソル位置に挿入されます。
+    </p>
+    ${imgTag(imgs.zennPalette, 'Zenn 記法パレット', 'Zenn プロファイル時のみ表示される Zenn 記法挿入パレット')}
+
+    <table>
+      <thead><tr><th>ボタン</th><th>挿入される記法</th></tr></thead>
+      <tbody>
+        <tr><td>:::message</td><td>情報ボックス（青）</td></tr>
+        <tr><td>:::message alert</td><td>警告ボックス（赤）</td></tr>
+        <tr><td>:::details</td><td>折りたたみアコーディオン</td></tr>
+        <tr><td>@[youtube]</td><td>YouTube 動画埋め込み</td></tr>
+        <tr><td>@[tweet]</td><td>ツイート埋め込み</td></tr>
+        <tr><td>@[speakerdeck]</td><td>SlideShare 埋め込み</td></tr>
+        <tr><td>@[codesandbox]</td><td>CodeSandbox 埋め込み</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <strong>注意:</strong> Zenn 記法パレットは Zenn プロファイル選択時のみ表示されます。
+      Qiita / 汎用プロファイルでは非表示です。
+    </div>
+
+    <h3>21.6 Markdown コピーボタン</h3>
+    <p>
+      FM パネル下部に <strong>コピーボタン</strong>が表示されます。現在の Front Matter と本文を結合した完全な Markdown をクリップボードにコピーします。
+    </p>
+    ${imgTag(imgs.copyButtons, 'コピーボタン', 'Markdown コピーボタン（Zenn モード時は Qiita 変換コピーも表示）')}
+
+    <ul>
+      <li><strong>📋 Markdown をコピー:</strong> 現在のプロファイル形式のまま完全 Markdown をコピー（常時表示）</li>
+      <li><strong>⇄ Qiita 用に変換してコピー:</strong> Zenn プロファイルのみ表示。:::message 等を自動除去し、topics → tags 変換した Qiita 向け Markdown をコピー</li>
+    </ul>
+    <p>コピー成否はトーストメッセージで通知されます。</p>
+
+    <h3>21.7 リンクの挿入</h3>
     <p><kbd>Ctrl</kbd>+<kbd>K</kbd> を押すとリンク挿入ダイアログが表示されます。</p>
     ${imgTag(imgs.linkInsertDialog, 'リンク挿入ダイアログ', 'リンク挿入ダイアログ — Ctrl+K')}
-
     <p>または Markdown 記法で直接入力: <code>[リンクテキスト](URL)</code></p>
 
-    <h3>クロスファイルリンク</h3>
+    <h3>21.8 クロスファイルリンク</h3>
     <p>別の Markdown ファイルへのリンクを <kbd>Ctrl</kbd>+クリックすると、そのファイルが新しいタブで開きます。</p>
 
-    <h3>文書統計</h3>
+    <h3>21.9 文書統計</h3>
     <p>メニューバーの「ツール」→「文書統計」から文字数・単語数・読了時間を確認できます。</p>
     ${imgTag(imgs.wordCountDialog, '文書統計ダイアログ', '文書統計 — 文字数・単語数・読了時間')}
 

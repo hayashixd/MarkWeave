@@ -20,16 +20,89 @@
 
 1. 変更機能に対応する既存シナリオの有無を確認する
 2. シナリオの selector と実際の DOM が一致しているか確認する
-3. `npm run manual:capture` を実行してスクリーンショットを再撮影する
+3. `pnpm manual:capture` を実行してスクリーンショットを再撮影する
 4. `node docs/generate-manual.cjs` を実行して HTML マニュアルを再生成する
 5. 差分を確認し、手順と画像が一致していることを確認する
 
-## 4. シナリオが存在しない場合
+## 3a. UI 全面刷新時 — 一括リフレッシュ
 
-1. `docs/00_Meta/feature-list.md` で対象機能の概要を確認する
-2. Playwright で対象 UI の selector を確認する
-3. `docs/manual-scenarios/{feature-name}.yaml` を新規作成する
-4. 上記「必須作業フロー」を実施する
+UI が広範囲に変わった場合は **1コマンドで全更新** できる:
+
+```bash
+pnpm manual:refresh
+```
+
+これにより以下がすべて実行される:
+
+| ステップ | 内容 | 出力先 |
+|---------|------|--------|
+| 1 | `e2e/manual-capture/` を全実行 | `docs/manual-screenshots/**/*.png` |
+| 2 | `e2e/demo-capture/` を全実行（GIF） | `doc-public/demo-gifs/**/*.gif` |
+| 3 | `generate-manual.cjs` を実行 | `doc-public/manuals/user-manual-full.html` |
+| 4 | `generate-use-cases.cjs` を実行 | `doc-public/use-cases.html` |
+
+個別にスキップしたい場合:
+
+```bash
+# スクリーンショットのみ
+pnpm manual:capture
+
+# GIF のみ
+pnpm manual:capture:demo
+
+# HTML 生成のみ（撮影済み画像を使う）
+pnpm manual:generate
+
+# 途中失敗しても全ステップ実行
+pnpm manual:refresh --continue-on-error
+
+# GIF 撮影をスキップして高速リフレッシュ
+pnpm manual:refresh --skip-gifs
+```
+
+## 4. 新機能追加時の必須作業（シナリオ新規作成）
+
+新しいマニュアル項目を追加する場合、**撮影スクリプトの追加だけでは不十分**。
+以下の3ファイルをセットで更新すること。
+
+### 4-1. 撮影シナリオを作成する
+
+1. `e2e/manual-capture/{feature-name}.spec.ts` を新規作成する
+2. `captureStep` / `captureWithAnnotation` を使って撮影ステップを実装する
+3. `pnpm manual:capture` で動作確認する
+
+> `e2e/manual-capture/` 配下の spec は Playwright が自動スキャンするため、
+> `pnpm manual:refresh` に**自動で組み込まれる**。
+
+### 4-2. `generate-manual.cjs` に画像パスを登録する（必須）
+
+**`pnpm manual:refresh` を実行しても、`generate-manual.cjs` に登録されていない画像は HTML に埋め込まれない。**
+
+```js
+// docs/generate-manual.cjs の imgs オブジェクトに追加する
+const imgs = {
+  // ... 既存エントリ ...
+
+  // 新機能のスクリーンショット
+  myFeatureStep1: loadImage('my-feature/01_step1.png'),
+  myFeatureStep2: loadImage('my-feature/02_step2.png'),
+  myFeatureOverview: loadImage('my-feature/03_overview.png'),
+};
+```
+
+### 4-3. HTML テンプレートに画像を配置する（必須）
+
+`generate-manual.cjs` 内の HTML テンプレート文字列の該当セクションに
+`<img src="${imgs.myFeatureStep1}">` の形式で挿入する。
+
+### チェックリスト
+
+新機能追加時に以下をすべて完了させること:
+
+- [ ] `e2e/manual-capture/{feature}.spec.ts` を作成した
+- [ ] `generate-manual.cjs` の `imgs` に画像パスを追加した
+- [ ] `generate-manual.cjs` の HTML テンプレートに `<img>` を配置した
+- [ ] `pnpm manual:refresh` を実行して HTML を確認した
 
 ## 5. 変更対象外（通常はマニュアル更新不要）
 

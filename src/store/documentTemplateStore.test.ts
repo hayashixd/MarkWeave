@@ -22,10 +22,18 @@ describe('documentTemplateStore', () => {
   // getAllTemplates
   // =========================================================================
   describe('getAllTemplates', () => {
-    it('returns 4 built-in templates when no user templates', () => {
+    it('returns 7 built-in templates when no user templates', () => {
       const all = useDocumentTemplateStore.getState().getAllTemplates();
-      expect(all.length).toBe(4);
+      expect(all.length).toBe(7);
       expect(all.every((t) => t.id.startsWith('builtin-'))).toBe(true);
+    });
+
+    it('includes Zenn and Qiita built-in templates', () => {
+      const all = useDocumentTemplateStore.getState().getAllTemplates();
+      const ids = all.map((t) => t.id);
+      expect(ids).toContain('builtin-zenn-tech');
+      expect(ids).toContain('builtin-zenn-idea');
+      expect(ids).toContain('builtin-qiita');
     });
 
     it('returns built-in + user templates', () => {
@@ -39,7 +47,7 @@ describe('documentTemplateStore', () => {
         }],
       });
       const all = useDocumentTemplateStore.getState().getAllTemplates();
-      expect(all.length).toBe(5);
+      expect(all.length).toBe(8);
     });
   });
 

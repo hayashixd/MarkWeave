@@ -110,6 +110,50 @@ attendees: []
     updatedAt: '2026-01-01T00:00:00Z',
   },
   {
+    id: 'builtin-zenn-tech',
+    name: 'Zenn 技術記事',
+    content: `---
+title: ""
+emoji: "📝"
+type: "tech"
+topics: []
+published: false
+---
+
+{{cursor}}`,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'builtin-zenn-idea',
+    name: 'Zenn アイデア記事',
+    content: `---
+title: ""
+emoji: "💡"
+type: "idea"
+topics: []
+published: false
+---
+
+{{cursor}}`,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'builtin-qiita',
+    name: 'Qiita 記事',
+    content: `---
+title: ""
+tags:
+  - name: ""
+private: false
+---
+
+{{cursor}}`,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  },
+  {
     id: 'builtin-weekly-review',
     name: '週次レビュー',
     content: `---

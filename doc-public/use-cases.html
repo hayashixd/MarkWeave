@@ -387,7 +387,7 @@
     <h1 data-i18n="hero.h1">実際の使い方</h1>
     <p data-i18n="hero.desc">「自分のワークフローに合うか？」を確認するためのシナリオ別ガイド。MarkWeave がどんな場面で、どう役立つかを具体的な手順で紹介します。</p>
     <div class="scenario-jumps">
-      <a href="#scenario-1" class="scenario-jump"><span class="scenario-num">01</span> <span data-i18n="hero.jump1">Zenn / Qiita 記事執筆</span></a>
+      <a href="#scenario-1" class="scenario-jump"><span class="scenario-num">01</span> <span data-i18n="hero.jump1">Zenn / Qiita 記事執筆・クロスポスト</span></a>
       <a href="#scenario-2" class="scenario-jump"><span class="scenario-num">02</span> <span data-i18n="hero.jump2">コードスニペット + AI レビュー</span></a>
       <a href="#scenario-3" class="scenario-jump"><span class="scenario-num">03</span> <span data-i18n="hero.jump3">集中して長文を書く</span></a>
       <a href="#scenario-4" class="scenario-jump"><span class="scenario-num">04</span> <span data-i18n="hero.jump4">既存 .md ファイルを引き継ぐ</span></a>
@@ -400,30 +400,31 @@
   <div class="scenario-inner">
     <div class="scenario-text">
       <p class="scenario-num-badge" data-i18n="s1.badge">Scenario 01 — Zenn / Qiita</p>
-      <h2 data-i18n="s1.h2">Zenn / Qiita に<br>週1本記事を書く</h2>
+      <h2 data-i18n="s1.h2">Zenn / Qiita に<br>週1本記事を書いてクロスポスト</h2>
 
       <div class="before-card">
         <p class="label">Before</p>
-        <p data-i18n="s1.before">VS Code のプレビューとエディタを行き来するたびに書くリズムが崩れる。Markdown の記法が邪魔に感じる。</p>
+        <p data-i18n="s1.before">VS Code のプレビューとエディタを行き来するたびに書くリズムが崩れる。Zenn で書いた <code>:::message</code> や <code>@[youtube]</code> を Qiita 向けに手作業で書き直すのが面倒。</p>
       </div>
       <div class="after-card">
         <p class="label">After</p>
-        <p data-i18n="s1.after">1ウィンドウで書きながらレンダリング確認。コードブロックも数式も即座に表示。YAML メタデータの GUI 編集で Front Matter を記法なしで管理。</p>
+        <p data-i18n="s1.after">プロファイルを「Zenn」に設定して書くだけ。Qiita 非対応記法があればリアルタイム警告。「⇄ Qiita 用に変換してコピー」で変換済み Markdown がクリップボードに入り、そのまま Qiita に貼り付け完了。</p>
       </div>
 
       <ol class="workflow">
-        <li data-i18n="s1.step1"><code>Ctrl+N</code> で新規ファイルを作成</li>
-        <li data-i18n="s1.step2">先頭の <code>---</code> ブロックでタイトル・タグ・emoji を GUI 入力</li>
-        <li data-i18n="s1.step3"><code># </code> で見出し、<code>- </code> でリスト。記法を入力すると即レンダリング</li>
-        <li data-i18n="s1.step4">「ファイル → エクスポート → Markdown」でZenn/Qiita向けに最適化して書き出し</li>
-        <li data-i18n="s1.step5">書き出した <code>.md</code> を Zenn / Qiita のエディタにそのまま貼り付けて公開</li>
+        <li data-i18n="s1.step1"><code>Ctrl+N</code> で新規ファイルを作成し、FM パネルでプロファイルを <strong>Zenn</strong> に切り替え</li>
+        <li data-i18n="s1.step2">title / emoji / type / topics を GUI 入力。YAML を直接書かなくてよい</li>
+        <li data-i18n="s1.step3">Zenn 記法パレットから <code>:::message</code> や <code>@[youtube]</code> をワンクリック挿入しながら執筆</li>
+        <li data-i18n="s1.step4">FM パネルの「📋 Markdown をコピー」で Zenn 向け完全 Markdown をクリップボードへ → Zenn に貼り付けて公開</li>
+        <li data-i18n="s1.step5">Qiita にもポストしたい場合は「⇄ Qiita 用に変換してコピー」をクリック。Zenn 固有記法を自動除去した Markdown が取得できる</li>
       </ol>
 
       <div class="feature-pills">
         <span class="pill" data-i18n="s1.pill1">WYSIWYG 編集</span>
-        <span class="pill" data-i18n="s1.pill2">YAML Front Matter GUI</span>
-        <span class="pill" data-i18n="s1.pill3">Markdown エクスポート</span>
-        <span class="pill" data-i18n="s1.pill4">コードブロック</span>
+        <span class="pill" data-i18n="s1.pill2">プラットフォームプロファイル</span>
+        <span class="pill" data-i18n="s1.pill3">Zenn 記法パレット</span>
+        <span class="pill" data-i18n="s1.pill4">構文警告</span>
+        <span class="pill" data-i18n="s1.pill5">Qiita 変換コピー</span>
       </div>
     </div>
 
@@ -624,23 +625,24 @@
       'hero.label': 'Use Cases',
       'hero.h1': '実際の使い方',
       'hero.desc': '「自分のワークフローに合うか？」を確認するためのシナリオ別ガイド。MarkWeave がどんな場面で、どう役立つかを具体的な手順で紹介します。',
-      'hero.jump1': 'Zenn / Qiita 記事執筆',
+      'hero.jump1': 'Zenn / Qiita 記事執筆・クロスポスト',
       'hero.jump2': 'コードスニペット + AI レビュー',
       'hero.jump3': '集中して長文を書く',
       'hero.jump4': '既存 .md ファイルを引き継ぐ',
       's1.badge': 'Scenario 01 — Zenn / Qiita',
-      's1.h2': 'Zenn / Qiita に\n週1本記事を書く',
-      's1.before': 'VS Code のプレビューとエディタを行き来するたびに書くリズムが崩れる。Markdown の記法が邪魔に感じる。',
-      's1.after': '1ウィンドウで書きながらレンダリング確認。コードブロックも数式も即座に表示。YAML メタデータの GUI 編集で Front Matter を記法なしで管理。',
-      's1.step1': 'Ctrl+N で新規ファイルを作成',
-      's1.step2': '先頭の --- ブロックでタイトル・タグ・emoji を GUI 入力',
-      's1.step3': '# で見出し、- でリスト。記法を入力すると即レンダリング',
-      's1.step4': '「ファイル → エクスポート → Markdown」でZenn/Qiita向けに最適化して書き出し',
-      's1.step5': '書き出した .md を Zenn / Qiita のエディタにそのまま貼り付けて公開',
+      's1.h2': 'Zenn / Qiita に\n週1本記事を書いてクロスポスト',
+      's1.before': 'VS Code のプレビューとエディタを行き来するたびに書くリズムが崩れる。Zenn で書いた :::message や @[youtube] を Qiita 向けに手作業で書き直すのが面倒。',
+      's1.after': 'プロファイルを「Zenn」に設定して書くだけ。Qiita 非対応記法があればリアルタイム警告。「⇄ Qiita 用に変換してコピー」で変換済み Markdown がクリップボードに入り、そのまま Qiita に貼り付け完了。',
+      's1.step1': 'Ctrl+N で新規ファイルを作成し、FM パネルでプロファイルを Zenn に切り替え',
+      's1.step2': 'title / emoji / type / topics を GUI 入力。YAML を直接書かなくてよい',
+      's1.step3': 'Zenn 記法パレットから :::message や @[youtube] をワンクリック挿入しながら執筆',
+      's1.step4': 'FM パネルの「📋 Markdown をコピー」で Zenn 向け完全 Markdown をクリップボードへ → Zenn に貼り付けて公開',
+      's1.step5': 'Qiita にもポストしたい場合は「⇄ Qiita 用に変換してコピー」をクリック。Zenn 固有記法を自動除去した Markdown が取得できる',
       's1.pill1': 'WYSIWYG 編集',
-      's1.pill2': 'YAML Front Matter GUI',
-      's1.pill3': 'Markdown エクスポート',
-      's1.pill4': 'コードブロック',
+      's1.pill2': 'プラットフォームプロファイル',
+      's1.pill3': 'Zenn 記法パレット',
+      's1.pill4': '構文警告',
+      's1.pill5': 'Qiita 変換コピー',
       's1.cap1': '記法を入力した瞬間にレンダリングされる',
       's1.cap2': 'Front Matter を記法なしで GUI 編集',
       's2.badge': 'Scenario 02 — AI Copy',
@@ -707,23 +709,24 @@
       'hero.label': 'Use Cases',
       'hero.h1': 'How People Use MarkWeave',
       'hero.desc': 'Wondering if it fits your workflow? Here are four concrete scenarios showing how MarkWeave helps — with step-by-step walkthroughs.',
-      'hero.jump1': 'Zenn / Qiita articles',
+      'hero.jump1': 'Zenn / Qiita articles & cross-posting',
       'hero.jump2': 'Code snippets + AI review',
       'hero.jump3': 'Long-form focus writing',
       'hero.jump4': 'Inheriting existing .md files',
       's1.badge': 'Scenario 01 — Zenn / Qiita',
-      's1.h2': 'Writing a weekly article\nfor Zenn or Qiita',
-      's1.before': 'Constantly switching between VS Code\'s editor and preview breaks the writing flow. Markdown syntax feels like noise.',
-      's1.after': 'Write and see rendered output in one window. Code blocks, math, and diagrams render instantly inline. Manage YAML Front Matter without touching syntax.',
-      's1.step1': 'Create a new file with Ctrl+N',
-      's1.step2': 'Fill in title, tags, and emoji via the GUI Front Matter panel at the top of the file',
-      's1.step3': 'Type # for headings, - for lists — syntax renders as you type',
-      's1.step4': 'Export via File → Export → Markdown, optimized for Zenn / Qiita',
-      's1.step5': 'Paste the exported .md directly into Zenn or Qiita and publish',
+      's1.h2': 'Writing weekly articles\nfor Zenn and cross-posting to Qiita',
+      's1.before': 'Constantly switching between VS Code\'s editor and preview breaks the writing flow. Cleaning up Zenn-specific syntax like :::message and @[youtube] by hand before posting to Qiita is tedious.',
+      's1.after': 'Set the profile to "Zenn" and write. Real-time warnings flag Qiita-incompatible syntax. One click on "⇄ Convert & Copy for Qiita" strips Zenn-specific markup and puts Qiita-ready Markdown on your clipboard.',
+      's1.step1': 'Create a new file with Ctrl+N and switch the FM panel profile to Zenn',
+      's1.step2': 'Fill in title, emoji, type, and topics via the GUI — no YAML required',
+      's1.step3': 'Use the Zenn syntax palette to insert :::message or @[youtube] with one click while writing',
+      's1.step4': 'Click "📋 Copy Markdown" in the FM panel to copy complete Zenn-format Markdown → paste into Zenn and publish',
+      's1.step5': 'To also post on Qiita, click "⇄ Convert & Copy for Qiita" — Zenn-specific markup is stripped automatically',
       's1.pill1': 'WYSIWYG editing',
-      's1.pill2': 'YAML Front Matter GUI',
-      's1.pill3': 'Markdown export',
-      's1.pill4': 'Code blocks',
+      's1.pill2': 'Platform profile',
+      's1.pill3': 'Zenn syntax palette',
+      's1.pill4': 'Syntax warnings',
+      's1.pill5': 'Qiita conversion copy',
       's1.cap1': 'Syntax renders the instant you type it',
       's1.cap2': 'Edit Front Matter via GUI — no syntax needed',
       's2.badge': 'Scenario 02 — AI Copy',

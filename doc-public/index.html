@@ -500,7 +500,7 @@
 <section id="solutions">
   <div class="container">
     <p class="section-label" data-i18n="solutions.label">Features</p>
-    <h2 data-i18n="solutions.h2">4 つの解決策</h2>
+    <h2 data-i18n="solutions.h2">6 つの解決策</h2>
 
     <div class="solution-solo">
       <div class="solution-text">
@@ -548,6 +548,24 @@
         <img src="demo-gifs/prose-lint.gif" alt="Prose Lint デモ">
       </div>
     </div>
+
+    <div class="solution">
+      <div class="solution-text">
+        <h3 data-i18n="solutions.sol6.h3">6. Zenn と Qiita を同時に運用できる</h3>
+        <p data-i18n="solutions.sol6.p">プロファイルを「Zenn」に切り替えると <code>:::message</code> や <code>@[youtube]</code> などの専用記法がパレットから挿入できる。「⇄ Qiita 用に変換してコピー」ボタン1クリックで、Zenn 固有記法を自動除去して <code>topics → tags</code> 変換した Markdown をクリップボードへ。Qiita の記事エディタにそのまま貼り付けるだけ。</p>
+      </div>
+      <div class="solution-img">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1.5rem;font-size:0.82rem;color:var(--text-muted);">
+          <p style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);margin-bottom:0.75rem;">Qiita 変換の例</p>
+          <p style="margin-bottom:0.5rem;"><span style="color:#fca5a5;">✗ Zenn</span> &nbsp;<code style="font-size:0.78rem;">:::message\n注意書き\n:::</code></p>
+          <p style="margin-bottom:0.5rem;"><span style="color:#fca5a5;">✗ Zenn</span> &nbsp;<code style="font-size:0.78rem;">@[youtube](id)</code></p>
+          <p style="margin-bottom:0.5rem;"><span style="color:#fca5a5;">✗ Zenn</span> &nbsp;<code style="font-size:0.78rem;">topics: ["ts", "react"]</code></p>
+          <p style="margin:1rem 0 0.5rem;border-top:1px solid var(--border);padding-top:0.75rem;"><span style="color:var(--success);">✓ Qiita</span> &nbsp;注意書き（記法除去・内容保持）</p>
+          <p style="margin-bottom:0.5rem;"><span style="color:var(--success);">✓ Qiita</span> &nbsp;（行削除）</p>
+          <p><span style="color:var(--success);">✓ Qiita</span> &nbsp;<code style="font-size:0.78rem;">tags:\n  - name: ts</code></p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -571,6 +589,7 @@
           <li data-i18n="features.group1.li9">フォーカス / タイプライター / Zen モード</li>
           <li data-i18n="features.group1.li10">ポモドーロ / ワードスプリント</li>
           <li data-i18n="features.group1.li11">文章スタイル Lint — 冗長表現・文体混在を AI 不要でチェック</li>
+          <li data-i18n="features.group1.li12">Zenn 記法パレット（:::message / @[youtube] 等のワンクリック挿入）</li>
         </ul>
       </div>
       <div class="features-group">
@@ -586,6 +605,8 @@
           <li data-i18n="features.group2.li8">外部変更検知（Dropbox / OneDrive 対応）</li>
           <li data-i18n="features.group2.li9">ローカルファースト（データは自分の PC に）</li>
           <li data-i18n="features.group2.li10">アプリ内自動アップデート</li>
+          <li data-i18n="features.group2.li11">Zenn → Qiita ワンクリック変換コピー</li>
+          <li data-i18n="features.group2.li12">プラットフォーム別構文警告（Qiita 非対応記法の自動検出）</li>
         </ul>
       </div>
     </div>

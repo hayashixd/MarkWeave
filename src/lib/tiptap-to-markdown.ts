@@ -76,8 +76,10 @@ export function serializeBlockNode(
 
     case 'codeBlock': {
       const lang = (node.attrs?.language as string) ?? '';
+      const meta = (node.attrs?.meta as string) ?? '';
+      const infoString = lang && meta ? `${lang} ${meta}` : lang;
       const code = node.content?.map((c) => c.text ?? '').join('') ?? '';
-      return `\`\`\`${lang}\n${code}\n\`\`\``;
+      return `\`\`\`${infoString}\n${code}\n\`\`\``;
     }
 
     case 'horizontalRule':

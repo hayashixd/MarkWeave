@@ -43,12 +43,17 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testIgnore: /demo-capture/,
+      testIgnore: /demo-capture|manual-capture/,
+    },
+    {
+      name: "manual-capture",
+      testDir: "./e2e/manual-capture",
+      use: { ...devices["Desktop Chrome"], headless: false },
     },
     {
       name: "demo-chromium",
       testDir: "./e2e/demo-capture",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], headless: false },
     },
   ],
 

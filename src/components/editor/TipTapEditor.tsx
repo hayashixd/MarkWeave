@@ -80,7 +80,10 @@ import {
 } from '../../extensions/SlashCommandsExtension';
 import { SlashCommandMenu } from '../SlashCommands/SlashCommandMenu';
 import { FrontMatterPanel } from './FrontMatterPanel';
+import { ZennSyntaxPalette } from './ZennSyntaxPalette';
 import { parseFrontMatter, serializeFrontMatter } from '../../lib/frontmatter';
+import { detectPlatform } from '../../lib/platform-detector';
+import { useTabProfileStore } from '../../store/tabProfileStore';
 import { WikilinkExtension, type WikilinkAutoState } from '../../extensions/WikilinkExtension';
 import { WikilinkPopup } from './WikilinkPopup';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -159,10 +162,15 @@ export function MarkdownEditor({
 
   // Git ガター差分インジケーター用（Phase 7.5）
   const workspaceRootForGit = useWorkspaceStore((s) => s.root);
+  const activeTabId = useTabStore((s) => s.activeTabId);
   const activeTabFilePath = useTabStore((s) => {
     const activeId = s.activeTabId;
     return s.tabs.find((t) => t.id === activeId)?.filePath ?? null;
   });
+  const tabProfileOverride = useTabProfileStore((s) =>
+    activeTabId ? s.overrides[activeTabId] : undefined,
+  );
+  const effectivePlatform = tabProfileOverride ?? detectPlatform(frontMatterYaml);
 
   // 検索バーの状態
   const [searchVisible, setSearchVisible] = useState(false);
@@ -952,6 +960,14 @@ export function MarkdownEditor({
     [applyExternalMarkdownToEditor, editor],
   );
 
+  // 現在の本文 Markdown（Front Matter なし）を取得するコールバック
+  // FrontMatterPanel のコピー操作・警告表示に使用する
+  const getBodyMarkdown = useCallback((): string => {
+    if (!editor) return '';
+    const json = editor.getJSON() as unknown as TipTapDoc;
+    return tiptapToMarkdown(json);
+  }, [editor]);
+
   // 現在の Markdown を取得するメソッド（Front Matter 含む）
   const getMarkdown = useCallback((): string | null => {
     if (!editor) return null;
@@ -1002,6 +1018,10 @@ export function MarkdownEditor({
         onToggleMode={toggleMode}
         getMarkdown={() => getMarkdown() ?? ''}
       />
+      {/* Zenn 記法パレット（Zenn プロファイル有効時のみ） */}
+      {mode === 'wysiwyg' && effectivePlatform === 'zenn' && editor && (
+        <ZennSyntaxPalette editor={editor} />
+      )}
       {editor && <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />}
       {/* クイックオープンモーダル（Ctrl+P） */}
       {quickOpenVisible && <QuickOpenModal onClose={() => setQuickOpenVisible(false)} />}
@@ -1098,6 +1118,8 @@ export function MarkdownEditor({
                   onContentChangeRef.current?.(serializeFrontMatter(newYaml, body));
                 }
               }}
+              getBodyMarkdown={getBodyMarkdown}
+              tabId={activeTabId ?? undefined}
             />
           </div>
           {/* 検索バー（フローティング） */}
