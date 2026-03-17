@@ -31,5 +31,11 @@
   },
   "sidebar": {
     "showAdvancedTabs": "Show advanced sidebar tabs (Git, Graph, Backlinks, AI)"
+  },
+  "appearance": {
+    "language": "Display Language",
+    "languageAuto": "Auto (follow OS setting)",
+    "languageJa": "日本語",
+    "languageEn": "English"
   }
 }

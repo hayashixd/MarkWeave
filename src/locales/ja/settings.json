@@ -31,5 +31,11 @@
   },
   "sidebar": {
     "showAdvancedTabs": "高度なサイドバータブを表示（Git・グラフ・バックリンク・AI）"
+  },
+  "appearance": {
+    "language": "表示言語",
+    "languageAuto": "自動（OS設定に従う）",
+    "languageJa": "日本語",
+    "languageEn": "English"
   }
 }

@@ -174,6 +174,22 @@ export function AppearanceTab() {
         </div>
       </div>
 
+      {/* 表示言語 */}
+      <div>
+        <label className="block text-sm font-medium mb-1">{t('appearance.language')}</label>
+        <select
+          value={appearance.language}
+          onChange={(e) =>
+            update({ language: e.target.value as 'auto' | 'ja' | 'en' })
+          }
+          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="auto">{t('appearance.languageAuto')}</option>
+          <option value="ja">{t('appearance.languageJa')}</option>
+          <option value="en">{t('appearance.languageEn')}</option>
+        </select>
+      </div>
+
       {/* サイドバー詳細設定 */}
       <fieldset>
         <legend className="text-sm font-medium mb-2">サイドバー</legend>
