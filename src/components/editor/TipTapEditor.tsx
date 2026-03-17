@@ -97,8 +97,6 @@ import { useTabStore } from '../../store/tabStore';
 export type EditorMode = 'wysiwyg' | 'source';
 
 const LARGE_FILE_SOURCE_MODE_THRESHOLD_BYTES = 3 * 1024 * 1024;
-/** performance-design.md §2: ProseMirror ポジション空間サイズが閾値を超えたらソースモードに切替 */
-const LARGE_FILE_NODE_COUNT_THRESHOLD = 3000;
 /**
  * トップレベルブロック数閾値。仮想スクロールが 16ms 予算を超え始める 2000 ノード手前で
  * ソースモードへ切替することでスクロールジャンクを防ぐ。
@@ -552,13 +550,11 @@ export function MarkdownEditor({
       // ここで明示的に設定し、次回 effect 実行時の同一内容再注入を防ぐ。
       lastEmittedContentRef.current = initialContent;
 
-      // performance-design.md §2: ノード数による大規模ファイル判定
-      // パース後にノード数をチェックし、閾値超過時はソースモードへ切替
-      // nodeSize: ProseMirror ポジション空間サイズ（文字数に近い値）
+      // performance-design.md §2: ブロック数による大規模ファイル判定
+      // パース後にトップレベルブロック数をチェックし、閾値超過時はソースモードへ切替
       // childCount: トップレベルブロック数（仮想スクロールの負荷に直結）
-      const nodeCount = editor.state.doc.nodeSize;
       const blockCount = editor.state.doc.childCount;
-      if (nodeCount >= LARGE_FILE_NODE_COUNT_THRESHOLD || blockCount >= LARGE_FILE_BLOCK_COUNT_THRESHOLD) {
+      if (blockCount >= LARGE_FILE_BLOCK_COUNT_THRESHOLD) {
         lastEmittedContentRef.current = initialContent;
         setSourceText(initialContent);
         setMode('source');
@@ -622,10 +618,9 @@ export function MarkdownEditor({
       // applyContent（ファイルロード時）と同等のチェックをユーザー操作にも適用し、
       // 大規模コンテンツが WYSIWYG でレンダリングされてフリーズするのを防ぐ。
       const blockCount = editor.state.doc.childCount;
-      const nodeCount = editor.state.doc.nodeSize;
       if (
         modeRef.current === 'wysiwyg' &&
-        (blockCount >= LARGE_FILE_BLOCK_COUNT_THRESHOLD || nodeCount >= LARGE_FILE_NODE_COUNT_THRESHOLD)
+        blockCount >= LARGE_FILE_BLOCK_COUNT_THRESHOLD
       ) {
         if (serializeTimerRef.current) {
           clearTimeout(serializeTimerRef.current);
