@@ -110,21 +110,28 @@ export function useSessionRestore() {
         }
 
         // セッションのファイルをタブとして復元
+        // skipActivate: true で全ファイルを追加し、中間タブのエディタ再マウントを防ぐ。
+        // 最後に setActiveTab で一度だけアクティブタブを確定する。
         let activeTabId: string | null = null;
+        let firstTabId: string | null = null;
         let failCount = 0;
 
         for (const file of session.openFiles) {
-          const tabId = await openFileAsTab(file.path);
+          const tabId = await openFileAsTab(file.path, { skipActivate: true });
           if (tabId === null) {
             failCount++;
-          } else if (file.path === session.activeFilePath) {
-            activeTabId = tabId;
+          } else {
+            if (!firstTabId) firstTabId = tabId;
+            if (file.path === session.activeFilePath) {
+              activeTabId = tabId;
+            }
           }
         }
 
-        // アクティブタブを復元
-        if (activeTabId) {
-          setActiveTab(activeTabId);
+        // アクティブタブを復元（skipActivate で全タブ非アクティブのため、ここで確定）
+        const targetTabId = activeTabId ?? firstTabId;
+        if (targetTabId) {
+          setActiveTab(targetTabId);
         }
 
         // ペイン分割状態の復元

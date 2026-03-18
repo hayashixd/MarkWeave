@@ -43,6 +43,8 @@ interface TabStore {
       lineEnding?: LineEnding;
       fileType?: FileType;
       isReadOnly?: boolean;
+      /** true にすると activeTabId を変更しない（複数ファイル一括オープン時のフリーズ防止） */
+      skipActivate?: boolean;
     },
   ) => string;
   removeTab: (tabId: string) => void;
@@ -90,7 +92,9 @@ export const useTabStore = create<TabStore>((set, get) => ({
     if (tabData.filePath) {
       const existing = state.tabs.find((t) => t.filePath === tabData.filePath);
       if (existing) {
-        set({ activeTabId: existing.id });
+        if (!tabData.skipActivate) {
+          set({ activeTabId: existing.id });
+        }
         return existing.id;
       }
     }
@@ -124,7 +128,7 @@ export const useTabStore = create<TabStore>((set, get) => ({
 
     set({
       tabs: [...state.tabs, newTab],
-      activeTabId: id,
+      ...(tabData.skipActivate ? {} : { activeTabId: id }),
     });
 
     return id;

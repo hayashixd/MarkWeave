@@ -49,8 +49,9 @@ export function useOpenFileDialog() {
     // open() は multiple:true の場合に string[] を返す
     const paths = Array.isArray(selected) ? selected : [selected];
 
-    for (const path of paths) {
-      await openFileAsTab(path);
+    // 最後のファイルのみをアクティブにし、中間タブのエディタ再マウントを防ぐ
+    for (let i = 0; i < paths.length; i++) {
+      await openFileAsTab(paths[i]!, i < paths.length - 1 ? { skipActivate: true } : undefined);
     }
   }, [openFileAsTab]);
 }

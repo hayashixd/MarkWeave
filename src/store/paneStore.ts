@@ -46,7 +46,7 @@ interface SplitEditorStore {
   /** アクティブペインを変更する */
   setActivePaneId: (paneId: string) => void;
   /** ペインにタブを追加する */
-  addTabToPane: (tabId: string, paneId?: string) => void;
+  addTabToPane: (tabId: string, paneId?: string, skipActivate?: boolean) => void;
   /** ペインからタブを削除する */
   removeTabFromPane: (tabId: string) => void;
   /** ペイン内のアクティブタブを設定する */
@@ -184,7 +184,7 @@ export const usePaneStore = create<SplitEditorStore>((set, get) => ({
     set({ activePaneId: paneId });
   },
 
-  addTabToPane: (tabId, paneId) => {
+  addTabToPane: (tabId, paneId, skipActivate) => {
     const state = get();
     const targetPaneId = paneId ?? state.activePaneId;
     const targetPane = state.panes.find((p) => p.id === targetPaneId);
@@ -197,7 +197,7 @@ export const usePaneStore = create<SplitEditorStore>((set, get) => ({
     set({
       panes: state.panes.map((p) =>
         p.id === targetPaneId
-          ? { ...p, tabs: [...p.tabs, tabId], activeTabId: tabId }
+          ? { ...p, tabs: [...p.tabs, tabId], activeTabId: skipActivate ? p.activeTabId : tabId }
           : p,
       ),
     });

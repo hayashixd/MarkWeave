@@ -21,7 +21,7 @@ export function useOpenFileAsTab() {
   const show = useToastStore((s) => s.show);
 
   return useCallback(
-    async (path: string): Promise<string | null> => {
+    async (path: string, options?: { skipActivate?: boolean }): Promise<string | null> => {
       try {
         const content = await readFile(path);
         const fileName = path.split(/[/\\]/).pop() ?? 'Untitled';
@@ -30,6 +30,7 @@ export function useOpenFileAsTab() {
           fileName,
           content,
           savedContent: content,
+          skipActivate: options?.skipActivate,
         });
 
         // Windows ジャンプリストと「最近使ったファイル」に登録する

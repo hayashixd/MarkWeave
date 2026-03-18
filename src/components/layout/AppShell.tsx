@@ -165,9 +165,12 @@ export function AppShell() {
     const prevIds = prevTabIdsRef.current;
 
     // 追加されたタブをペインに登録
+    // tabStore の activeTabId と一致しないタブは skipActivate=true で追加し、
+    // 中間タブのエディタ再マウントによるフリーズを防ぐ
     const addedIds = currentIds.filter((id) => !prevIds.includes(id));
+    const currentActiveTabId = useTabStore.getState().activeTabId;
     for (const id of addedIds) {
-      addTabToPane(id);
+      addTabToPane(id, undefined, id !== currentActiveTabId);
     }
 
     // 削除されたタブをペインから除去
