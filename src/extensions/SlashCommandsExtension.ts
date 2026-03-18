@@ -85,6 +85,7 @@ export const SlashCommandsExtension = Extension.create<SlashCommandsOptions>({
             if (event.key === 'Escape') {
               // メニューを閉じる（/クエリはそのまま残す）
               view.dispatch(view.state.tr.setMeta(pluginKey, INITIAL_STATE));
+              self.options.onStateChange(INITIAL_STATE);
               return true;
             }
 
