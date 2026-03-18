@@ -332,7 +332,23 @@ published: false
 
 ---
 
-## 13. Handling Large Files
+## 13. Smart Paste
+
+When you copy **rich text (formatted text or HTML)** from a web page, Word, or another app and paste it into MarkWeave, a confirmation bar appears at the top of the editor.
+
+| Action | Result |
+|--------|--------|
+| **Paste as Markdown** or `Enter` | Converts headings, bold, italic, lists, links, and code blocks to Markdown |
+| **Plain text** or `Escape` | Strips all formatting and pastes as plain text |
+| **✕** (close) | Dismisses the bar |
+
+After 3 seconds, **Paste as Markdown** is automatically applied.
+
+> **Tip**: To skip the confirmation bar entirely, use `Ctrl+Shift+V` (Paste as Plain Text).
+
+---
+
+## 14. Handling Large Files
 
 MarkWeave handles large files gracefully:
 
@@ -343,7 +359,7 @@ For typical technical articles (a few dozen KB), you won't need to think about t
 
 ---
 
-## 14. Advanced FAQ
+## 15. Advanced FAQ
 
 **Q. How do I enable Backlinks or Tag View?**
 Go to Settings (`Ctrl+,`) → Plugins tab and enable the desired feature. They are hidden by default.

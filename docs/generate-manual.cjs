@@ -148,6 +148,10 @@ const imgs = {
   platformWarnings: loadImage('platform-profile/04_warnings.png'),
   zennPalette: loadImage('platform-profile/05_zenn-palette.png'),
   copyButtons: loadImage('platform-profile/06_copy-buttons.png'),
+  // smart-paste (新規)
+  smartPasteBar: loadImage('smart-paste/01_smart-paste-bar.png'),
+  smartPasteButtons: loadImage('smart-paste/02_smart-paste-buttons.png'),
+  smartPasteOverview: loadImage('smart-paste/03_smart-paste-overview.png'),
 };
 
 function imgTag(src, alt, caption) {
@@ -1402,9 +1406,30 @@ graph TD
     </table>
   </section>
 
-  <!-- 29. FAQ -->
+  <!-- 29. スマートペースト -->
+  <section id="smart-paste">
+    <h2>29. スマートペースト</h2>
+    <p>Web ページや Word などから<strong>書式付きテキスト（リッチテキスト）</strong>をコピーして MarkWeave に貼り付けると、エディタ上部に確認バーが表示されます。Markdown への変換方法をその場で選択できます。</p>
+    ${imgTag(imgs.smartPasteBar, 'スマートペースト確認バー', 'リッチテキスト貼り付け時にエディタ上部に表示される確認バー')}
+
+    <h3>貼り付け方法の選択</h3>
+    <table>
+      <thead><tr><th>操作</th><th>動作</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Markdown として貼り付け</strong>（または <kbd>Enter</kbd>）</td><td>見出し・太字・斜体・リスト・リンク・コードブロックなどの書式を Markdown に変換して貼り付けます</td></tr>
+        <tr><td><strong>プレーンテキスト</strong>（または <kbd>Escape</kbd>）</td><td>すべての書式を除去し、プレーンテキストとして貼り付けます</td></tr>
+        <tr><td><strong>✕</strong>（閉じる）</td><td>確認バーを閉じます</td></tr>
+      </tbody>
+    </table>
+    ${imgTag(imgs.smartPasteButtons, 'スマートペースト ボタン', 'Markdown・プレーンテキスト・閉じるの 3 択ボタン')}
+
+    <p>確認バーが表示されてから <strong>3秒後</strong>に自動的に「Markdown として貼り付け」が実行されます。素早くプレーンテキストで貼り付けたい場合は <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> を使うと確認バーをスキップできます。</p>
+    ${imgTag(imgs.smartPasteOverview, 'スマートペースト 概要', 'Web からのリッチテキストを Markdown に変換して貼り付ける流れ')}
+  </section>
+
+  <!-- 30. FAQ -->
   <section id="faq">
-    <h2>29. FAQ</h2>
+    <h2>30. FAQ</h2>
     <dl>
       <div class="faq-item">
         <dt>Q1. Markdown 記法を知らなくても使えますか？</dt>
