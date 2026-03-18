@@ -379,20 +379,28 @@ pnpm build
 - `tsc -b` と `vite build` が両方エラーなしで完了すること
 - テストファイルが型エラーを起こしていないことも確認される
 
-### 2. フロントエンドテスト
+### 2. フロントエンドテスト + カバレッジ閾値確認
 ```bash
-pnpm test
+pnpm test:coverage
 ```
 - すべてのテストが PASS すること
+- カバレッジ閾値（branches 78% / statements 50% 等）を下回らないこと
+- 性能テスト（`large-file-threshold`, `virtual-scroll-perf`）はカバレッジ計測の影響を受けるため除外される。性能のみ確認したい場合は別途 `pnpm test:perf` を実行すること
 
-### 3. Rust ビルド・テスト
+### 3. 依存パッケージのセキュリティ確認
+```bash
+pnpm audit
+```
+- 既知の脆弱性がないこと（`No known vulnerabilities found`）
+
+### 4. Rust ビルド・テスト
 ```bash
 cd src-tauri && cargo build && cargo test
 ```
 - コンパイルエラーがないこと
 - ユニットテストがすべて通ること
 
-### 4. バージョン番号の一致確認
+### 5. バージョン番号の一致確認
 以下の3ファイルのバージョンが一致していること：
 
 | ファイル | 確認箇所 |
@@ -401,7 +409,7 @@ cd src-tauri && cargo build && cargo test
 | `src-tauri/Cargo.toml` | `version =` |
 | `src-tauri/tauri.conf.json` | `"version"` |
 
-### 5. タグ・プッシュ
+### 6. タグ・プッシュ
 
 **Claude Code にリリースを依頼する場合（推奨）:**
 

@@ -2,6 +2,14 @@ use crate::models::error::AppError;
 use std::path::Path;
 use std::time::Duration;
 
+/// 読み込みを許可するファイルサイズの上限 (100 MB)。
+/// これを超えるファイルは OOM のリスクがあるため拒否する。
+const MAX_READ_FILE_BYTES: u64 = 104_857_600; // 100 MB
+
+/// ディレクトリツリーの最大再帰深度。
+/// シンボリックリンク循環・異常に深いフォルダ構造によるスタックオーバーフローを防ぐ。
+const MAX_TREE_DEPTH: usize = 50;
+
 /// パスを正規化し、シンボリックリンクを解決する（security-design.md §3.4, §4.2 準拠）。
 /// パストラバーサル攻撃に対する多層防御として、canonicalize 後のパスで操作する。
 fn canonicalize_path(path: &str) -> Result<std::path::PathBuf, String> {
@@ -36,6 +44,19 @@ pub async fn read_file(path: String) -> Result<String, String> {
             path: path.clone(),
         }
         .into());
+    }
+
+    // ファイルサイズチェック（100MB 上限）
+    let metadata = tokio::fs::metadata(&canonical).await.map_err(|e| {
+        AppError::from_io(e, &path).to_string()
+    })?;
+    if metadata.len() > MAX_READ_FILE_BYTES {
+        return Err(format!(
+            "ファイルサイズが上限を超えています（{}MB / 最大 {}MB）: {}",
+            metadata.len() / 1_048_576,
+            MAX_READ_FILE_BYTES / 1_048_576,
+            path
+        ));
     }
 
     // 正規化済みパスでファイル読み込み
@@ -207,6 +228,24 @@ pub async fn list_workspace_files(
 }
 
 fn collect_file_tree(dir: &Path, extensions: &[String]) -> std::io::Result<Vec<FileNode>> {
+    collect_file_tree_inner(dir, extensions, 0)
+}
+
+fn collect_file_tree_inner(
+    dir: &Path,
+    extensions: &[String],
+    depth: usize,
+) -> std::io::Result<Vec<FileNode>> {
+    // 異常に深いディレクトリ構造・シンボリックリンク循環を防ぐ
+    if depth >= MAX_TREE_DEPTH {
+        log::warn!(
+            "collect_file_tree: 最大深度 {} に達しました。ディレクトリをスキップ: {}",
+            MAX_TREE_DEPTH,
+            dir.display()
+        );
+        return Ok(Vec::new());
+    }
+
     let mut entries: Vec<FileNode> = Vec::new();
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
@@ -221,7 +260,7 @@ fn collect_file_tree(dir: &Path, extensions: &[String]) -> std::io::Result<Vec<F
         }
 
         if path.is_dir() {
-            let children = collect_file_tree(&path, extensions)?;
+            let children = collect_file_tree_inner(&path, extensions, depth + 1)?;
             entries.push(FileNode {
                 name,
                 path: path.to_string_lossy().to_string(),
@@ -261,6 +300,23 @@ pub async fn list_markdown_files(root_path: String) -> Result<Vec<String>, Strin
 }
 
 fn collect_md_files(dir: &Path, files: &mut Vec<String>) -> std::io::Result<()> {
+    collect_md_files_inner(dir, files, 0)
+}
+
+fn collect_md_files_inner(
+    dir: &Path,
+    files: &mut Vec<String>,
+    depth: usize,
+) -> std::io::Result<()> {
+    if depth >= MAX_TREE_DEPTH {
+        log::warn!(
+            "collect_md_files: 最大深度 {} に達しました。ディレクトリをスキップ: {}",
+            MAX_TREE_DEPTH,
+            dir.display()
+        );
+        return Ok(());
+    }
+
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -271,7 +327,7 @@ fn collect_md_files(dir: &Path, files: &mut Vec<String>) -> std::io::Result<()> 
             continue;
         }
         if path.is_dir() {
-            collect_md_files(&path, files)?;
+            collect_md_files_inner(&path, files, depth + 1)?;
         } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
             files.push(path.to_string_lossy().to_string());
         }
@@ -446,6 +502,144 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::tempdir;
+
+    // -------------------------------------------------------------------------
+    // read_file: ファイルサイズ上限テスト
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_read_file_rejects_file_exceeding_size_limit() {
+        let dir = tempdir().unwrap();
+        let large_file = dir.path().join("large.md");
+        // MAX_READ_FILE_BYTES + 1 バイトのファイルを作成
+        let content = vec![b'A'; (MAX_READ_FILE_BYTES + 1) as usize];
+        fs::write(&large_file, &content).unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(read_file(large_file.to_string_lossy().to_string()));
+
+        assert!(result.is_err(), "100MB 超えのファイルはエラーになるべき");
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("上限"),
+            "エラーメッセージにサイズ上限の説明が含まれるべき: {err}"
+        );
+    }
+
+    #[test]
+    fn test_read_file_accepts_file_within_size_limit() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("normal.md");
+        let content = "# Hello\n\nThis is a normal file.";
+        fs::write(&file, content).unwrap();
+
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(read_file(file.to_string_lossy().to_string()));
+
+        assert!(result.is_ok(), "通常サイズのファイルは読み込めるべき");
+        assert_eq!(result.unwrap(), content);
+    }
+
+    #[test]
+    fn test_read_file_rejects_relative_path() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(read_file("relative/path/file.md".to_string()));
+        assert!(result.is_err(), "相対パスはエラーになるべき");
+    }
+
+    #[test]
+    fn test_read_file_returns_error_for_nonexistent_file() {
+        let dir = tempdir().unwrap();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = rt.block_on(read_file(
+            dir.path().join("ghost.md").to_string_lossy().to_string(),
+        ));
+        assert!(result.is_err(), "存在しないファイルはエラーになるべき");
+    }
+
+    // -------------------------------------------------------------------------
+    // collect_file_tree: 深度制限テスト
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn test_collect_file_tree_depth_limit_stops_recursion() {
+        let dir = tempdir().unwrap();
+
+        // MAX_TREE_DEPTH + 5 段の深いディレクトリを作成
+        let mut current = dir.path().to_path_buf();
+        for i in 0..(MAX_TREE_DEPTH + 5) {
+            current = current.join(format!("level_{}", i));
+            fs::create_dir(&current).unwrap();
+        }
+        // 最深部にファイルを配置
+        fs::write(current.join("deep.md"), "deep content").unwrap();
+
+        // エラーにならず、最大深度で打ち切られること
+        let result = collect_file_tree(dir.path(), &[".md".to_string()]);
+        assert!(result.is_ok(), "深度制限によりパニック・エラーにならないこと");
+        // 最深部のファイルは含まれない（深度制限でスキップ）
+        fn find_deep_md(nodes: &[FileNode]) -> bool {
+            for node in nodes {
+                if node.name == "deep.md" {
+                    return true;
+                }
+                if let Some(children) = &node.children {
+                    if find_deep_md(children) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        let nodes = result.unwrap();
+        assert!(
+            !find_deep_md(&nodes),
+            "MAX_TREE_DEPTH を超えたファイルは収集されないこと"
+        );
+    }
+
+    #[test]
+    fn test_collect_file_tree_normal_depth_works() {
+        let dir = tempdir().unwrap();
+        // 3段のネストは正常に動作すること
+        let l1 = dir.path().join("a");
+        let l2 = l1.join("b");
+        let l3 = l2.join("c");
+        fs::create_dir_all(&l3).unwrap();
+        fs::write(l3.join("note.md"), "content").unwrap();
+
+        let result = collect_file_tree(dir.path(), &[".md".to_string()]).unwrap();
+
+        fn find_md(nodes: &[FileNode], name: &str) -> bool {
+            for node in nodes {
+                if node.name == name {
+                    return true;
+                }
+                if let Some(children) = &node.children {
+                    if find_md(children, name) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        assert!(
+            find_md(&result, "note.md"),
+            "通常の深度（3段）ではファイルが収集されること"
+        );
+    }
 
     // -------------------------------------------------------------------------
     // collect_file_tree
