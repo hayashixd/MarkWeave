@@ -2,7 +2,7 @@
 
 **Markdown 記法を見ずに書いて、技術記事をそのまま公開できるローカル WYSIWYG エディタ。**
 
-Windows / Linux 対応 · ローカルファースト · 30日間無料試用 · 買い切り $24.99
+Windows / Linux 対応 · ローカルファースト · 30日間無料試用 · ベータキャンペーン価格 $9.99
 
 **[➡ Gumroad で購入する](https://xdhyskh.gumroad.com/l/qwctrq)** · **[➡ 開発記事（Zenn）](https://zenn.dev/hayashixd/articles/f00eea197f087c)**
 
@@ -93,7 +93,7 @@ Claude API キー不要。すべてローカルで動く。
 
 ## ダウンロード
 
-**[➡ Gumroad で購入する（$24.99）](https://xdhyskh.gumroad.com/l/qwctrq)**
+**[➡ Gumroad で購入する（ベータ価格 $9.99）](https://xdhyskh.gumroad.com/l/qwctrq)**
 
 購入後、最新版（Windows `.msi` / Linux `.AppImage`）のダウンロードリンクが届きます。
 
@@ -156,7 +156,7 @@ pnpm tauri dev   # デスクトップアプリとして起動
 | 対応 OS | Windows 10/11、Linux（x86-64） |
 | macOS | 未対応（開発者が Mac を所持していないため動作確認不可） |
 | ライセンス | MIT |
-| 価格 | 買い切り $24.99、3 デバイスまで。サブスクなし |
+| 価格 | ベータキャンペーン価格 $9.99（正式版 $24.99 予定）、3 デバイスまで。サブスクなし |
 | 試用期間 | インストール後 30 日間は無料で全機能を試用可能 |
 | アップデート | アプリ内自動アップデート（署名済みパッケージ） |
 | サポート | GitHub Issues |
