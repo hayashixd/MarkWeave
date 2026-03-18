@@ -21,22 +21,29 @@ interface TestResult {
   duration_ms: number;
 }
 
+/** ANSI エスケープシーケンスを除去する */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
+}
+
 function parseVitestOutput(stdout: string, stderr: string): TestResult {
-  const combined = stdout + "\n" + stderr;
+  // ANSI カラーコードを除去してからパース
+  const combined = stripAnsi(stdout + "\n" + stderr);
 
   let passed = 0;
   let failed = 0;
   let duration_ms = 0;
   const failures: TestFailure[] = [];
 
-  // Parse "Tests  N passed (N)" or "Tests  N passed | M failed (T)"
-  const testsLine = combined.match(
-    /Tests\s+(?:(\d+)\s+passed)?(?:\s*\|\s*)?(?:(\d+)\s+failed)?\s*\((\d+)\)/
-  );
-  if (testsLine) {
-    passed = parseInt(testsLine[1] ?? "0", 10);
-    failed = parseInt(testsLine[2] ?? "0", 10);
-  }
+  // Vitest の出力形式:
+  //   全通過: "Tests  1453 passed (1453)"
+  //   失敗あり: "Tests  7 failed | 1453 passed (1460)"
+  // failed が先に来るため、passed/failed を独立してパースする
+  const passedMatch = combined.match(/\bTests\b.*?(\d+)\s+passed/);
+  const failedMatch = combined.match(/\bTests\b.*?(\d+)\s+failed/);
+  if (passedMatch) passed = parseInt(passedMatch[1]!, 10);
+  if (failedMatch) failed = parseInt(failedMatch[1]!, 10);
 
   // Parse duration: "Duration  12.81s"
   const durationMatch = combined.match(/Duration\s+([\d.]+)s/);
@@ -44,19 +51,17 @@ function parseVitestOutput(stdout: string, stderr: string): TestResult {
     duration_ms = Math.round(parseFloat(durationMatch[1]!) * 1000);
   }
 
-  // Parse failure blocks: "FAIL src/..." followed by error details
-  // Vitest outputs "× test name" for failed tests
-  const failurePattern = /[×✕]\s+(.+?)(?:\n[\s\S]*?(?:Error|AssertionError):\s*(.+?)(?:\n|$))?/g;
+  // "× test name" パターンで失敗テスト名を抽出
+  const failurePattern = /[×✕]\s+(.+)/g;
   let match: RegExpExecArray | null;
   while ((match = failurePattern.exec(combined)) !== null) {
-    failures.push({
-      name: match[1]!.trim(),
-      message: match[2]?.trim() ?? "Test failed",
-    });
+    const name = match[1]!.trim();
+    if (name) {
+      failures.push({ name, message: "Test failed" });
+    }
   }
 
-  // If we detected failed count but didn't parse individual failures,
-  // try a simpler approach: look for "FAIL" file lines
+  // 失敗数を検出できたが個別名が取れない場合は FAIL ファイル行にフォールバック
   if (failed > 0 && failures.length === 0) {
     const failFilePattern = /FAIL\s+(.+\.(?:test|spec)\.(?:ts|tsx))/g;
     while ((match = failFilePattern.exec(combined)) !== null) {

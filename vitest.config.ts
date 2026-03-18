@@ -44,10 +44,10 @@ export default defineConfig({
       thresholds: {
         // 「退行防止ライン」: components / ipc を除外した実測値 (2026-03-18)
         // 新機能追加時にこの数値を少しずつ引き上げる
-        statements: 50,
-        branches: 78,
-        functions: 55,
-        lines: 50,
+        statements: 54,
+        branches: 84,
+        functions: 63,
+        lines: 54,
       },
     },
   },

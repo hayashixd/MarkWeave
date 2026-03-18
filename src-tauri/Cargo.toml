@@ -1,6 +1,6 @@
 [package]
 name = "markweave"
-version = "0.9.9"
+version = "0.9.10"
 description = "Typora-inspired WYSIWYG MarkWeave"
 authors = ["you"]
 license = "MIT"

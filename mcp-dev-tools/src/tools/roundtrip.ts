@@ -132,18 +132,18 @@ process.stdout.write(JSON.stringify({
           }
         );
 
-        const combined = proc.stdout + "\n" + proc.stderr;
+        // ANSI カラーコードを除去してからパース
+        // eslint-disable-next-line no-control-regex
+        const combined = (proc.stdout + "\n" + proc.stderr).replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "");
 
         // Parse test counts
+        // Vitest 出力例: "Tests  105 passed (105)" / "Tests  2 failed | 103 passed (105)"
         let passed = 0;
         let failed = 0;
-        const testsLine = combined.match(
-          /Tests\s+(?:(\d+)\s+passed)?(?:\s*\|\s*)?(?:(\d+)\s+failed)?\s*\((\d+)\)/
-        );
-        if (testsLine) {
-          passed = parseInt(testsLine[1] ?? "0", 10);
-          failed = parseInt(testsLine[2] ?? "0", 10);
-        }
+        const passedMatch = combined.match(/\bTests\b.*?(\d+)\s+passed/);
+        const failedMatch = combined.match(/\bTests\b.*?(\d+)\s+failed/);
+        if (passedMatch) passed = parseInt(passedMatch[1]!, 10);
+        if (failedMatch) failed = parseInt(failedMatch[1]!, 10);
 
         // Parse duration
         let duration_ms = Date.now() - start;
