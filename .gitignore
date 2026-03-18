@@ -9,6 +9,10 @@ dist/
 src-tauri/target/
 src-tauri/gen/schemas
 
+# Tauri signing keys (never commit private keys)
+*.key
+*.key.pub
+
 # IDE
 .vscode/
 .idea/
