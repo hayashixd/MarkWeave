@@ -95,10 +95,7 @@ async fn do_check(app: &AppHandle, notify_not_found: bool) -> anyhow::Result<boo
         }
         Err(e) => {
             log::warn!("アップデートチェック失敗: {e}");
-            if notify_not_found {
-                app.emit("update-check-error", e.to_string())?;
-            }
-            Ok(false)
+            Err(e)
         }
     }
 }
