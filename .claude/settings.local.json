@@ -106,7 +106,25 @@
       "Bash(gh api:*)",
       "Bash(gh.exe api:*)",
       "WebFetch(domain:api.github.com)",
-      "Read(//c/Users/xdhys/AppData/Local/Temp/markweave-zenn/**)"
+      "Read(//c/Users/xdhys/AppData/Local/Temp/markweave-zenn/**)",
+      "mcp__test-automation__roundtrip_check",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(k\\) for k in d.get\\(''''mcpServers'''',{}\\).keys\\(\\)]\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); ta=d.get\\(''''mcpServers'''',{}\\).get\\(''''test-automation'''',{}\\); print\\(json.dumps\\(ta, indent=2\\)\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''mcpServers'''',{}\\), indent=2\\)\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); mcp=d.get\\(''''mcpServers'''',{}\\); print\\(json.dumps\\({k: v for k,v in mcp.items\\(\\) if ''''test'''' in k.lower\\(\\)}, indent=2\\)\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(list\\(d.get\\(''''mcpServers'''',{}\\).keys\\(\\)\\), indent=2\\)\\)\")",
+      "Bash(npx tsx -e \":*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npx tsx:*)",
+      "Bash(cargo build:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''scripts'''',{}\\), indent=2\\)\\)\")",
+      "Bash(pnpm test:e2e --project=chromium)",
+      "Bash(dir:*)",
+      "Bash(for i:*)",
+      "Bash(do)",
+      "Bash(wmic process:*)",
+      "Bash(done)"
     ]
   },
   "mcpToolSearch": true
