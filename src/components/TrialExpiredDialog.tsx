@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { activateLicense, type LicenseStatus } from '../lib/tauri-commands';
+import { STORE_URL } from '../constants/urls';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useTranslation } from '../i18n';
 
@@ -98,7 +99,7 @@ export function TrialExpiredDialog({ onActivated }: TrialExpiredDialogProps) {
         <p className="text-xs text-gray-400">
           {t('license.buyLink')}{' '}
           <a
-            href="https://xdhyskh.gumroad.com/l/qwctrq"
+            href={STORE_URL}
             target="_blank"
             rel="noreferrer"
             className="underline hover:text-gray-600"

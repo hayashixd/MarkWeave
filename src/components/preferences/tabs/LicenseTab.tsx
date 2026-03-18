@@ -15,6 +15,7 @@ import {
   type TrialStatus,
 } from '../../../lib/tauri-commands';
 import { useTranslation } from '../../../i18n';
+import { STORE_URL } from '../../../constants/urls';
 
 export function LicenseTab() {
   const { t } = useTranslation('settings');
@@ -146,7 +147,7 @@ export function LicenseTab() {
           <p className="text-xs text-gray-400">
             {t('license.buyLink')}{' '}
             <a
-              href="https://xdhyskh.gumroad.com/l/qwctrq"
+              href={STORE_URL}
               target="_blank"
               rel="noreferrer"
               className="underline hover:text-gray-600"

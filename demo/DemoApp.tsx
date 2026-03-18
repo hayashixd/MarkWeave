@@ -6,6 +6,7 @@
  * - テーマ切り替え: localStorage('mw-demo-theme')
  */
 import { useState, useEffect, useCallback } from 'react';
+import { STORE_URL, STORE_PRICE } from '../src/constants/urls';
 import { DemoEditor } from './DemoEditor';
 
 // ── i18n ─────────────────────────────────────────────────────
@@ -20,7 +21,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'nav.usecases': '活用事例',
     'nav.manual': 'マニュアル',
     'nav.demo': 'デモ',
-    'nav.buy': '購入する — $24.99',
+    'nav.buy': `購入する — ${STORE_PRICE}`,
     'hero.badge': 'ブラウザで試せる インタラクティブデモ',
     'hero.tagline': 'Markdown を WYSIWYG で書けるローカルエディタ',
     'hero.h1': 'スラッシュコマンドを試してみよう',
@@ -53,7 +54,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'cta.sub': 'デスクトップ版ではフル機能が使えます',
     'cta.note': 'エクスポート（HTML/PDF/Word）・ファイル管理・AI コピー・Zen モード・ポモドーロ・Prose Lint など',
     'cta.download': '無料でダウンロード（30日間）',
-    'cta.buy': '購入する — $24.99',
+    'cta.buy': `購入する — ${STORE_PRICE}`,
     'cta.meta.onetime': '⚡ 買い切り',
     'cta.meta.nosub': '🚫 サブスクなし',
     'cta.meta.devices': '💻 3デバイスまで',
@@ -103,7 +104,7 @@ const translations: Record<Lang, Record<string, string>> = {
     'cta.sub': 'The desktop version gives you the full feature set',
     'cta.note': 'Export (HTML/PDF/Word) · File management · AI Copy · Zen Mode · Pomodoro · Prose Lint, and more',
     'cta.download': 'Download Free (30 days)',
-    'cta.buy': 'Buy — $24.99',
+    'cta.buy': `Buy — ${STORE_PRICE}`,
     'cta.meta.onetime': '⚡ One-time',
     'cta.meta.nosub': '🚫 No subscription',
     'cta.meta.devices': '💻 Up to 3 devices',
@@ -120,7 +121,7 @@ const GIF_BASE = '../demo-gifs';
 const LP_BASE = '..';
 
 const DOWNLOAD_URL = 'https://github.com/hayashixd/MarkWeave/releases/latest';
-const BUY_URL = 'https://xdhyskh.gumroad.com/l/qwctrq';
+const BUY_URL = STORE_URL;
 
 // ── コンポーネント ────────────────────────────────────────────
 

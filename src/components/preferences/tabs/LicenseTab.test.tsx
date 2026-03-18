@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { LicenseTab } from './LicenseTab';
+import { STORE_URL } from '../../../constants/urls';
 import * as tauriCommands from '../../../lib/tauri-commands';
 
 // ---- i18n モック（翻訳キーをそのまま返す） ----
@@ -118,7 +119,7 @@ describe('未認証状態', () => {
     render(<LicenseTab />);
     await waitFor(() => {
       const link = screen.getByRole('link', { name: 'Gumroad' });
-      expect(link).toHaveAttribute('href', 'https://xdhyskh.gumroad.com/l/qwctrq');
+      expect(link).toHaveAttribute('href', STORE_URL);
     });
   });
 });
