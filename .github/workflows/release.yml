@@ -155,6 +155,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Extract release notes from tag annotation
+        id: tag_notes
+        shell: bash
+        run: |
+          NOTES=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
+          if [ -z "$NOTES" ]; then
+            NOTES="このリリースの変更点は git log を参照してください。"
+          fi
+          {
+            echo "notes<<NOTES_EOF"
+            echo "$NOTES"
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -181,6 +195,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'v__VERSION__'
+          releaseBody: ${{ steps.tag_notes.outputs.notes }}
           releaseDraft: false
           prerelease: false
 
@@ -230,24 +245,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           HASHES=$(sort /tmp/hashes/hash.txt 2>/dev/null)
-          if [ -z "$HASHES" ]; then
-            echo "No hash files found, skipping."
-            exit 0
-          fi
           NOTES=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
           if [ -z "$NOTES" ]; then
             NOTES="このリリースの変更点は git log を参照してください。"
           fi
           {
             printf '%s\n' "$NOTES"
-            printf '\n## SHA256 チェックサム\n\n'
-            printf 'ダウンロードしたファイルの整合性を確認できます。\n\n'
-            printf '```\n'
-            printf '%s\n' "$HASHES"
-            printf '```\n\n'
-            printf '**Windows:** `certutil -hashfile MarkWeave_*.msi SHA256`\n'
-            printf '**Linux:** `sha256sum MarkWeave_*.AppImage`\n'
-            printf '\n---\n\n'
+            if [ -n "$HASHES" ]; then
+              printf '\n## SHA256 チェックサム\n\n'
+              printf 'ダウンロードしたファイルの整合性を確認できます。\n\n'
+              printf '```\n'
+              printf '%s\n' "$HASHES"
+              printf '```\n\n'
+              printf '**Windows:** `certutil -hashfile MarkWeave_*.msi SHA256`\n'
+              printf '**Linux:** `sha256sum MarkWeave_*.AppImage`\n'
+              printf '\n---\n\n'
+            fi
             printf '🔏 [Code Signing Policy / コード署名ポリシー](https://github.com/hayashixd/MarkWeave/blob/main/SIGNING_POLICY.md)\n'
           } > /tmp/release_notes.md
           gh release edit "${{ github.ref_name }}" \
