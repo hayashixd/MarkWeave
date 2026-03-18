@@ -4,6 +4,7 @@ mod fs;
 mod menu;
 mod models;
 mod updater;
+mod watchdog;
 
 use commands::ai_commands;
 use commands::license_commands;
@@ -48,6 +49,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::PendingUpdate(std::sync::Mutex::new(None)))
+        .manage(watchdog::WatchdogState::new())
         .manage(StartupFilePaths(std::sync::Mutex::new(
             // args().skip(1) で実行ファイルパス以外の全引数をファイルパスとして収集
             std::env::args().skip(1).collect(),
@@ -137,6 +139,7 @@ pub fn run() {
             updater::install_update,
             has_startup_files,
             get_startup_file_paths,
+            watchdog::heartbeat,
         ])
         .plugin(
             tauri_plugin_log::Builder::default()
@@ -198,6 +201,13 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 updater::background_check(update_handle).await;
             });
+
+            // ウォッチドッグ起動: フロントエンドのハートビートが途絶えたら強制終了
+            let last_beat = app
+                .state::<watchdog::WatchdogState>()
+                .last_beat
+                .clone();
+            watchdog::start_watchdog(last_beat);
 
             // 初回起動時のコマンドライン引数は StartupFilePath に保存済み。
             // フロントエンドが listen 登録後に get_startup_file_path で取得する。

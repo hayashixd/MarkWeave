@@ -317,3 +317,12 @@ export async function testAiApiKey(provider: string, key: string): Promise<void>
     throw new Error(translateError(err));
   }
 }
+
+/**
+ * ウォッチドッグ用ハートビート。
+ * AppShell が 10 秒ごとに呼ぶ。60 秒途絶えると Rust 側が強制終了する。
+ * 失敗しても UI に影響させないため、エラーは握りつぶす。
+ */
+export async function heartbeat(): Promise<void> {
+  await invoke<void>('heartbeat').catch(() => {});
+}

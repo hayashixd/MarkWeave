@@ -43,7 +43,7 @@ import { useAutoSave } from '../../hooks/useAutoSave';
 import { useWindowState } from '../../hooks/useWindowState';
 import { useDropListener } from '../../hooks/useDropListener';
 import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
-import { writeFile, checkForUpdates, installUpdate, getTrialStatus, getLicenseStatus, type LicenseStatus } from '../../lib/tauri-commands';
+import { writeFile, checkForUpdates, installUpdate, getTrialStatus, getLicenseStatus, heartbeat, type LicenseStatus } from '../../lib/tauri-commands';
 import { TrialExpiredDialog } from '../TrialExpiredDialog';
 import { useToastStore } from '../../store/toastStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -250,6 +250,15 @@ export function AppShell() {
         })),
     );
     return cleanup;
+  }, []);
+
+  // ウォッチドッグ用ハートビート（10 秒ごと）
+  // Rust 側が 60 秒途絶えを検出したら強制終了し、crash-recovery が次回起動時に復元する。
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+    heartbeat(); // 即座に初回送信してウォッチドッグタイマーを開始させる
+    const id = setInterval(heartbeat, 10_000);
+    return () => clearInterval(id);
   }, []);
 
   // 外部ファイルオープンイベント受信（シングルインスタンス制御・CLI引数対応）
