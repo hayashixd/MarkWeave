@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "MarkWeave",
-  "version": "0.9.14",
+  "version": "0.9.15",
   "identifier": "com.markweave.dev",
   "build": {
     "frontendDist": "../dist",
@@ -27,7 +27,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "RWR5eE909H7+XKVdpeyqVSWJ1hjABOZOcmEFxrEX2q2YvCpbxwMQzmwR",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVDRkU3RUY0NzQ0Rjc4NzkKUldSNWVFOTA5SDcrWEtWZHBleXFWU1dKMWhqQUJPWk9jbUVGeHJFWDJxMll2Q3BieHdNUXptd1IK",
       "endpoints": [
         "https://github.com/hayashixd/MarkWeave/releases/latest/download/latest.json"
       ]
