@@ -32,6 +32,7 @@ export function useFileOpenListener() {
     // listen() より後に実行されるため、イベントの取りこぼしが発生しない。
     // 複数ファイル (a.md b.md c.md) も全て開く。
     invoke<string[]>('get_startup_file_paths').then((paths) => {
+      if (!Array.isArray(paths)) return;
       for (const path of paths) {
         openFileAsTab(path);
       }

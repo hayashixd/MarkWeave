@@ -49,6 +49,8 @@ import { IncrementalSerializer } from '../../lib/incremental-serialize';
 import type { TipTapDoc } from '../../lib/markdown-to-tiptap';
 import { TableContextMenu } from '../Table/TableContextMenu';
 import type { TableContextMenuState } from '../Table/TableContextMenu';
+import { AiContextMenu } from '../AiPanel/AiContextMenu';
+import type { AiContextMenuState } from '../AiPanel/AiContextMenu';
 import { SearchExtension } from '../../extensions/SearchExtension';
 import { SearchBar } from '../Search/SearchBar';
 import { QuickOpenModal } from '../QuickOpen/QuickOpenModal';
@@ -71,6 +73,9 @@ import { markdownToTipTap as mdToTipTapForPaste } from '../../lib/markdown-to-ti
 import { SourceEditor } from './SourceEditor';
 import { useToastStore } from '../../store/toastStore';
 import { AiCopyButton } from '../AiPanel/AiCopyButton';
+import { AiEditPanel } from '../AiPanel/AiEditPanel';
+import { BUILTIN_TEMPLATES, loadAllTemplates, acceptAiEdit, acceptAiContinue } from '../../ai/edit';
+import type { AiEditTemplate } from '../../ai/edit/types';
 import { TyporaFocusExtension } from '../../extensions/TyporaFocusExtension';
 import { FocusModeExtension } from '../../extensions/FocusModeExtension';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -202,6 +207,11 @@ export function MarkdownEditor({
     filePath: string;
   } | null>(null);
 
+  // AI 編集パネルの状態
+  const [aiEditVisible, setAiEditVisible] = useState(false);
+  const [aiEditInitialTemplateId, setAiEditInitialTemplateId] = useState<string | undefined>();
+  const [aiEditTemplates, setAiEditTemplates] = useState<AiEditTemplate[]>(BUILTIN_TEMPLATES);
+
   // Wikilink オートコンプリートの状態
   const [wikilinkAutoState, setWikilinkAutoState] = useState<WikilinkAutoState>({
     active: false,
@@ -258,6 +268,16 @@ export function MarkdownEditor({
   });
   const closeTableMenu = useCallback(() => {
     setTableMenu((prev) => ({ ...prev, visible: false }));
+  }, []);
+
+  // AI コンテキストメニューの状態
+  const [aiContextMenu, setAiContextMenu] = useState<AiContextMenuState>({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
+  const closeAiContextMenu = useCallback(() => {
+    setAiContextMenu((prev) => ({ ...prev, visible: false }));
   }, []);
 
   const editor = useEditor({
@@ -445,6 +465,13 @@ export function MarkdownEditor({
       if ((e.ctrlKey || e.metaKey) && e.key === 'g' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
         setGoToLineVisible(true);
+        return;
+      }
+
+      // Ctrl+Shift+I: AI 編集パネル（ai-edit-design.md §6.1）
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') {
+        e.preventDefault();
+        setAiEditVisible((v) => !v);
         return;
       }
     };
@@ -813,12 +840,24 @@ export function MarkdownEditor({
       root.style.zoom = root.style.getPropertyValue('--app-zoom');
     };
 
+    const onAiEdit = (e: Event) => {
+      const detail = (e as CustomEvent<{ templateId?: string } | undefined>).detail;
+      if (detail?.templateId) {
+        setAiEditInitialTemplateId(detail.templateId);
+        setAiEditVisible(true);
+      } else {
+        setAiEditInitialTemplateId(undefined);
+        setAiEditVisible((v) => !v);
+      }
+    };
+
     window.addEventListener('menu-find', onFind);
     window.addEventListener('menu-find-replace', onFindReplace);
     window.addEventListener('menu-text-stats', onTextStats);
     window.addEventListener('menu-editor-mode', onEditorMode);
     window.addEventListener('menu-paste-plain', onPastePlain);
     window.addEventListener('menu-zoom', onZoom);
+    window.addEventListener('menu-ai-edit', onAiEdit);
     return () => {
       window.removeEventListener('menu-find', onFind);
       window.removeEventListener('menu-find-replace', onFindReplace);
@@ -826,8 +865,16 @@ export function MarkdownEditor({
       window.removeEventListener('menu-editor-mode', onEditorMode);
       window.removeEventListener('menu-paste-plain', onPastePlain);
       window.removeEventListener('menu-zoom', onZoom);
+      window.removeEventListener('menu-ai-edit', onAiEdit);
     };
   }, [editor, mode, toggleMode]);
+
+  // AI 編集テンプレートの読み込み
+  useEffect(() => {
+    loadAllTemplates().then(setAiEditTemplates).catch(() => {
+      // テンプレート読み込み失敗時は組み込みテンプレートで続行
+    });
+  }, []);
 
   // タイプライター打鍵音フィードバック (Phase 7)
   const typewriterSound = useSettingsStore((s) => s.settings.editor.typewriterSound);
@@ -978,13 +1025,21 @@ export function MarkdownEditor({
   const handleContextMenu = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!editor) return;
-      // クリック対象がテーブルセル内かどうか判定
       const target = e.target as HTMLElement;
-      const cellEl = target.closest('td, th');
-      if (!cellEl) return;
 
-      e.preventDefault();
-      setTableMenu({ visible: true, x: e.clientX, y: e.clientY });
+      // テーブルセル内: テーブルコンテキストメニューを表示
+      const cellEl = target.closest('td, th');
+      if (cellEl) {
+        e.preventDefault();
+        setTableMenu({ visible: true, x: e.clientX, y: e.clientY });
+        return;
+      }
+
+      // テキスト選択時: AI コンテキストメニューを表示
+      if (!editor.state.selection.empty) {
+        e.preventDefault();
+        setAiContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+      }
     },
     [editor],
   );
@@ -1018,6 +1073,16 @@ export function MarkdownEditor({
         <ZennSyntaxPalette editor={editor} />
       )}
       {editor && <TableContextMenu editor={editor} menu={tableMenu} onClose={closeTableMenu} />}
+      <AiContextMenu
+        menu={aiContextMenu}
+        hasSelection={!editor?.state.selection.empty}
+        onAiEdit={() => { setAiEditInitialTemplateId(undefined); setAiEditVisible(true); }}
+        onAiProofread={() => { setAiEditInitialTemplateId('builtin-proofread'); setAiEditVisible(true); }}
+        onAiRewrite={() => { setAiEditInitialTemplateId('builtin-rewrite'); setAiEditVisible(true); }}
+        onAiSummarize={() => { setAiEditInitialTemplateId('builtin-summarize'); setAiEditVisible(true); }}
+        onAiTranslate={() => { setAiEditInitialTemplateId('builtin-translate'); setAiEditVisible(true); }}
+        onClose={closeAiContextMenu}
+      />
       {/* クイックオープンモーダル（Ctrl+P） */}
       {quickOpenVisible && <QuickOpenModal onClose={() => setQuickOpenVisible(false)} />}
       {/* 行番号ジャンプダイアログ（Ctrl+G） */}
@@ -1168,6 +1233,37 @@ export function MarkdownEditor({
             // エディタの画像を再表示するためにリフレッシュ
             editor?.commands.focus();
           }}
+        />
+      )}
+      {/* AI 編集パネル (ai-edit-design.md §6) */}
+      {aiEditVisible && editor && (
+        <AiEditPanel
+          templates={aiEditTemplates}
+          initialTemplateId={aiEditInitialTemplateId}
+          documentText={getMarkdown() ?? ''}
+          selectionText={
+            editor.state.selection.empty
+              ? ''
+              : editor.state.doc.textBetween(
+                  editor.state.selection.from,
+                  editor.state.selection.to,
+                )
+          }
+          selectionFrom={editor.state.selection.from}
+          selectionTo={editor.state.selection.to}
+          cursorAtEnd={
+            editor.state.selection.to >= editor.state.doc.content.size - 2
+          }
+          onAccept={(text, from, to) => {
+            if (from === to) {
+              // 「続きを書く」の場合: カーソル位置に挿入
+              acceptAiContinue(editor, from, text);
+            } else {
+              // 選択テキストの置換
+              acceptAiEdit(editor, from, to, text);
+            }
+          }}
+          onClose={() => setAiEditVisible(false)}
         />
       )}
     </div>

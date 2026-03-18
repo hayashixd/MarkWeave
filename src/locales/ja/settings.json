@@ -8,7 +8,8 @@
     "templates": "テンプレート",
     "snippets": "スニペット",
     "plugins": "プラグイン",
-    "license": "ライセンス"
+    "license": "ライセンス",
+    "ai": "AI"
   },
   "license": {
     "title": "ライセンス認証",
@@ -31,6 +32,27 @@
   },
   "sidebar": {
     "showAdvancedTabs": "高度なサイドバータブを表示（Git・グラフ・バックリンク・AI）"
+  },
+  "ai": {
+    "title": "AI 設定（BYOK）",
+    "description": "AI 機能はユーザー自身の API キーを使用します（Bring Your Own Key）。API 利用料金はユーザー負担です。",
+    "provider": "プロバイダ",
+    "apiKey": "API キー",
+    "apiKeyPlaceholder": "sk-ant-... または sk-...",
+    "save": "保存",
+    "saving": "保存中...",
+    "test": "接続テスト",
+    "testing": "テスト中...",
+    "statusNone": "未設定",
+    "statusStore": "設定済み（設定ファイル）",
+    "statusEnv": "設定済み（環境変数）",
+    "testOk": "接続成功",
+    "saveOk": "保存しました",
+    "clearKey": "キーを削除",
+    "clearConfirm": "この API キーを削除しますか？",
+    "envReadOnly": "環境変数 {{var}} から読み込んでいます。上書きするにはキーを入力して保存してください。",
+    "getKeyAnthropic": "Anthropic Console でキーを取得",
+    "getKeyOpenAI": "OpenAI Platform でキーを取得"
   },
   "appearance": {
     "language": "表示言語",

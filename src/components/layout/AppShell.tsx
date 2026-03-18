@@ -803,6 +803,15 @@ export function AppShell() {
     },
     file_daily_note: createDailyNote,
     file_print: () => { window.print(); },
+    edit_ai_edit: () => {
+      window.dispatchEvent(new CustomEvent('menu-ai-edit'));
+    },
+    edit_ai_proofread: () => {
+      window.dispatchEvent(new CustomEvent('menu-ai-edit', { detail: { templateId: 'builtin-proofread' } }));
+    },
+    edit_ai_rewrite: () => {
+      window.dispatchEvent(new CustomEvent('menu-ai-edit', { detail: { templateId: 'builtin-rewrite' } }));
+    },
     edit_paste_plain: () => {
       window.dispatchEvent(new CustomEvent('menu-paste-plain'));
     },

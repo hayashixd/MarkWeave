@@ -47,3 +47,5 @@ test-recordings/
 
 # Zenn articles (local drafts)
 zenn-articles/
+
+.env

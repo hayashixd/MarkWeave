@@ -124,6 +124,7 @@ docs/
 | ファイル | 役割 | 追記すべき情報 |
 |---------|------|--------------|
 | `ai-design.md` | AI コピーボタン（最適化パイプライン・RTICCO 構造解析・言語推定）とテンプレートシステム（登録・検索・永続化・管理 UI）を統合した設計 | 新最適化ステップ追加、テンプレート種別追加、AI プロバイダー連携 |
+| `ai-edit-design.md` | AI 文章編集機能（インライン編集・ストリーミング・diff プレビュー・Accept/Reject・プロンプトテンプレート・参考資料コンテキスト注入・カスタムテンプレート保存） | テンプレート追加、新プロバイダー対応、チャットパネル拡張 |
 
 ### HTML/ サブディレクトリ
 
@@ -218,6 +219,7 @@ docs/
 | 新しいエクスポート形式（Pandoc 以外） | `06_Export_Interop/export-interop-design.md` |
 | 新しい画像処理・フォーマット | `05_Features/Image/image-design.md` |
 | 新しい AI 最適化ステップ・テンプレート | `05_Features/AI/ai-design.md` |
+| AI 文章編集（インライン編集・ストリーミング・テンプレート） | `05_Features/AI/ai-edit-design.md` |
 | HTML 対応要素の追加 | `05_Features/HTML/html-editing-design.md` |
 | Rust バックエンド構成・IPC コマンド追加 | `01_Architecture/system-design.md` §3.2 |
 | パフォーマンス改善の設計 | `01_Architecture/performance-design.md` |

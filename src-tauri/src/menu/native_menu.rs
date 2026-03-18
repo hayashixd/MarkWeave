@@ -47,6 +47,9 @@ mod ids {
     pub const EDIT_FIND: &str = "edit_find";
     pub const EDIT_FIND_REPLACE: &str = "edit_find_replace";
     pub const EDIT_TEXT_STATS: &str = "edit_text_stats";
+    pub const EDIT_AI_EDIT: &str = "edit_ai_edit";
+    pub const EDIT_AI_PROOFREAD: &str = "edit_ai_proofread";
+    pub const EDIT_AI_REWRITE: &str = "edit_ai_rewrite";
     pub const EDIT_PREFERENCES: &str = "edit_preferences";
     // 表示メニュー
     pub const VIEW_MODE_WYSIWYG: &str = "view_mode_wysiwyg";
@@ -250,6 +253,20 @@ pub fn build_menu(app: &AppHandle<Wry>, lang: Lang) -> Result<(), Box<dyn std::e
                 l(lang, "文書統計...", "Document Statistics..."),
             )
             .build(app)?,
+        )
+        .separator()
+        .item(
+            &MenuItemBuilder::with_id(ids::EDIT_AI_EDIT, l(lang, "AI 編集...", "AI Edit..."))
+                .accelerator("CmdOrCtrl+Shift+I")
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id(ids::EDIT_AI_PROOFREAD, l(lang, "AI 校正", "AI Proofread"))
+                .build(app)?,
+        )
+        .item(
+            &MenuItemBuilder::with_id(ids::EDIT_AI_REWRITE, l(lang, "AI リライト", "AI Rewrite"))
+                .build(app)?,
         )
         .separator()
         .item(

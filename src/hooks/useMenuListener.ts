@@ -29,6 +29,9 @@ export interface MenuActions {
   file_daily_note: () => void;
   file_print: () => void;
   // 編集メニュー
+  edit_ai_edit: () => void;
+  edit_ai_proofread: () => void;
+  edit_ai_rewrite: () => void;
   edit_paste_plain: () => void;
   edit_find: () => void;
   edit_find_replace: () => void;

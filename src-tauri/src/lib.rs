@@ -69,6 +69,9 @@ pub fn run() {
         .manage(window_sync::FileLockRegistry::new())
         .manage(window_sync::WindowCounter::new())
         .manage(watch_commands::WatcherRegistry::new())
+        .manage(ai_commands::AiStreamRegistry(std::sync::Arc::new(
+            tokio::sync::Mutex::new(std::collections::HashMap::new()),
+        )))
         .invoke_handler(tauri::generate_handler![
             export_commands::print_to_pdf,
             export_commands::check_pandoc,
@@ -121,6 +124,11 @@ pub fn run() {
             image_commands::purge_image_cache,
             search_commands::search_workspace,
             ai_commands::call_ai_api,
+            ai_commands::start_ai_stream,
+            ai_commands::cancel_ai_stream,
+            ai_commands::get_ai_provider_config,
+            ai_commands::set_ai_api_key,
+            ai_commands::test_ai_api_key,
             license_commands::activate_license,
             license_commands::get_license_status,
             license_commands::remove_license,

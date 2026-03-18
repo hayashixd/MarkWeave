@@ -3,6 +3,8 @@ import { z } from "zod";
 import { execa } from "execa";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs/promises";
+import os from "node:os";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -21,43 +23,47 @@ export function registerRoundtripTools(server: McpServer): void {
         .describe("Markdown string to round-trip through the converter"),
     },
     async ({ markdown }) => {
-      // npx tsx -e で変換関数を呼び出し、JSON を stdout に出力する
+      // tsx -e はESMのimport文が動作しないため、一時ファイル経由で実行する
       const script = `
-        import { markdownToTipTap } from './src/lib/markdown-to-tiptap.ts';
-        import { tiptapToMarkdown } from './src/lib/tiptap-to-markdown.ts';
+import { markdownToTipTap } from './src/lib/markdown-to-tiptap.ts';
+import { tiptapToMarkdown } from './src/lib/tiptap-to-markdown.ts';
 
-        const input = ${JSON.stringify(markdown)};
-        const doc = markdownToTipTap(input);
-        const output = tiptapToMarkdown(doc);
+const input = ${JSON.stringify(markdown)};
+const doc = markdownToTipTap(input);
+const output = tiptapToMarkdown(doc);
 
-        const diff = [];
-        const inputLines = input.split('\\n');
-        const outputLines = output.split('\\n');
-        const maxLen = Math.max(inputLines.length, outputLines.length);
-        for (let i = 0; i < maxLen; i++) {
-          if (inputLines[i] !== outputLines[i]) {
-            diff.push(
-              'L' + (i + 1) + ': '
-              + JSON.stringify(inputLines[i] ?? '<missing>') + ' → '
-              + JSON.stringify(outputLines[i] ?? '<missing>')
-            );
-          }
-        }
+const diff = [];
+const inputLines = input.split('\\n');
+const outputLines = output.split('\\n');
+const maxLen = Math.max(inputLines.length, outputLines.length);
+for (let i = 0; i < maxLen; i++) {
+  if (inputLines[i] !== outputLines[i]) {
+    diff.push(
+      'L' + (i + 1) + ': '
+      + JSON.stringify(inputLines[i] ?? '<missing>') + ' => '
+      + JSON.stringify(outputLines[i] ?? '<missing>')
+    );
+  }
+}
 
-        console.log(JSON.stringify({
-          input,
-          output,
-          is_identical: input === output,
-          diff,
-        }));
-      `;
+process.stdout.write(JSON.stringify({
+  input,
+  output,
+  is_identical: input === output,
+  diff,
+}) + '\\n');
+`;
 
+      const tmpFile = path.join(PROJECT_ROOT, `__roundtrip_tmp_${Date.now()}.ts`);
       try {
-        const proc = await execa("npx", ["tsx", "-e", script], {
+        await fs.writeFile(tmpFile, script, "utf-8");
+        const proc = await execa("npx", ["tsx", tmpFile], {
           cwd: PROJECT_ROOT,
           reject: false,
           timeout: 30_000,
         });
+
+        await fs.unlink(tmpFile).catch(() => {});
 
         if (proc.exitCode !== 0) {
           return {
@@ -89,6 +95,7 @@ export function registerRoundtripTools(server: McpServer): void {
           ],
         };
       } catch (err) {
+        await fs.unlink(tmpFile).catch(() => {});
         return {
           content: [
             {

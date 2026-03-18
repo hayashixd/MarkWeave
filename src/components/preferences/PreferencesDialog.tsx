@@ -16,9 +16,10 @@ import { PluginsTab } from './tabs/PluginsTab';
 import { SnippetsTab } from './tabs/SnippetsTab';
 import { TemplatesTab } from './tabs/TemplatesTab';
 import { LicenseTab } from './tabs/LicenseTab';
+import { AiTab } from './tabs/AiTab';
 import { useTranslation } from '../../i18n';
 
-type TabId = 'appearance' | 'editor' | 'writing' | 'snippets' | 'templates' | 'plugins' | 'license';
+type TabId = 'appearance' | 'editor' | 'writing' | 'snippets' | 'templates' | 'plugins' | 'ai' | 'license';
 
 interface PreferencesDialogProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function PreferencesDialog({ isOpen, onClose, initialTab }: PreferencesDi
     { id: 'snippets', label: t('tabs.snippets') },
     { id: 'templates', label: t('tabs.templates') },
     { id: 'plugins', label: t('tabs.plugins') },
+    { id: 'ai', label: t('tabs.ai') },
     { id: 'license', label: t('tabs.license') },
   ];
 
@@ -109,6 +111,7 @@ export function PreferencesDialog({ isOpen, onClose, initialTab }: PreferencesDi
             {activeTab === 'snippets' && <SnippetsTab />}
             {activeTab === 'templates' && <TemplatesTab />}
             {activeTab === 'plugins' && <PluginsTab />}
+            {activeTab === 'ai' && <AiTab />}
             {activeTab === 'license' && <LicenseTab />}
           </div>
         </div>

@@ -73,6 +73,10 @@
 | ─ セパレータ ─ | | | | |
 | 文書統計... | `edit_text_stats` | — | 文書統計ダイアログ | CustomEvent → TipTapEditor |
 | ─ セパレータ ─ | | | | |
+| AI 編集... | `edit_ai_edit` | Ctrl+Shift+I | AI インライン編集 | CustomEvent → TipTapEditor |
+| AI 校正 | `edit_ai_proofread` | — | AI インライン編集（校正テンプレート直接実行） | CustomEvent → TipTapEditor |
+| AI リライト | `edit_ai_rewrite` | — | AI インライン編集（リライトテンプレート直接実行） | CustomEvent → TipTapEditor |
+| ─ セパレータ ─ | | | | |
 | 設定... | `edit_preferences` | Ctrl+, | プリファレンスダイアログ | AppShell |
 
 ---

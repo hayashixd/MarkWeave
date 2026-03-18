@@ -8,7 +8,8 @@
     "templates": "Templates",
     "snippets": "Snippets",
     "plugins": "Plugins",
-    "license": "License"
+    "license": "License",
+    "ai": "AI"
   },
   "license": {
     "title": "License Activation",
@@ -31,6 +32,27 @@
   },
   "sidebar": {
     "showAdvancedTabs": "Show advanced sidebar tabs (Git, Graph, Backlinks, AI)"
+  },
+  "ai": {
+    "title": "AI Settings (BYOK)",
+    "description": "AI features use your own API key (Bring Your Own Key). API usage costs are your responsibility.",
+    "provider": "Provider",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "sk-ant-... or sk-...",
+    "save": "Save",
+    "saving": "Saving...",
+    "test": "Test Connection",
+    "testing": "Testing...",
+    "statusNone": "Not configured",
+    "statusStore": "Configured (settings file)",
+    "statusEnv": "Configured (environment variable)",
+    "testOk": "Connection successful",
+    "saveOk": "Saved",
+    "clearKey": "Remove key",
+    "clearConfirm": "Remove this API key?",
+    "envReadOnly": "Read from environment variable {{var}}. Enter a key below to override.",
+    "getKeyAnthropic": "Get key from Anthropic Console",
+    "getKeyOpenAI": "Get key from OpenAI Platform"
   },
   "appearance": {
     "language": "Display Language",

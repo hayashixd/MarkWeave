@@ -278,3 +278,42 @@ export async function removeLicense(): Promise<void> {
     throw new Error(translateError(err));
   }
 }
+
+// ──────────────────────────────────────────────
+// AI API key 管理
+// ──────────────────────────────────────────────
+
+export interface AiProviderConfig {
+  provider: string;
+  has_key: boolean;
+  /** "store" | "env" | "none" */
+  key_source: 'store' | 'env' | 'none';
+  models: string[];
+}
+
+/** 全プロバイダの設定状態を取得（設定 UI 用） */
+export async function getAiProviderConfig(): Promise<AiProviderConfig[]> {
+  try {
+    return await invoke<AiProviderConfig[]>('get_ai_provider_config');
+  } catch {
+    return [];
+  }
+}
+
+/** API key をストアに保存する */
+export async function setAiApiKey(provider: string, key: string): Promise<void> {
+  try {
+    await invoke<void>('set_ai_api_key', { provider, key });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
+
+/** API key の疎通確認（保存前バリデーション用） */
+export async function testAiApiKey(provider: string, key: string): Promise<void> {
+  try {
+    await invoke<void>('test_ai_api_key', { provider, key });
+  } catch (err) {
+    throw new Error(translateError(err));
+  }
+}
