@@ -27,7 +27,8 @@
     "manual:generate": "node docs/generate-manual.cjs && node docs/generate-use-cases.cjs",
     "manual:refresh": "node scripts/manual-refresh.mjs",
     "build:demo": "vite build --config vite.config.demo.ts",
-    "capture:slash-gif": "playwright test e2e/demo-capture/slash-commands.spec.ts --headed"
+    "capture:slash-gif": "playwright test e2e/demo-capture/slash-commands.spec.ts --headed",
+    "test:integration": "cd src-tauri && cargo test -- --ignored --nocapture"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.0",
