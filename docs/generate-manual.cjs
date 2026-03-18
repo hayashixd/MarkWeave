@@ -75,6 +75,7 @@ const imgs = {
   settingsEditorTab: loadImage('settings/03_settings-editor-tab.png'),
   settingsWritingTab: loadImage('settings/04_settings-writing-tab.png'),
   settingsPluginsTab: loadImage('settings/05_settings-plugins-tab.png'),
+  settingsAiTab: loadImage('settings/06_settings-ai-tab.png'),
   // export
   beforeExport: loadImage('export/01_before-export.png'),
   exportDialogHtml: loadImage('export/02_export-dialog-html.png'),
@@ -992,6 +993,74 @@ graph TD
     <h3>プラグインタブ</h3>
     <p>インストール済みプラグインの有効/無効・アンインストール・設定を管理できます。</p>
     ${imgTag(imgs.settingsPluginsTab, 'プラグイン設定', 'プラグインタブ — プラグイン管理')}
+
+    <h3>AI タブ（AI 機能のセットアップ）</h3>
+    <p>
+      MarkWeave の AI 機能は <strong>BYOK（Bring Your Own Key）</strong> 方式を採用しています。
+      AI を利用するには、ユーザー自身が取得した API キーを設定する必要があります。API の利用料金は各プロバイダに直接支払う形になります。
+    </p>
+    ${imgTag(imgs.settingsAiTab, 'AI 設定タブ', 'AI タブ — プロバイダ選択・API キー入力・接続テスト')}
+
+    <h3>20.5.1 API キーの取得</h3>
+    <p>利用するプロバイダの管理画面で API キーを発行してください。</p>
+    <table>
+      <thead><tr><th>プロバイダ</th><th>使用モデル</th><th>キー取得先</th></tr></thead>
+      <tbody>
+        <tr><td>Anthropic</td><td>Claude Sonnet / Haiku</td><td>https://console.anthropic.com/settings/keys</td></tr>
+        <tr><td>OpenAI</td><td>GPT-4o / GPT-4o mini</td><td>https://platform.openai.com/api-keys</td></tr>
+      </tbody>
+    </table>
+
+    <h3>20.5.2 API キーの設定手順</h3>
+    <ol class="steps">
+      <li><kbd>Ctrl</kbd>+<kbd>,</kbd> または「ファイル」→「設定」を開きます</li>
+      <li>「AI」タブを選択します</li>
+      <li>「プロバイダ」ボタンで使用するサービスを選択します（<strong>Anthropic</strong> または <strong>OpenAI</strong>）</li>
+      <li>「API キー」欄にキーを入力します（<code>sk-ant-...</code> または <code>sk-...</code> の形式）</li>
+      <li><strong>「接続テスト」</strong>ボタンを押して疎通を確認します（「接続成功」と表示されれば OK）</li>
+      <li><strong>「保存」</strong>ボタンを押してキーを保存します</li>
+    </ol>
+    <p>保存後はステータスバッジが「設定済み（設定ファイル）」に変わり、AI 機能が有効になります。</p>
+
+    <h3>20.5.3 ステータスバッジの意味</h3>
+    <table>
+      <thead><tr><th>表示</th><th>状態</th></tr></thead>
+      <tbody>
+        <tr><td>設定済み（設定ファイル）</td><td>設定ダイアログから保存済み</td></tr>
+        <tr><td>設定済み（環境変数）</td><td>環境変数 <code>ANTHROPIC_API_KEY</code> / <code>OPENAI_API_KEY</code> から読み込み中</td></tr>
+        <tr><td>未設定</td><td>API キーが見つからない — AI 機能は使用不可</td></tr>
+      </tbody>
+    </table>
+
+    <h3>20.5.4 環境変数での設定（上級者向け）</h3>
+    <p>
+      GUI を使わずに環境変数でキーを設定することもできます。
+      環境変数とアプリ設定の両方が存在する場合、<strong>設定ファイル（アプリ設定）が優先</strong>されます。
+    </p>
+    <table>
+      <thead><tr><th>プロバイダ</th><th>環境変数名</th></tr></thead>
+      <tbody>
+        <tr><td>Anthropic</td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+        <tr><td>OpenAI</td><td><code>OPENAI_API_KEY</code></td></tr>
+      </tbody>
+    </table>
+    <div class="tip">
+      <strong>ヒント:</strong> 環境変数が読み込まれている場合でも、設定タブから新しいキーを入力して「保存」すると上書きできます。
+    </div>
+
+    <h3>20.5.5 どの AI 機能に API キーが必要か</h3>
+    <table>
+      <thead><tr><th>機能</th><th>API キー</th><th>使用プロバイダ</th></tr></thead>
+      <tbody>
+        <tr><td>AI 編集パネル（文章の書き換え・校正）</td><td>必要</td><td>Anthropic（Claude Sonnet）固定</td></tr>
+        <tr><td>AI コピー機能（✨ ボタン）</td><td>不要</td><td>ローカル処理のみ</td></tr>
+        <tr><td>AI テンプレートパネル</td><td>不要</td><td>ローカル処理のみ</td></tr>
+        <tr><td>RTICCO 構造診断パネル</td><td>不要</td><td>ローカル処理のみ</td></tr>
+      </tbody>
+    </table>
+    <div class="tip">
+      <strong>ヒント:</strong> 現時点の AI 編集パネルは Anthropic（Claude）のみに対応しています。OpenAI のキーを設定しても AI 編集パネルでは使用されません。
+    </div>
   </section>
 
   <!-- 21. YAML Front Matter・プラットフォームプロファイル・コピー -->
@@ -1116,6 +1185,9 @@ graph TD
     <p>
       ツールバー右端の <strong>✨ AI コピー</strong> ボタンを使うと、現在のドキュメントを AI（Claude・ChatGPT など）に貼り付けやすい形式に最適化してクリップボードにコピーできます。
     </p>
+    <div class="tip">
+      <strong>API キー不要:</strong> AI コピー機能はすべてローカル処理で動作します。Anthropic / OpenAI の API キーを設定していなくても使用できます。
+    </div>
     ${imgTag(imgs.aiCopyButtonToolbar, 'AI コピーボタン', 'ツールバー右端の「✨ AI コピー」ボタン')}
 
     <h3>22.1 基本的な使い方</h3>
@@ -1159,6 +1231,9 @@ graph TD
     <p>
       AI テンプレートパネルを使うと、ブログ記事・議事録・要約・コードレビューなど、用途別のテンプレートをエディタに素早く挿入できます。
     </p>
+    <div class="tip">
+      <strong>API キー不要:</strong> AI テンプレートパネルはテンプレートを挿入するだけのローカル機能です。API キーの設定は不要です。
+    </div>
     ${imgTag(imgs.aiTemplatePanelOpen, 'AI テンプレートパネル', 'サイドバーの AI テンプレートパネル')}
 
     <h3>23.1 パネルを開く</h3>

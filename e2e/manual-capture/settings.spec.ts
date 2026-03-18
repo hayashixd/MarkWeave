@@ -79,6 +79,15 @@ test.describe("マニュアル撮影: 設定ダイアログ", () => {
         await captureStep(page, "settings-plugins-tab", OUTPUT_DIR);
       }
 
+      // ── Step 6: AI タブ（設定ダイアログ nav 内の AI ボタン） ──
+      const aiTab = page.locator(".fixed.inset-0.z-50 nav button").nth(6);
+      const aiTabVisible = await aiTab.isVisible().catch(() => false);
+      if (aiTabVisible) {
+        await aiTab.click();
+        await page.waitForTimeout(400);
+        await captureStep(page, "settings-ai-tab", OUTPUT_DIR);
+      }
+
       // ダイアログを閉じる
       await page.keyboard.press("Escape");
       await page.waitForTimeout(300);
