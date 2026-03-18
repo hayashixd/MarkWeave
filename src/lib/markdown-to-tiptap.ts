@@ -37,8 +37,8 @@ export interface TipTapDoc {
  * 毎回 unified() を組み立てるとプラグイン初期化コストが発生するため
  * モジュール読み込み時に1度だけ生成してキャッシュする。
  */
-const PARSER_GFM = unified().use(remarkParse).use(remarkGfm);
-const PARSER_FULL = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+const PARSER_GFM = unified().use(remarkParse).use(remarkGfm, { singleTilde: false });
+const PARSER_FULL = unified().use(remarkParse).use(remarkGfm, { singleTilde: false }).use(remarkMath);
 
 /**
  * Markdown に含まれる構文の概要を素早く検出する。
@@ -63,6 +63,13 @@ const PARSE_CACHE_MAX_BYTES = 200 * 1024; // 200KB
 let parseCache: { input: string; doc: TipTapDoc } | null = null;
 
 /**
+ * 参照形式リンクの定義マップ。
+ * markdownToTipTap() の先頭で収集し、convertInlineNodes() の linkReference 処理で参照する。
+ * JS はシングルスレッドのためモジュールスコープ変数の競合は発生しない。
+ */
+let _linkDefs: Map<string, { url: string; title?: string | null }> = new Map();
+
+/**
  * Markdown テキストを TipTap JSON に変換する
  */
 export function markdownToTipTap(markdown: string): TipTapDoc {
@@ -74,6 +81,17 @@ export function markdownToTipTap(markdown: string): TipTapDoc {
   const { hasMath } = detectMarkdownFeatures(markdown);
   const parser = hasMath ? PARSER_FULL : PARSER_GFM;
   const tree = parser.parse(markdown) as Root;
+
+  // 参照形式リンクの定義を収集（linkReference 処理で参照するため先行スキャン）
+  _linkDefs = new Map();
+  for (const node of tree.children) {
+    if (node.type === 'definition') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const d = node as any;
+      _linkDefs.set(d.identifier, { url: d.url, title: d.title ?? null });
+    }
+  }
+
   const content = tree.children.flatMap(convertBlockNode);
 
   // ProseMirror の doc は最低 1 つのブロックノードが必要
@@ -253,6 +271,10 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
       return [{ type: 'paragraph', content: contentNodes }];
     }
 
+    case 'definition':
+      // _linkDefs に収集済み。空段落にしない
+      return [];
+
     default:
       // 未対応のブロック要素は段落として保持
       return [{ type: 'paragraph' }];
@@ -411,6 +433,28 @@ function convertInlineNodes(
 
       case 'break': {
         result.push({ type: 'hardBreak' });
+        break;
+      }
+
+      case 'linkReference': {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ref = node as any;
+        const def = _linkDefs.get(ref.identifier);
+        if (def) {
+          const linkMark: TipTapMark = {
+            type: 'link',
+            attrs: {
+              href: def.url,
+              target: null,
+              rel: null,
+              ...(def.title ? { title: def.title } : {}),
+            },
+          };
+          result.push(...convertInlineNodes(node.children, [...parentMarks, linkMark]));
+        } else {
+          // 定義が見つからない場合はリンクテキストをプレーンテキストとして保持
+          result.push(...convertInlineNodes(node.children, parentMarks));
+        }
         break;
       }
 
