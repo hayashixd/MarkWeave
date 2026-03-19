@@ -38,6 +38,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCellWithStyle, TableHeaderWithStyle } from '../../extensions/TableCellWithStyle';
 import { TableDragExtension } from '../../extensions/TableDragExtension';
+import { DragHandleExtension } from '../../extensions/DragHandleExtension';
 import { common, createLowlight } from 'lowlight';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIMEComposition } from './useIMEComposition';
@@ -339,6 +340,7 @@ export function MarkdownEditor({
       TableCellWithStyle,
       TableHeaderWithStyle,
       TableDragExtension,
+      DragHandleExtension,
       SmartPasteExtension,
       SearchExtension,
       Image.configure({

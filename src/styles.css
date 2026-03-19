@@ -405,6 +405,42 @@
   pointer-events: none;
 }
 
+/* ===== ブロックドラッグハンドル ===== */
+
+.block-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  color: var(--color-text-subtle);
+  opacity: 0.45;
+  transition: opacity 80ms ease, background-color 80ms ease;
+  user-select: none;
+}
+
+.block-drag-handle:hover {
+  opacity: 1;
+  background-color: var(--color-bg-secondary);
+  border-color: var(--color-text-subtle);
+  cursor: grab;
+}
+
+.block-drag-handle--dragging {
+  opacity: 1 !important;
+  cursor: grabbing !important;
+  background-color: var(--color-bg-tertiary);
+}
+
+.block-drag-drop-indicator {
+  pointer-events: none;
+  border-radius: 1px;
+}
+
 /* ===== 検索ハイライト（Phase 3） ===== */
 
 .search-match {
