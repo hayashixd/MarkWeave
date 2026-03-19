@@ -301,6 +301,12 @@ function ZennForm({
   const [type, setType] = useState<'tech' | 'idea'>(initial.type);
   const [topics, setTopics] = useState<string[]>(initial.topics);
   const [published, setPublished] = useState(initial.published);
+  const [publicationName, setPublicationName] = useState(initial.publication_name ?? '');
+  const [publishedAt, setPublishedAt] = useState(initial.published_at ?? '');
+  const [slide, setSlide] = useState(initial.slide ?? false);
+  const [showAdvanced, setShowAdvanced] = useState(
+    !!(initial.publication_name || initial.published_at || initial.slide),
+  );
 
   // 外部から yaml が変わった場合（タブ切り替え等）に再同期する
   const lastSerializedRef = useRef<string>(yaml);
@@ -312,6 +318,10 @@ function ZennForm({
       setType(fm.type);
       setTopics(fm.topics);
       setPublished(fm.published);
+      setPublicationName(fm.publication_name ?? '');
+      setPublishedAt(fm.published_at ?? '');
+      setSlide(fm.slide ?? false);
+      setShowAdvanced(!!(fm.publication_name || fm.published_at || fm.slide));
       lastSerializedRef.current = yaml;
     }
   }, [yaml]);
@@ -325,6 +335,21 @@ function ZennForm({
     [onChange],
   );
 
+  const buildFm = useCallback(
+    (overrides: Partial<ZennFrontmatter> = {}): ZennFrontmatter => ({
+      title,
+      emoji,
+      type,
+      topics,
+      published,
+      publication_name: publicationName || undefined,
+      published_at: publishedAt || undefined,
+      slide: slide || undefined,
+      ...overrides,
+    }),
+    [title, emoji, type, topics, published, publicationName, publishedAt, slide],
+  );
+
   return (
     <div className="space-y-3 py-1">
       {/* タイトル */}
@@ -335,7 +360,7 @@ function ZennForm({
           value={title}
           onChange={(e) => {
             setTitle(e.target.value);
-            emit({ title: e.target.value, emoji, type, topics, published });
+            emit(buildFm({ title: e.target.value }));
           }}
           placeholder="記事タイトル"
           className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -353,7 +378,7 @@ function ZennForm({
           value={emoji}
           onChange={(e) => {
             setEmoji(e.target.value);
-            emit({ title, emoji: e.target.value, type, topics, published });
+            emit(buildFm({ emoji: e.target.value }));
           }}
           maxLength={4}
           className="w-14 text-center text-2xl px-1 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -371,7 +396,7 @@ function ZennForm({
           ]}
           onChange={(v) => {
             setType(v);
-            emit({ title, emoji, type: v, topics, published });
+            emit(buildFm({ type: v }));
           }}
         />
       </div>
@@ -386,7 +411,7 @@ function ZennForm({
           tags={topics}
           onChange={(newTopics) => {
             setTopics(newTopics);
-            emit({ title, emoji, type, topics: newTopics, published });
+            emit(buildFm({ topics: newTopics }));
           }}
           maxCount={5}
           placeholder="typescript, react ..."
@@ -405,10 +430,75 @@ function ZennForm({
           onChange={(v) => {
             const pub = v === 'published';
             setPublished(pub);
-            emit({ title, emoji, type, topics, published: pub });
+            emit(buildFm({ published: pub }));
           }}
         />
       </div>
+
+      {/* 詳細設定トグル */}
+      <button
+        type="button"
+        onClick={() => setShowAdvanced((v) => !v)}
+        className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+      >
+        <span>{showAdvanced ? '▾' : '▸'}</span>
+        詳細設定（Publication・予約投稿・スライド）
+      </button>
+
+      {/* 詳細設定フィールド */}
+      {showAdvanced && (
+        <div className="space-y-3 pl-3 border-l-2 border-gray-100">
+          {/* Publication 名 */}
+          <label className="block">
+            <span className="text-xs font-medium text-gray-600 mb-1 block">
+              Publication スラッグ
+              <span className="ml-1 text-gray-400 font-normal">（オプション）</span>
+            </span>
+            <input
+              type="text"
+              value={publicationName}
+              onChange={(e) => {
+                setPublicationName(e.target.value);
+                emit(buildFm({ publication_name: e.target.value || undefined }));
+              }}
+              placeholder="my-publication"
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+          </label>
+
+          {/* 予約投稿日時 */}
+          <label className="block">
+            <span className="text-xs font-medium text-gray-600 mb-1 block">
+              予約投稿日時
+              <span className="ml-1 text-gray-400 font-normal">（published: true の場合のみ有効）</span>
+            </span>
+            <input
+              type="datetime-local"
+              value={publishedAt ? publishedAt.slice(0, 16) : ''}
+              onChange={(e) => {
+                const val = e.target.value ? e.target.value + ':00+09:00' : '';
+                setPublishedAt(val);
+                emit(buildFm({ published_at: val || undefined }));
+              }}
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            />
+          </label>
+
+          {/* スライドモード */}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={slide}
+              onChange={(e) => {
+                setSlide(e.target.checked);
+                emit(buildFm({ slide: e.target.checked || undefined }));
+              }}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-xs text-gray-700">スライドモードで公開</span>
+          </label>
+        </div>
+      )}
 
       <Warnings platform="zenn" bodyMarkdown={bodyMarkdown} topicsCount={topics.length} />
 

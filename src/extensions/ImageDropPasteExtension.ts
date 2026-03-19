@@ -3,16 +3,30 @@
  *
  * image-design.md §1, §6 に準拠。
  *
- * - ドラッグ&ドロップで画像ファイルを挿入
- * - クリップボードからの画像貼り付け
- * - Data URI フォールバック（Tauri が利用不可の場合）
+ * プラットフォーム対応 (Phase 4):
+ * - Zenn + ワークスペースあり + ファイル保存済み:
+ *   Zenn CLI 慣習に従い <workspace>/images/ に保存し /images/filename.png として挿入
+ * - Qiita + ワークスペースあり + ファイル保存済み:
+ *   ファイルと同階層の images/ サブフォルダに保存し相対パスで挿入
+ * - 上記以外: Data URI フォールバック（従来動作）
  */
 
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
+import { invoke } from '@tauri-apps/api/core';
+import { useWorkspaceStore } from '../store/workspaceStore';
+import { useTabStore } from '../store/tabStore';
+import { useTabProfileStore } from '../store/tabProfileStore';
+import { detectPlatform } from '../lib/platform-detector';
+import { parseFrontMatter } from '../lib/frontmatter';
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml'];
+
+interface SaveImageResult {
+  savedPath: string;
+  relativePath: string;
+}
 
 /**
  * ファイルを Data URI に変換する
@@ -41,11 +55,94 @@ function insertImage(view: EditorView, src: string, alt: string, pos?: number) {
 }
 
 /**
- * 画像ファイルを処理してエディタに挿入する
+ * 画像ファイルを処理してエディタに挿入する。
+ *
+ * Zenn プラットフォームかつワークスペースが開かれているとき:
+ *   - Tauri save_image コマンドで <workspace>/images/ に保存
+ *   - /images/filename.png（Zenn CLI 慣習のワークスペースルート相対パス）として挿入
+ *
+ * Qiita プラットフォームかつワークスペースが開かれているとき:
+ *   - ファイルと同階層の images/ サブフォルダに保存
+ *   - 相対パスで挿入
+ *
+ * それ以外: Data URI フォールバック
  */
 async function handleImageFile(view: EditorView, file: File, pos?: number) {
+  const workspaceRoot = useWorkspaceStore.getState().root;
+  const activeTabId = useTabStore.getState().activeTabId;
+  const activeTab = activeTabId
+    ? useTabStore.getState().tabs.find((t) => t.id === activeTabId)
+    : null;
+  const filePath = activeTab?.filePath ?? null;
+  const tabContent = activeTab?.content ?? '';
+
+  // プラットフォーム検出
+  const { yaml } = parseFrontMatter(tabContent);
+  const override = activeTabId
+    ? useTabProfileStore.getState().overrides[activeTabId]
+    : undefined;
+  const platform = override ?? detectPlatform(yaml);
+
+  // Zenn / Qiita かつワークスペースあり かつ ファイル保存済みの場合のみ Tauri 経由で保存
+  if (
+    (platform === 'zenn' || platform === 'qiita') &&
+    workspaceRoot &&
+    filePath
+  ) {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const imageData = Array.from(new Uint8Array(arrayBuffer));
+
+      const settings =
+        platform === 'zenn'
+          ? {
+              // Zenn CLI 慣習: ワークスペースルートの /images/ に保存
+              saveMode: 'custom-absolute',
+              subfolderName: 'images',
+              customPath: workspaceRoot + '/images',
+              filenameStrategy: 'timestamp-original',
+              deduplicateByHash: true,
+            }
+          : {
+              // Qiita: ファイルと同階層の images/ サブフォルダに保存
+              saveMode: 'subfolder',
+              subfolderName: 'images',
+              customPath: '',
+              filenameStrategy: 'timestamp-original',
+              deduplicateByHash: true,
+            };
+
+      const result = await invoke<SaveImageResult>('save_image', {
+        markdownPath: filePath,
+        imageData,
+        originalName: file.name,
+        settings,
+      });
+
+      let imageSrc: string;
+      if (platform === 'zenn') {
+        // savedPath: C:\ws\images\20240101_photo.png → /images/20240101_photo.png
+        const savedNormalized = result.savedPath.replace(/\\/g, '/');
+        const filename = savedNormalized.split('/').pop() ?? file.name;
+        imageSrc = `/images/${filename}`;
+      } else {
+        // Qiita: ファイルからの相対パス（./images/filename.png）
+        imageSrc = result.relativePath.startsWith('.')
+          ? result.relativePath
+          : `./${result.relativePath}`;
+      }
+
+      const alt = file.name.replace(/\.[^/.]+$/, '');
+      insertImage(view, imageSrc, alt, pos);
+      return;
+    } catch (err) {
+      console.error('画像のファイル保存に失敗しました（Data URI にフォールバック）:', err);
+      // エラー時は Data URI にフォールバック
+    }
+  }
+
+  // フォールバック: Data URI として埋め込む
   try {
-    // Data URI に変換して挿入（Phase 4 で Tauri ファイル保存に置き換え）
     const dataUri = await fileToDataUri(file);
     const alt = file.name.replace(/\.[^/.]+$/, '');
     insertImage(view, dataUri, alt, pos);

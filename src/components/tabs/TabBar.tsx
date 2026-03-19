@@ -18,6 +18,7 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import { useTabStore } from '../../store/tabStore';
 import type { TabState } from '../../store/tabStore';
 import { useStoreWithEqualityFn } from 'zustand/traditional';
+import { useTabPlatformCacheStore } from '../../store/tabPlatformCacheStore';
 
 interface TabBarProps {
   onCloseTab?: (tabId: string, isDirty: boolean) => void;
@@ -44,6 +45,7 @@ function tabsShallowEqual(prev: TabState[], next: TabState[]): boolean {
 export function TabBar({ onCloseTab, onNewTab, onDetachTab }: TabBarProps) {
   const tabs = useStoreWithEqualityFn(useTabStore, (s) => s.tabs, tabsShallowEqual);
   const activeTabId = useTabStore((s) => s.activeTabId);
+  const platformCache = useTabPlatformCacheStore((s) => s.platforms);
   const setActiveTab = useTabStore((s) => s.setActiveTab);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tab: TabState } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -143,6 +145,22 @@ export function TabBar({ onCloseTab, onNewTab, onDetachTab }: TabBarProps) {
               onKeyDown={(e) => handleTabKeyDown(e, index)}
               onContextMenu={(e) => handleContextMenu(e, tab)}
             >
+              {platformCache[tab.id] === 'zenn' && (
+                <span
+                  className="flex-shrink-0 text-xs font-bold px-1 py-0.5 rounded bg-blue-100 text-blue-700 leading-none"
+                  title="Zenn"
+                >
+                  Z
+                </span>
+              )}
+              {platformCache[tab.id] === 'qiita' && (
+                <span
+                  className="flex-shrink-0 text-xs font-bold px-1 py-0.5 rounded bg-green-100 text-green-700 leading-none"
+                  title="Qiita"
+                >
+                  Q
+                </span>
+              )}
               <span className="truncate max-w-40">
                 {tab.isReadOnly && (
                   <span className="text-gray-400 mr-1" title="読み取り専用">

@@ -15,6 +15,12 @@ export interface ZennFrontmatter {
   type: 'tech' | 'idea';
   topics: string[];
   published: boolean;
+  /** Zenn Publication のスラッグ（オプション） */
+  publication_name?: string;
+  /** 予約投稿日時（ISO 8601、オプション） */
+  published_at?: string;
+  /** スライドモード（オプション） */
+  slide?: boolean;
 }
 
 export const ZENN_DEFAULTS: ZennFrontmatter = {
@@ -58,12 +64,19 @@ export function parseZennFrontmatter(yaml: string): ZennFrontmatter {
     }
   }
 
+  const publicationNameMatch = yaml.match(/^publication_name:\s*["']?(.+?)["']?\s*$/m);
+  const publishedAtMatch = yaml.match(/^published_at:\s*["']?(.+?)["']?\s*$/m);
+  const slideMatch = yaml.match(/^slide:\s*(true|false)\s*$/m);
+
   return {
     title: titleMatch?.[1]?.replace(/^["']|["']$/g, '').trim() ?? '',
     emoji: emojiMatch?.[1]?.replace(/^["']|["']$/g, '').trim() ?? '📝',
     type: (typeMatch?.[1] as 'tech' | 'idea') ?? 'tech',
     topics,
     published: publishedMatch?.[1] === 'true',
+    publication_name: publicationNameMatch?.[1]?.replace(/^["']|["']$/g, '').trim() || undefined,
+    published_at: publishedAtMatch?.[1]?.replace(/^["']|["']$/g, '').trim() || undefined,
+    slide: slideMatch ? slideMatch[1] === 'true' : undefined,
   };
 }
 
@@ -75,11 +88,15 @@ export function serializeZennFrontmatter(fm: ZennFrontmatter): string {
     fm.topics.length > 0
       ? `[${fm.topics.map((t) => `"${t}"`).join(', ')}]`
       : '[]';
-  return [
+  const lines = [
     `title: "${fm.title}"`,
     `emoji: "${fm.emoji}"`,
     `type: "${fm.type}"`,
     `topics: ${topicsStr}`,
     `published: ${fm.published}`,
-  ].join('\n');
+  ];
+  if (fm.publication_name) lines.push(`publication_name: "${fm.publication_name}"`);
+  if (fm.published_at) lines.push(`published_at: "${fm.published_at}"`);
+  if (fm.slide !== undefined) lines.push(`slide: ${fm.slide}`);
+  return lines.join('\n');
 }

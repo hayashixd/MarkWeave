@@ -98,6 +98,20 @@ export function serializeBlockNode(
       return `\`\`\`mermaid\n${mermaidCode}\n\`\`\``;
     }
 
+    case 'zennMessageBlock': {
+      const messageType = (node.attrs?.messageType as string) ?? 'message';
+      const content = (node.attrs?.content as string) ?? '';
+      const opener = messageType === 'alert' ? ':::message alert' : ':::message';
+      return `${opener}\n${content}\n:::`;
+    }
+
+    case 'zennDetailsBlock': {
+      const title = (node.attrs?.title as string) ?? '';
+      const content = (node.attrs?.content as string) ?? '';
+      const opener = title ? `:::details ${title}` : ':::details';
+      return `${opener}\n${content}\n:::`;
+    }
+
     default:
       return '';
   }

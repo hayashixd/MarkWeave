@@ -86,9 +86,12 @@ import {
 import { SlashCommandMenu } from '../SlashCommands/SlashCommandMenu';
 import { FrontMatterPanel } from './FrontMatterPanel';
 import { ZennSyntaxPalette } from './ZennSyntaxPalette';
+import { PublishBar } from './PublishBar';
+import { ZennMessageBlock, ZennDetailsBlock } from '../../extensions/ZennBlocksExtension';
 import { parseFrontMatter, serializeFrontMatter } from '../../lib/frontmatter';
 import { detectPlatform } from '../../lib/platform-detector';
 import { useTabProfileStore } from '../../store/tabProfileStore';
+import { useTabPlatformCacheStore } from '../../store/tabPlatformCacheStore';
 import { WikilinkExtension, type WikilinkAutoState } from '../../extensions/WikilinkExtension';
 import { WikilinkPopup } from './WikilinkPopup';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -174,6 +177,14 @@ export function MarkdownEditor({
     activeTabId ? s.overrides[activeTabId] : undefined,
   );
   const effectivePlatform = tabProfileOverride ?? detectPlatform(frontMatterYaml);
+
+  // effectivePlatform が変わったらタブバー用のキャッシュを更新する
+  const setPlatformCache = useTabPlatformCacheStore((s) => s.setPlatform);
+  useEffect(() => {
+    if (activeTabId) {
+      setPlatformCache(activeTabId, effectivePlatform);
+    }
+  }, [activeTabId, effectivePlatform, setPlatformCache]);
 
   // 検索バーの状態
   const [searchVisible, setSearchVisible] = useState(false);
@@ -327,6 +338,8 @@ export function MarkdownEditor({
       MathInline,
       MathBlock,
       MermaidBlock,
+      ZennMessageBlock,
+      ZennDetailsBlock,
       BookmarkExtension,
       WordCompleteExtension,
       TyporaFocusExtension,
@@ -1068,6 +1081,14 @@ export function MarkdownEditor({
         onToggleMode={toggleMode}
         getMarkdown={() => getMarkdown() ?? ''}
       />
+      {/* 公開バー（Zenn / Qiita プロファイル有効時のみ） */}
+      {mode === 'wysiwyg' && (effectivePlatform === 'zenn' || effectivePlatform === 'qiita') && (
+        <PublishBar
+          platform={effectivePlatform}
+          yaml={frontMatterYaml}
+          getBodyMarkdown={getBodyMarkdown}
+        />
+      )}
       {/* Zenn 記法パレット（Zenn プロファイル有効時のみ） */}
       {mode === 'wysiwyg' && effectivePlatform === 'zenn' && editor && (
         <ZennSyntaxPalette editor={editor} />

@@ -2,10 +2,11 @@
  * Zenn 記法挿入パレット
  *
  * Zenn プロファイル有効時のみ表示される、
- * Zenn 固有記法（:::message, @[youtube] 等）を素早く挿入するためのパレット。
+ * Zenn 固有記法を素早く挿入するためのパレット。
  *
- * 挿入は TipTap JSON ノード配列として行うことで、
- * raw テキストとして段落に変換されラウンドトリップを保つ。
+ * :::message / :::message alert / :::details は ZennMessageBlock / ZennDetailsBlock
+ * カスタムノードとして直接挿入し、即座に WYSIWYG 表示される。
+ * @[...] 埋め込み記法は段落テキストとして挿入（Zenn 独自、WYSIWYG 非対応）。
  */
 
 import type { Editor } from '@tiptap/react';
@@ -14,53 +15,33 @@ interface ZennSyntaxPaletteProps {
   editor: Editor;
 }
 
-interface PaletteItem {
-  label: string;
-  title: string;
-  /** エディタに挿入する段落のテキスト行 */
-  lines: string[];
-}
-
-const PALETTE_ITEMS: PaletteItem[] = [
-  {
-    label: ':::message',
-    title: 'メッセージブロックを挿入',
-    lines: [':::message', 'メッセージ内容', ':::'],
-  },
-  {
-    label: ':::message alert',
-    title: '警告ブロックを挿入',
-    lines: [':::message alert', '警告メッセージ内容', ':::'],
-  },
-  {
-    label: ':::details',
-    title: 'アコーディオンを挿入',
-    lines: [':::details タイトル', '折りたたみ内容', ':::'],
-  },
-  {
-    label: '@[youtube]',
-    title: 'YouTube 動画を埋め込む',
-    lines: ['@[youtube](VIDEO_ID)'],
-  },
-  {
-    label: '@[tweet]',
-    title: 'ツイートを埋め込む',
-    lines: ['@[tweet](https://twitter.com/user/status/ID)'],
-  },
-  {
-    label: '@[speakerdeck]',
-    title: 'SpeakerDeck スライドを埋め込む',
-    lines: ['@[speakerdeck](SLIDE_ID)'],
-  },
-  {
-    label: '@[codesandbox]',
-    title: 'CodeSandbox を埋め込む',
-    lines: ['@[codesandbox](https://codesandbox.io/embed/SANDBOX_ID)'],
-  },
-];
-
 export function ZennSyntaxPalette({ editor }: ZennSyntaxPaletteProps) {
-  const insertBlock = (lines: string[]) => {
+  const insertMessageBlock = (messageType: 'message' | 'alert') => {
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: 'zennMessageBlock',
+        attrs: {
+          messageType,
+          content: messageType === 'alert' ? '警告メッセージ内容' : 'メッセージ内容',
+        },
+      })
+      .run();
+  };
+
+  const insertDetailsBlock = () => {
+    editor
+      .chain()
+      .focus()
+      .insertContent({
+        type: 'zennDetailsBlock',
+        attrs: { title: 'タイトル', content: '折りたたみ内容' },
+      })
+      .run();
+  };
+
+  const insertEmbed = (lines: string[]) => {
     const nodes = lines.map((line) => ({
       type: 'paragraph',
       content: line ? [{ type: 'text', text: line }] : [],
@@ -75,17 +56,66 @@ export function ZennSyntaxPalette({ editor }: ZennSyntaxPaletteProps) {
       aria-label="Zenn 記法パレット"
     >
       <span className="text-xs text-blue-500 font-medium mr-1 flex-shrink-0">Zenn:</span>
-      {PALETTE_ITEMS.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          title={item.title}
-          onClick={() => insertBlock(item.lines)}
-          className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
-        >
-          {item.label}
-        </button>
-      ))}
+
+      {/* ブロック記法 → ZennBlock ノードとして挿入 */}
+      <button
+        type="button"
+        title="メッセージブロックを挿入"
+        onClick={() => insertMessageBlock('message')}
+        className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
+      >
+        :::message
+      </button>
+      <button
+        type="button"
+        title="警告ブロックを挿入"
+        onClick={() => insertMessageBlock('alert')}
+        className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
+      >
+        :::message alert
+      </button>
+      <button
+        type="button"
+        title="アコーディオンを挿入"
+        onClick={() => insertDetailsBlock()}
+        className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
+      >
+        :::details
+      </button>
+
+      {/* 埋め込み記法 → 段落テキストとして挿入 */}
+      <button
+        type="button"
+        title="YouTube 動画を埋め込む"
+        onClick={() => insertEmbed(['@[youtube](VIDEO_ID)'])}
+        className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
+      >
+        @[youtube]
+      </button>
+      <button
+        type="button"
+        title="ツイートを埋め込む"
+        onClick={() => insertEmbed(['@[tweet](https://twitter.com/user/status/ID)'])}
+        className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
+      >
+        @[tweet]
+      </button>
+      <button
+        type="button"
+        title="SpeakerDeck スライドを埋め込む"
+        onClick={() => insertEmbed(['@[speakerdeck](SLIDE_ID)'])}
+        className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
+      >
+        @[speakerdeck]
+      </button>
+      <button
+        type="button"
+        title="CodeSandbox を埋め込む"
+        onClick={() => insertEmbed(['@[codesandbox](https://codesandbox.io/embed/SANDBOX_ID)'])}
+        className="text-xs px-2 py-0.5 rounded border border-blue-200 bg-white text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 font-mono"
+      >
+        @[codesandbox]
+      </button>
     </div>
   );
 }

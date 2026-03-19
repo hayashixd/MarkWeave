@@ -70,6 +70,54 @@ let parseCache: { input: string; doc: TipTapDoc } | null = null;
 let _linkDefs: Map<string, { url: string; title?: string | null }> = new Map();
 
 /**
+ * Zenn 固有ブロックのプレースホルダーとノードデータのマップ。
+ * markdownToTipTap() の先頭でリセットし、前処理で登録、convertBlockNode() で参照する。
+ */
+// アンダースコアを含まないプレースホルダー（__ はMarkdownで太字として解釈されるため）
+const ZENN_BLOCK_PREFIX = 'ZENNBLOCKx';
+let _zennBlockRegistry: Map<string, TipTapNode> = new Map();
+
+/**
+ * Zenn 固有ブロック記法（:::message / :::message alert / :::details）を
+ * プレースホルダー行に置換し、後続の remark パースに備える。
+ *
+ * platform-copy.ts の convertZennBodyToQiita と同じ正規表現パターンを使用。
+ */
+function preprocessZennBlocks(markdown: string): string {
+  _zennBlockRegistry = new Map();
+  let idx = 0;
+
+  // :::message / :::message alert ブロック
+  let result = markdown.replace(
+    /^(:::message(?:\s+alert)?)\n([\s\S]*?)^:::\n?/gm,
+    (_, opener: string, content: string) => {
+      const key = `${ZENN_BLOCK_PREFIX}${idx++}x`;
+      const messageType = opener.includes('alert') ? 'alert' : 'message';
+      _zennBlockRegistry.set(key, {
+        type: 'zennMessageBlock',
+        attrs: { messageType, content: content.replace(/\n$/, '') },
+      });
+      return key + '\n';
+    },
+  );
+
+  // :::details <title> ブロック
+  result = result.replace(
+    /^:::details([^\n]*)\n([\s\S]*?)^:::\n?/gm,
+    (_, titlePart: string, content: string) => {
+      const key = `${ZENN_BLOCK_PREFIX}${idx++}x`;
+      _zennBlockRegistry.set(key, {
+        type: 'zennDetailsBlock',
+        attrs: { title: titlePart.trim(), content: content.replace(/\n$/, '') },
+      });
+      return key + '\n';
+    },
+  );
+
+  return result;
+}
+
+/**
  * Markdown テキストを TipTap JSON に変換する
  */
 export function markdownToTipTap(markdown: string): TipTapDoc {
@@ -78,9 +126,12 @@ export function markdownToTipTap(markdown: string): TipTapDoc {
     return parseCache.doc;
   }
 
-  const { hasMath } = detectMarkdownFeatures(markdown);
+  // Zenn 固有ブロックをプレースホルダーに置換してから remark にかける
+  const preprocessed = preprocessZennBlocks(markdown);
+
+  const { hasMath } = detectMarkdownFeatures(preprocessed);
   const parser = hasMath ? PARSER_FULL : PARSER_GFM;
-  const tree = parser.parse(markdown) as Root;
+  const tree = parser.parse(preprocessed) as Root;
 
   // 参照形式リンクの定義を収集（linkReference 処理で参照するため先行スキャン）
   _linkDefs = new Map();
@@ -120,13 +171,26 @@ function convertBlockNode(node: RootContent): TipTapNode[] {
         },
       ];
 
-    case 'paragraph':
+    case 'paragraph': {
+      // Zenn ブロックのプレースホルダー検出
+      if (node.children?.length === 1) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const firstChild = node.children[0] as any;
+        if (
+          firstChild.type === 'text' &&
+          typeof firstChild.value === 'string' &&
+          _zennBlockRegistry.has(firstChild.value)
+        ) {
+          return [_zennBlockRegistry.get(firstChild.value)!];
+        }
+      }
       return [
         {
           type: 'paragraph',
           content: convertInlineNodes(node.children),
         },
       ];
+    }
 
     case 'list': {
       // タスクリスト判定: いずれかの item に checked が設定されていればタスクリスト

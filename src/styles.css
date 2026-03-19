@@ -872,6 +872,149 @@
 
 /* ===== クイックオープン（Phase 3: Ctrl+P） ===== */
 
+/* ===== Zenn ブロック記法（ZennBlocksExtension） ===== */
+
+.zenn-message-block-wrapper,
+.zenn-details-block-wrapper {
+  margin: 0.75rem 0;
+}
+
+.zenn-block--selected > * {
+  outline: 2px solid rgba(59, 130, 246, 0.4);
+  outline-offset: 1px;
+}
+
+/* ─── :::message レンダリング ─── */
+.zenn-message-rendered {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border-left: 4px solid;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.zenn-message-rendered--message {
+  background-color: #eff6ff;
+  border-color: #3b82f6;
+  color: #1e40af;
+}
+
+.zenn-message-rendered--alert {
+  background-color: #fff7ed;
+  border-color: #f97316;
+  color: #9a3412;
+}
+
+.zenn-message-rendered:hover {
+  opacity: 0.9;
+}
+
+.zenn-message-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.zenn-message-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ─── :::message 編集モード ─── */
+.zenn-message-editor,
+.zenn-details-editor {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.zenn-block-editor__label {
+  color: var(--color-text-subtle);
+  font-family: monospace;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+}
+
+.zenn-block-editor__textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  resize: none;
+  color: var(--color-text);
+  padding: 4px;
+  min-height: 60px;
+}
+
+.zenn-block-editor__hint {
+  font-size: 0.6875rem;
+  color: var(--color-text-subtle);
+  padding: 2px 4px;
+}
+
+/* ─── :::details レンダリング ─── */
+.zenn-details-rendered {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.zenn-details-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--color-bg-secondary);
+  font-size: 0.9375rem;
+  user-select: none;
+}
+
+.zenn-details-arrow {
+  font-size: 0.6875rem;
+  color: var(--color-text-subtle);
+  flex-shrink: 0;
+}
+
+.zenn-details-title {
+  flex: 1;
+  font-weight: 500;
+}
+
+.zenn-details-hint {
+  font-size: 0.6875rem;
+  color: var(--color-text-subtle);
+  flex-shrink: 0;
+}
+
+.zenn-details-body {
+  padding: 0.75rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* ─── :::details 編集モード タイトル入力 ─── */
+.zenn-details-editor__title-input {
+  display: inline-block;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  outline: none;
+  background: transparent;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--color-text);
+  min-width: 8rem;
+  padding: 0 2px;
+}
+
 .quick-open-backdrop {
   position: fixed;
   inset: 0;

@@ -71,6 +71,8 @@ import { FloatingTocPanel } from '../Outline/FloatingTocPanel';
 import { useMenuListener } from '../../hooks/useMenuListener';
 import i18next, { useTranslation } from '../../i18n';
 import { useGitStore } from '../../store/gitStore';
+import { useTabPlatformCacheStore } from '../../store/tabPlatformCacheStore';
+import { NewTabPlatformPicker } from '../NewTabPlatformPicker/NewTabPlatformPicker';
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -86,6 +88,7 @@ export function AppShell() {
   const [currentEditor, setCurrentEditor] = useState<Editor | null>(null);
   // フローティング TOC パネルの表示状態
   const [floatingTocOpen, setFloatingTocOpen] = useState(false);
+  const [newTabPickerOpen, setNewTabPickerOpen] = useState(false);
 
   // Zen Mode / 設定（細粒度セレクターで必要なフィールドのみ購読）
   const zenMode = useSettingsStore((s) => s.settings.editor.zenMode);
@@ -116,6 +119,7 @@ export function AppShell() {
   const activeTabId = useTabStore((s) => s.activeTabId);
   const addTab = useTabStore((s) => s.addTab);
   const removeTab = useTabStore((s) => s.removeTab);
+  const clearPlatformCache = useTabPlatformCacheStore((s) => s.clearPlatform);
   const updateContent = useTabStore((s) => s.updateContent);
   const getActiveTab = useTabStore((s) => s.getActiveTab);
   const getTab = useTabStore((s) => s.getTab);
@@ -390,15 +394,31 @@ export function AppShell() {
     };
   }, []); // 空の依存配列: ref 経由のため再登録不要
 
-  // 新しいタブを開く
+  // 新しいタブを開く — プラットフォーム選択ダイアログを表示する
   const handleNewTab = useCallback(() => {
-    addTab({
-      filePath: null,
-      fileName: 'Untitled',
-      content: '',
-      savedContent: '',
-    });
-  }, [addTab]);
+    setNewTabPickerOpen(true);
+  }, []);
+
+  const handleNewTabPickerSelect = useCallback(
+    (templateId: 'zenn-tech' | 'zenn-idea' | 'qiita' | 'blank') => {
+      setNewTabPickerOpen(false);
+      const today = new Date().toISOString().slice(0, 10);
+      const templateContents: Record<typeof templateId, string> = {
+        'zenn-tech': `---\ntitle: ""\nemoji: "📝"\ntype: "tech"\ntopics: []\npublished: false\n---\n\n`,
+        'zenn-idea': `---\ntitle: ""\nemoji: "💡"\ntype: "idea"\ntopics: []\npublished: false\n---\n\n`,
+        'qiita': `---\ntitle: ""\ntags:\n  - name: ""\nprivate: false\n---\n\n`,
+        'blank': '',
+      };
+      void today; // 将来 {{date}} に使用
+      addTab({
+        filePath: null,
+        fileName: 'Untitled',
+        content: templateContents[templateId],
+        savedContent: '',
+      });
+    },
+    [addTab],
+  );
 
   // タブを閉じる（未保存確認つき）
   const handleCloseTab = useCallback(
@@ -412,8 +432,9 @@ export function AppShell() {
         if (!confirmed) return;
       }
       removeTab(tabId);
+      clearPlatformCache(tabId);
     },
-    [removeTab],
+    [removeTab, clearPlatformCache],
   );
 
   // タブを新しいウィンドウに切り出す（Phase 7: マルチウィンドウ）
@@ -971,6 +992,14 @@ export function AppShell() {
         onSaveAsMarkdown={startSaveAsMarkdown}
         onSaveAsHtml={startSaveAsHtml}
       />
+
+      {/* 新規タブ プラットフォーム選択ダイアログ */}
+      {newTabPickerOpen && (
+        <NewTabPlatformPicker
+          onSelect={handleNewTabPickerSelect}
+          onCancel={() => setNewTabPickerOpen(false)}
+        />
+      )}
 
       {/* プリファレンスダイアログ */}
       <PreferencesDialog
