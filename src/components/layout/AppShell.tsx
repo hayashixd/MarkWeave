@@ -38,12 +38,13 @@ import { useCloseGuard } from '../../hooks/useCloseGuard';
 import { useSessionRestore, useRecoveryCheck } from '../../hooks/useSessionRestore';
 import { startCheckpointScheduler } from '../../store/crash-recovery';
 import { RecoveryDialog } from '../RecoveryDialog';
+import { ExternalChangeDialog } from '../ExternalChangeDialog';
 import { useFileOpenListener } from '../../hooks/useFileOpenListener';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { useWindowState } from '../../hooks/useWindowState';
 import { useDropListener } from '../../hooks/useDropListener';
 import { useOpenFileDialog, useSaveAsDialog } from '../../hooks/useFileDialogs';
-import { writeFile, checkForUpdates, installUpdate, getTrialStatus, getLicenseStatus, heartbeat, type LicenseStatus } from '../../lib/tauri-commands';
+import { writeFile, checkForUpdates, installUpdate, getTrialStatus, getLicenseStatus, heartbeat, readFile, type LicenseStatus } from '../../lib/tauri-commands';
 import { TrialExpiredDialog } from '../TrialExpiredDialog';
 import { useToastStore } from '../../store/toastStore';
 import { useWorkspaceStore } from '../../store/workspaceStore';
@@ -89,6 +90,7 @@ export function AppShell() {
   // フローティング TOC パネルの表示状態
   const [floatingTocOpen, setFloatingTocOpen] = useState(false);
   const [newTabPickerOpen, setNewTabPickerOpen] = useState(false);
+  const [externalChangeInfo, setExternalChangeInfo] = useState<{ tabId: string; filePath: string; fileName: string } | null>(null);
 
   // Zen Mode / 設定（細粒度セレクターで必要なフィールドのみ購読）
   const zenMode = useSettingsStore((s) => s.settings.editor.zenMode);
@@ -121,6 +123,7 @@ export function AppShell() {
   const removeTab = useTabStore((s) => s.removeTab);
   const clearPlatformCache = useTabPlatformCacheStore((s) => s.clearPlatform);
   const updateContent = useTabStore((s) => s.updateContent);
+  const markSaved = useTabStore((s) => s.markSaved);
   const getActiveTab = useTabStore((s) => s.getActiveTab);
   const getTab = useTabStore((s) => s.getTab);
 
@@ -272,6 +275,50 @@ export function AppShell() {
   useWindowSync();
   useWriteAccessTransferHandler();
   useDetachedTabInit();
+
+  // 外部変更検知ダイアログ（CLAUDE.md §2）
+  // useWindowSync が dispatchEvent した 'external-file-change' を受けて表示する。
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { filePath } = (e as CustomEvent<{ filePath: string }>).detail;
+      const tab = useTabStore.getState().getTabByPath(filePath);
+      if (!tab) return;
+      setExternalChangeInfo({ tabId: tab.id, filePath, fileName: tab.fileName });
+    };
+    window.addEventListener('external-file-change', handler);
+
+    // DEV 環境のみ: スクリーンショット撮影用のテストフック
+    let devHandler: ((e: Event) => void) | undefined;
+    if (import.meta.env.DEV) {
+      devHandler = (e: Event) => {
+        const { fileName } = (e as CustomEvent<{ fileName: string }>).detail;
+        setExternalChangeInfo({ tabId: '__dev__', filePath: '/dev/' + fileName, fileName });
+      };
+      window.addEventListener('__dev_external_change', devHandler);
+    }
+
+    return () => {
+      window.removeEventListener('external-file-change', handler);
+      if (devHandler) window.removeEventListener('__dev_external_change', devHandler);
+    };
+  }, []);
+
+  const handleExternalKeep = useCallback(() => {
+    setExternalChangeInfo(null);
+  }, []);
+
+  const handleExternalReload = useCallback(async () => {
+    if (!externalChangeInfo) return;
+    const { tabId, filePath } = externalChangeInfo;
+    try {
+      const diskContent = await readFile(filePath);
+      updateContent(tabId, diskContent);
+      markSaved(tabId);
+    } catch {
+      // 読み込み失敗時はダイアログを閉じるだけ
+    }
+    setExternalChangeInfo(null);
+  }, [externalChangeInfo, updateContent, markSaved]);
 
   // ドラッグ&ドロップでファイルを開く
   const { isDragOver } = useDropListener();
@@ -1074,6 +1121,15 @@ export function AppShell() {
           entries={recoveryEntries}
           onRestore={handleRestore}
           onDiscard={handleDiscard}
+        />
+      )}
+
+      {/* 外部変更検知ダイアログ（CLAUDE.md §2） */}
+      {externalChangeInfo && (
+        <ExternalChangeDialog
+          fileName={externalChangeInfo.fileName}
+          onKeep={handleExternalKeep}
+          onReload={handleExternalReload}
         />
       )}
 
