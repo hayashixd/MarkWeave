@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lintPlatformBody } from './platform-lint';
+import { lintPlatformBody, lintPlatformTitle } from './platform-lint';
 
 describe('lintPlatformBody', () => {
   it('generic プラットフォームでは常に空配列を返す', () => {
@@ -111,6 +111,33 @@ describe('lintPlatformBody', () => {
       expect(mermaidIssues).toHaveLength(1);
     });
   });
+
+describe('lintPlatformTitle', () => {
+  it('60文字以内のタイトルは問題なし（zenn）', () => {
+    expect(lintPlatformTitle('あ'.repeat(60), 'zenn')).toEqual([]);
+  });
+
+  it('60文字以内のタイトルは問題なし（qiita）', () => {
+    expect(lintPlatformTitle('あ'.repeat(60), 'qiita')).toEqual([]);
+  });
+
+  it('61文字以上で warning を返す（zenn）', () => {
+    const issues = lintPlatformTitle('あ'.repeat(61), 'zenn');
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.severity).toBe('warning');
+    expect(issues[0]!.message).toContain('61');
+  });
+
+  it('61文字以上で warning を返す（qiita）', () => {
+    const issues = lintPlatformTitle('a'.repeat(61), 'qiita');
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.severity).toBe('warning');
+  });
+
+  it('generic プラットフォームでは空配列を返す', () => {
+    expect(lintPlatformTitle('あ'.repeat(100), 'generic')).toEqual([]);
+  });
+});
 
   describe('zenn プラットフォーム + Mermaid', () => {
     it('Zenn では Mermaid ブロックがあっても警告なし', () => {

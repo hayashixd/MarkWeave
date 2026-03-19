@@ -15,6 +15,24 @@ export interface PlatformLintIssue {
 }
 
 /**
+ * タイトル文字列をプラットフォームに対して lint し、問題点のリストを返す。
+ *
+ * @param title    - 記事タイトル
+ * @param platform - 対象プラットフォーム
+ */
+export function lintPlatformTitle(title: string, platform: Platform): PlatformLintIssue[] {
+  if (platform === 'generic') return [];
+  const issues: PlatformLintIssue[] = [];
+  if (title.length > 60) {
+    issues.push({
+      severity: 'warning',
+      message: `タイトルが${title.length}文字です（60文字以内を推奨）`,
+    });
+  }
+  return issues;
+}
+
+/**
  * 本文 Markdown をプラットフォームに対して lint し、問題点のリストを返す。
  *
  * @param body     - 本文 Markdown（Front Matter なし）

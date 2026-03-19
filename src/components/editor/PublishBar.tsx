@@ -14,28 +14,13 @@ import { useToastStore } from '../../store/toastStore';
 import {
   buildMarkdownWithFrontMatter,
   convertZennToQiitaMarkdown,
+  validateBeforeCopy,
 } from '../../lib/platforms/platform-copy';
-import { parseZennFrontmatter } from '../../lib/platforms/zenn';
-import { parseQiitaFrontmatter } from '../../lib/platforms/qiita';
 
 interface PublishBarProps {
   platform: 'zenn' | 'qiita';
   yaml: string;
   getBodyMarkdown: () => string;
-}
-
-/** コピー前バリデーション。エラーがあれば string を返す（null = OK）。*/
-function validateBeforeCopy(platform: 'zenn' | 'qiita', yaml: string): string | null {
-  if (platform === 'zenn') {
-    const fm = parseZennFrontmatter(yaml);
-    if (!fm.title.trim()) return 'タイトルが未入力です';
-    if (fm.topics.length === 0) return 'トピックを1件以上入力してください';
-  } else {
-    const fm = parseQiitaFrontmatter(yaml);
-    if (!fm.title.trim()) return 'タイトルが未入力です';
-    if (fm.tags.length === 0) return 'タグを1件以上入力してください（Qiita 必須）';
-  }
-  return null;
 }
 
 export function PublishBar({ platform, yaml, getBodyMarkdown }: PublishBarProps) {

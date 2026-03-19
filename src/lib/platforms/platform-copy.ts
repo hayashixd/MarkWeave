@@ -7,8 +7,26 @@
  */
 
 import { parseZennFrontmatter } from './zenn';
-import { serializeQiitaFrontmatter } from './qiita';
+import { parseQiitaFrontmatter, serializeQiitaFrontmatter } from './qiita';
 import type { QiitaFrontmatter } from './qiita';
+
+/**
+ * コピー前バリデーション。エラーがあれば string を返す（null = OK）。
+ *
+ * PublishBar と PlatformFrontMatterForm の CopyButtons の両方から使用する。
+ */
+export function validateBeforeCopy(platform: 'zenn' | 'qiita', yaml: string): string | null {
+  if (platform === 'zenn') {
+    const fm = parseZennFrontmatter(yaml);
+    if (!fm.title.trim()) return 'タイトルが未入力です';
+    if (fm.topics.length === 0) return 'トピックを1件以上入力してください';
+  } else {
+    const fm = parseQiitaFrontmatter(yaml);
+    if (!fm.title.trim()) return 'タイトルが未入力です';
+    if (fm.tags.length === 0) return 'タグを1件以上入力してください（Qiita 必須）';
+  }
+  return null;
+}
 
 /**
  * YAML Front Matter と本文を結合した完全な Markdown を返す。
@@ -42,6 +60,12 @@ export function convertZennBodyToQiita(body: string): string {
 
   // @[...] 埋め込みを除去
   result = result.replace(/^@\[(?:youtube|tweet|speakerdeck|codesandbox)\]\([^)]*\)\n?/gm, '');
+
+  // Mermaid コードブロックを除去（Qiita 非対応）
+  result = result.replace(
+    /^```mermaid\b[\s\S]*?^```[ \t]*$/gm,
+    '<!-- [Mermaid図: Qiitaでは非対応のため変換時に省略] -->',
+  );
 
   return result;
 }

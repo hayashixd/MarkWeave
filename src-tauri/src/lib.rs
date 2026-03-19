@@ -122,6 +122,7 @@ pub fn run() {
             watch_commands::watch_file,
             watch_commands::watch_workspace,
             image_commands::save_image,
+            image_commands::read_image_bytes,
             image_commands::cache_remote_image,
             image_commands::purge_image_cache,
             search_commands::search_workspace,

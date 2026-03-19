@@ -3,6 +3,7 @@ import {
   buildMarkdownWithFrontMatter,
   convertZennBodyToQiita,
   convertZennToQiitaMarkdown,
+  validateBeforeCopy,
 } from './platform-copy';
 
 describe('buildMarkdownWithFrontMatter', () => {
@@ -89,6 +90,28 @@ describe('convertZennBodyToQiita', () => {
     expect(convertZennBodyToQiita(body)).toBe(body);
   });
 
+  it('Mermaid コードブロックを HTML コメントに置換する', () => {
+    const body = '前の段落\n\n```mermaid\ngraph TD;\n  A-->B;\n```\n\n後の段落\n';
+    const result = convertZennBodyToQiita(body);
+    expect(result).not.toContain('```mermaid');
+    expect(result).toContain('<!-- [Mermaid図: Qiitaでは非対応のため変換時に省略] -->');
+    expect(result).toContain('前の段落');
+    expect(result).toContain('後の段落');
+  });
+
+  it('複数の Mermaid ブロックを個別に置換する', () => {
+    const body = '```mermaid\ngraph TD; A-->B\n```\n\n```mermaid\nsequenceDiagram\n```\n';
+    const result = convertZennBodyToQiita(body);
+    expect(result).not.toContain('```mermaid');
+    const commentCount = (result.match(/<!-- \[Mermaid図/g) ?? []).length;
+    expect(commentCount).toBe(2);
+  });
+
+  it('通常のコードブロックは変更しない', () => {
+    const body = '```typescript\nconst x = 1;\n```\n';
+    expect(convertZennBodyToQiita(body)).toBe(body);
+  });
+
   it('複数行の :::message 本文を正しく保持する', () => {
     const body = ':::message\n1行目\n2行目\n3行目\n:::\n';
     const result = convertZennBodyToQiita(body);
@@ -139,11 +162,57 @@ describe('convertZennToQiitaMarkdown', () => {
     expect(tagMatches?.length).toBeLessThanOrEqual(5);
   });
 
+  it('Mermaid ブロックを含む本文も変換する', () => {
+    const yaml =
+      'title: "テスト"\nemoji: "📝"\ntype: "tech"\ntopics: ["a"]\npublished: false';
+    const body = '```mermaid\ngraph TD; A-->B\n```\n\n本文\n';
+    const result = convertZennToQiitaMarkdown(yaml, body);
+    expect(result).not.toContain('```mermaid');
+    expect(result).toContain('<!-- [Mermaid図');
+    expect(result).toContain('本文');
+  });
+
   it('private フィールドが false で出力される', () => {
     const yaml =
       'title: "公開記事"\nemoji: "📝"\ntype: "tech"\ntopics: []\npublished: true';
     const body = '本文';
     const result = convertZennToQiitaMarkdown(yaml, body);
     expect(result).toContain('private: false');
+  });
+});
+
+describe('validateBeforeCopy', () => {
+  describe('zenn', () => {
+    it('タイトルが空のときエラーメッセージを返す', () => {
+      const yaml = 'title: ""\nemoji: "📝"\ntype: "tech"\ntopics: ["a"]\npublished: false';
+      expect(validateBeforeCopy('zenn', yaml)).toContain('タイトル');
+    });
+
+    it('トピックが0件のときエラーメッセージを返す', () => {
+      const yaml = 'title: "テスト"\nemoji: "📝"\ntype: "tech"\ntopics: []\npublished: false';
+      expect(validateBeforeCopy('zenn', yaml)).toContain('トピック');
+    });
+
+    it('タイトルとトピックが揃っているとき null を返す', () => {
+      const yaml = 'title: "テスト"\nemoji: "📝"\ntype: "tech"\ntopics: ["a"]\npublished: false';
+      expect(validateBeforeCopy('zenn', yaml)).toBeNull();
+    });
+  });
+
+  describe('qiita', () => {
+    it('タイトルが空のときエラーメッセージを返す', () => {
+      const yaml = 'title: ""\ntags:\n  - name: TypeScript\nprivate: false';
+      expect(validateBeforeCopy('qiita', yaml)).toContain('タイトル');
+    });
+
+    it('タグが0件のときエラーメッセージを返す', () => {
+      const yaml = 'title: "テスト"\ntags: []\nprivate: false';
+      expect(validateBeforeCopy('qiita', yaml)).toContain('タグ');
+    });
+
+    it('タイトルとタグが揃っているとき null を返す', () => {
+      const yaml = 'title: "テスト"\ntags:\n  - name: TypeScript\nprivate: false';
+      expect(validateBeforeCopy('qiita', yaml)).toBeNull();
+    });
   });
 });

@@ -59,10 +59,11 @@ import { TextStatsDialog } from '../TextStats/TextStatsDialog';
 import Image from '@tiptap/extension-image';
 import { MathInline, MathBlock } from '../../extensions/MathExtension';
 import { MermaidBlock } from '../../extensions/MermaidExtension';
-import { ImageDropPasteExtension } from '../../extensions/ImageDropPasteExtension';
+import { ImageDropPasteExtension, handleImageFile } from '../../extensions/ImageDropPasteExtension';
 import { ImageAnnotationExtension } from '../../extensions/ImageAnnotationExtension';
 import type { ImageAnnotationEvent } from '../../extensions/ImageAnnotationExtension';
 import { ImageAnnotationModal } from '../ImageAnnotation';
+import { ImageUrlInputModal } from './ImageUrlInputModal';
 import { TEXT_TRANSFORM_COMMANDS } from '../../core/text-transform';
 import { BookmarkExtension } from '../../extensions/BookmarkExtension';
 import { WordCompleteExtension } from '../../extensions/WordCompleteExtension';
@@ -125,6 +126,8 @@ export interface EditorProps {
   placeholder?: string;
   /** エディタインスタンス作成後のコールバック（外部からアクセスするため） */
   onEditorReady?: (editor: ReturnType<typeof useEditor>) => void;
+  /** このエディタが属するタブの ID（FrontMatterPanel のプロファイルセレクター等に使用） */
+  tabId?: string;
 }
 
 export function MarkdownEditor({
@@ -133,6 +136,7 @@ export function MarkdownEditor({
   readOnly = false,
   placeholder = 'ここに入力を始めてください...\n\nヒント: ツールバーのボタンや、# + スペースで見出し、- + スペースでリスト、> + スペースで引用を作成できます。',
   onEditorReady,
+  tabId: tabIdProp,
 }: EditorProps) {
   const [mode, setMode] = useState<EditorMode>('wysiwyg');
 
@@ -168,10 +172,12 @@ export function MarkdownEditor({
 
   // Git ガター差分インジケーター用（Phase 7.5）
   const workspaceRootForGit = useWorkspaceStore((s) => s.root);
-  const activeTabId = useTabStore((s) => s.activeTabId);
+  const activeTabIdFromStore = useTabStore((s) => s.activeTabId);
+  // tabIdProp が渡されていればそちらを優先する（スプリットペイン・初期化タイミング対策）
+  const activeTabId = tabIdProp ?? activeTabIdFromStore;
   const activeTabFilePath = useTabStore((s) => {
-    const activeId = s.activeTabId;
-    return s.tabs.find((t) => t.id === activeId)?.filePath ?? null;
+    const id = tabIdProp ?? s.activeTabId;
+    return s.tabs.find((t) => t.id === id)?.filePath ?? null;
   });
   const tabProfileOverride = useTabProfileStore((s) =>
     activeTabId ? s.overrides[activeTabId] : undefined,
@@ -216,6 +222,12 @@ export function MarkdownEditor({
   const [annotationTarget, setAnnotationTarget] = useState<{
     src: string;
     filePath: string;
+  } | null>(null);
+
+  // Qiita 画像URL入力モーダルの状態
+  const [imageUrlRequest, setImageUrlRequest] = useState<{
+    defaultAlt: string;
+    pos?: number;
   } | null>(null);
 
   // AI 編集パネルの状態
@@ -933,6 +945,27 @@ export function MarkdownEditor({
     return () => window.removeEventListener('image-annotation-start', handler);
   }, [showToast]);
 
+  // Qiita 画像URL入力リクエストのイベントリスナー
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ defaultAlt: string; pos?: number }>).detail;
+      setImageUrlRequest(detail);
+    };
+    window.addEventListener('image-url-input-request', handler);
+    return () => window.removeEventListener('image-url-input-request', handler);
+  }, []);
+
+  // Tauri 経由のOS画像ドロップをエディタの画像処理ロジックに転送
+  useEffect(() => {
+    const handler = (e: Event) => {
+      if (!editor) return;
+      const { file } = (e as CustomEvent<{ file: File }>).detail;
+      handleImageFile(editor.view, file);
+    };
+    window.addEventListener('tauri-image-drop', handler);
+    return () => window.removeEventListener('tauri-image-drop', handler);
+  }, [editor]);
+
   // コードブロックにコピーボタンを自動付与 (テクニカルライター/開発者ペルソナ向け)
   useEffect(() => {
     if (!editor || mode !== 'wysiwyg') return;
@@ -1254,6 +1287,23 @@ export function MarkdownEditor({
             // エディタの画像を再表示するためにリフレッシュ
             editor?.commands.focus();
           }}
+        />
+      )}
+      {/* Qiita 画像URL入力モーダル */}
+      {imageUrlRequest && editor && (
+        <ImageUrlInputModal
+          defaultAlt={imageUrlRequest.defaultAlt}
+          onConfirm={(url, alt) => {
+            const view = editor.view;
+            const imageNode = view.state.schema.nodes['image'];
+            if (imageNode) {
+              const node = imageNode.create({ src: url, alt });
+              const insertPos = imageUrlRequest.pos ?? view.state.selection.from;
+              view.dispatch(view.state.tr.insert(insertPos, node));
+            }
+            setImageUrlRequest(null);
+          }}
+          onCancel={() => setImageUrlRequest(null)}
         />
       )}
       {/* AI 編集パネル (ai-edit-design.md §6) */}

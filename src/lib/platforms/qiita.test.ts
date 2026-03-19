@@ -24,6 +24,17 @@ describe('parseQiitaFrontmatter', () => {
     const fm = parseQiitaFrontmatter('title: "test"');
     expect(fm.tags).toEqual([]);
     expect(fm.private).toBe(false);
+    expect(fm.coediting).toBeUndefined();
+  });
+
+  it('parses coediting: true', () => {
+    const yaml = `title: "test"\ntags: []\nprivate: false\ncoediting: true`;
+    expect(parseQiitaFrontmatter(yaml).coediting).toBe(true);
+  });
+
+  it('parses coediting: false as undefined（デフォルト値と区別しない）', () => {
+    const yaml = `title: "test"\ntags: []\nprivate: false\ncoediting: false`;
+    expect(parseQiitaFrontmatter(yaml).coediting).toBe(false);
   });
 });
 
@@ -54,5 +65,24 @@ describe('serializeQiitaFrontmatter', () => {
     const yaml = serializeQiitaFrontmatter(original);
     const parsed = parseQiitaFrontmatter(yaml);
     expect(parsed).toEqual(original);
+  });
+
+  it('coediting: true のとき YAML に出力される', () => {
+    const yaml = serializeQiitaFrontmatter({ title: 'test', tags: [], private: false, coediting: true });
+    expect(yaml).toContain('coediting: true');
+  });
+
+  it('coediting: false / undefined のとき YAML に出力されない', () => {
+    const yaml1 = serializeQiitaFrontmatter({ title: 'test', tags: [], private: false });
+    expect(yaml1).not.toContain('coediting');
+    const yaml2 = serializeQiitaFrontmatter({ title: 'test', tags: [], private: false, coediting: false });
+    expect(yaml2).not.toContain('coediting');
+  });
+
+  it('coediting: true のラウンドトリップ', () => {
+    const original = { title: 'チーム記事', tags: ['Go'], private: false, coediting: true };
+    const yaml = serializeQiitaFrontmatter(original);
+    const parsed = parseQiitaFrontmatter(yaml);
+    expect(parsed.coediting).toBe(true);
   });
 });

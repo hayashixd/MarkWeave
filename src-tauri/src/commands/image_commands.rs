@@ -256,6 +256,25 @@ pub async fn save_image(
     })
 }
 
+/// ローカル画像ファイルをバイト列として読み込む Tauri コマンド。
+///
+/// useDropListener からの Tauri ドロップイベント処理で使用。
+/// plugin-fs のスコープ制限を回避するため、Rust 側で直接読み込む。
+#[tauri::command]
+pub async fn read_image_bytes(path: String) -> Result<Vec<u8>, String> {
+    let p = Path::new(&path);
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let allowed = ["png", "jpg", "jpeg", "gif", "webp", "svg"];
+    if !allowed.contains(&ext.as_str()) {
+        return Err(format!("UNSUPPORTED: 画像ファイルではありません: {}", path));
+    }
+    std::fs::read(&path).map_err(|e| format!("IO_ERROR: {}", e))
+}
+
 /// リモート画像をローカルにキャッシュする Tauri コマンド。
 ///
 /// tauri-ipc-interface.md §3 `cache_remote_image` に準拠。

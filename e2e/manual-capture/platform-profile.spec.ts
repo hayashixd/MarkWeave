@@ -254,6 +254,57 @@ test.describe("マニュアル撮影: プラットフォームプロファイル
       await captureStep(page, "zenn-palette", OUTPUT_DIR);
     }
 
+    // ── Step 5.5: Qiita coediting トグル (05b_coediting.png) ──
+    // Qiita プロファイルに切り替えてチーム記事トグルを確認
+    const qiitaBtn2 = page
+      .locator(".front-matter-panel__profile-btn")
+      .filter({ hasText: "Qiita" });
+    const qiitaBtn2Visible = await qiitaBtn2.isVisible().catch(() => false);
+    if (qiitaBtn2Visible) {
+      await qiitaBtn2.click();
+      await page.waitForTimeout(400);
+    }
+
+    const coeditingLabel = page.locator("text=チーム記事").first();
+    const coeditingVisible = await coeditingLabel.isVisible().catch(() => false);
+
+    if (coeditingVisible) {
+      const coeditingBox = await coeditingLabel.boundingBox();
+      if (coeditingBox) {
+        await captureWithAnnotation(
+          page,
+          "qiita-coediting",
+          [
+            {
+              rect: {
+                x: coeditingBox.x - 4,
+                y: coeditingBox.y - 4,
+                width: coeditingBox.width + 200,
+                height: coeditingBox.height + 40,
+              },
+              label: "チーム記事（coediting）トグル",
+              color: "green",
+            },
+          ],
+          OUTPUT_DIR
+        );
+      } else {
+        await captureStep(page, "qiita-coediting", OUTPUT_DIR);
+      }
+    } else {
+      await captureStep(page, "qiita-coediting", OUTPUT_DIR);
+    }
+
+    // Zenn に戻す
+    const zennBtn3 = page
+      .locator(".front-matter-panel__profile-btn")
+      .filter({ hasText: "Zenn" });
+    const zennBtn3Visible = await zennBtn3.isVisible().catch(() => false);
+    if (zennBtn3Visible) {
+      await zennBtn3.click();
+      await page.waitForTimeout(300);
+    }
+
     // ── Step 6: コピーボタン群 (06_copy-buttons.png) ──
     // Zenn プロファイル時: "Markdown をコピー" + "Qiita 用に変換してコピー" の 2 ボタン
     const copyBtnPrimary = page

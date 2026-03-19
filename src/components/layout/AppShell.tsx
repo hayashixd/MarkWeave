@@ -1000,6 +1000,7 @@ export function AppShell() {
                     initialContent={freshContent}
                     onContentChange={handleContentChange}
                     onEditorReady={setCurrentEditor}
+                    tabId={tab.id}
                   />
                 )}
               </EditorErrorBoundary>

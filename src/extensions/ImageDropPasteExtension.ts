@@ -18,6 +18,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useWorkspaceStore } from '../store/workspaceStore';
 import { useTabStore } from '../store/tabStore';
 import { useTabProfileStore } from '../store/tabProfileStore';
+import { useToastStore } from '../store/toastStore';
 import { detectPlatform } from '../lib/platform-detector';
 import { parseFrontMatter } from '../lib/frontmatter';
 
@@ -26,6 +27,20 @@ const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'imag
 interface SaveImageResult {
   savedPath: string;
   relativePath: string;
+}
+
+const IMAGE_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+};
+
+/** 拡張子から MIME タイプを返す */
+export function mimeFromExt(ext: string): string {
+  return IMAGE_MIME[ext.toLowerCase()] ?? 'image/octet-stream';
 }
 
 /**
@@ -67,7 +82,7 @@ function insertImage(view: EditorView, src: string, alt: string, pos?: number) {
  *
  * それ以外: Data URI フォールバック
  */
-async function handleImageFile(view: EditorView, file: File, pos?: number) {
+export async function handleImageFile(view: EditorView, file: File, pos?: number) {
   const workspaceRoot = useWorkspaceStore.getState().root;
   const activeTabId = useTabStore.getState().activeTabId;
   const activeTab = activeTabId
@@ -83,34 +98,31 @@ async function handleImageFile(view: EditorView, file: File, pos?: number) {
     : undefined;
   const platform = override ?? detectPlatform(yaml);
 
-  // Zenn / Qiita かつワークスペースあり かつ ファイル保存済みの場合のみ Tauri 経由で保存
-  if (
-    (platform === 'zenn' || platform === 'qiita') &&
-    workspaceRoot &&
-    filePath
-  ) {
+  // Qiita: 常に URL 入力モーダルを表示（ローカルパスは Qiita Web では無効）
+  if (platform === 'qiita') {
+    const defaultAlt = file.name.replace(/\.[^/.]+$/, '');
+    window.dispatchEvent(
+      new CustomEvent('image-url-input-request', {
+        detail: { defaultAlt, pos },
+      }),
+    );
+    return;
+  }
+
+  // Zenn かつワークスペースあり かつ ファイル保存済みの場合のみ Tauri 経由で保存
+  if (platform === 'zenn' && workspaceRoot && filePath) {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const imageData = Array.from(new Uint8Array(arrayBuffer));
 
-      const settings =
-        platform === 'zenn'
-          ? {
-              // Zenn CLI 慣習: ワークスペースルートの /images/ に保存
-              saveMode: 'custom-absolute',
-              subfolderName: 'images',
-              customPath: workspaceRoot + '/images',
-              filenameStrategy: 'timestamp-original',
-              deduplicateByHash: true,
-            }
-          : {
-              // Qiita: ファイルと同階層の images/ サブフォルダに保存
-              saveMode: 'subfolder',
-              subfolderName: 'images',
-              customPath: '',
-              filenameStrategy: 'timestamp-original',
-              deduplicateByHash: true,
-            };
+      const settings = {
+        // Zenn CLI 慣習: ワークスペースルートの /images/ に保存
+        saveMode: 'custom-absolute',
+        subfolderName: 'images',
+        customPath: workspaceRoot + '/images',
+        filenameStrategy: 'timestamp-original',
+        deduplicateByHash: true,
+      };
 
       const result = await invoke<SaveImageResult>('save_image', {
         markdownPath: filePath,
@@ -119,18 +131,10 @@ async function handleImageFile(view: EditorView, file: File, pos?: number) {
         settings,
       });
 
-      let imageSrc: string;
-      if (platform === 'zenn') {
-        // savedPath: C:\ws\images\20240101_photo.png → /images/20240101_photo.png
-        const savedNormalized = result.savedPath.replace(/\\/g, '/');
-        const filename = savedNormalized.split('/').pop() ?? file.name;
-        imageSrc = `/images/${filename}`;
-      } else {
-        // Qiita: ファイルからの相対パス（./images/filename.png）
-        imageSrc = result.relativePath.startsWith('.')
-          ? result.relativePath
-          : `./${result.relativePath}`;
-      }
+      // savedPath: C:\ws\images\20240101_photo.png → /images/20240101_photo.png
+      const savedNormalized = result.savedPath.replace(/\\/g, '/');
+      const filename = savedNormalized.split('/').pop() ?? file.name;
+      const imageSrc = `/images/${filename}`;
 
       const alt = file.name.replace(/\.[^/.]+$/, '');
       insertImage(view, imageSrc, alt, pos);
@@ -139,6 +143,16 @@ async function handleImageFile(view: EditorView, file: File, pos?: number) {
       console.error('画像のファイル保存に失敗しました（Data URI にフォールバック）:', err);
       // エラー時は Data URI にフォールバック
     }
+  }
+
+  // Zenn だがワークスペース未設定またはファイル未保存 → ガイダンス付き Base64 フォールバック
+  if (platform === 'zenn') {
+    useToastStore
+      .getState()
+      .show(
+        'info',
+        'ワークスペースを開いてファイルを保存すると /images/ に自動保存されます（現在は一時的に Base64 で挿入）',
+      );
   }
 
   // フォールバック: Data URI として埋め込む

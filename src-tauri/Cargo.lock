@@ -2368,7 +2368,7 @@ dependencies = [
 
 [[package]]
 name = "markweave"
-version = "0.9.15"
+version = "0.9.16"
 dependencies = [
  "anyhow",
  "dirs 5.0.1",

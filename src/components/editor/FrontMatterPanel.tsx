@@ -251,17 +251,24 @@ export function FrontMatterPanel({ yaml, onChange, getBodyMarkdown, tabId }: Fro
           {/* プラットフォームプロファイルセレクター（tabId がある時のみ表示） */}
           {tabId && (
             <div className="front-matter-panel__profile-selector">
-              <span className="front-matter-panel__profile-label">プロファイル:</span>
-              {(['generic', 'zenn', 'qiita'] as Platform[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => handlePlatformChange(p)}
-                  className={`front-matter-panel__profile-btn${effectivePlatform === p ? ' front-matter-panel__profile-btn--active' : ''}`}
-                >
-                  {PLATFORM_LABELS[p]}
-                </button>
-              ))}
+              <span className="front-matter-panel__profile-label">対象プラットフォーム</span>
+              <div className="front-matter-panel__profile-btns" role="group" aria-label="対象プラットフォームを選択">
+                {(['generic', 'zenn', 'qiita'] as Platform[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => handlePlatformChange(p)}
+                    aria-pressed={effectivePlatform === p}
+                    className={[
+                      'front-matter-panel__profile-btn',
+                      `front-matter-panel__profile-btn--${p}`,
+                      effectivePlatform === p ? 'front-matter-panel__profile-btn--active' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    {PLATFORM_LABELS[p]}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

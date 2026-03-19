@@ -24,10 +24,11 @@ import {
   serializeQiitaFrontmatter,
   type QiitaFrontmatter,
 } from '../../lib/platforms/qiita';
-import { lintPlatformBody, type PlatformLintIssue } from '../../lib/platforms/platform-lint';
+import { lintPlatformBody, lintPlatformTitle, type PlatformLintIssue } from '../../lib/platforms/platform-lint';
 import {
   buildMarkdownWithFrontMatter,
   convertZennToQiitaMarkdown,
+  validateBeforeCopy,
 } from '../../lib/platforms/platform-copy';
 import { useToastStore } from '../../store/toastStore';
 
@@ -168,12 +169,18 @@ function Warnings({
   platform,
   bodyMarkdown,
   topicsCount,
+  title,
 }: {
   platform: Platform;
   bodyMarkdown?: string;
   topicsCount?: number;
+  title?: string;
 }) {
   const items: Array<{ severity: PlatformLintIssue['severity']; message: string }> = [];
+
+  if (title !== undefined) {
+    items.push(...lintPlatformTitle(title, platform));
+  }
 
   if (platform === 'zenn' && topicsCount !== undefined && topicsCount > 5) {
     items.push({ severity: 'warning', message: 'トピックは最大5件です' });
@@ -235,6 +242,11 @@ function CopyButtons({
   const showToast = useToastStore((s) => s.show);
 
   const handleCopy = useCallback(async () => {
+    const validationError = validateBeforeCopy(platform, yaml);
+    if (validationError) {
+      showToast('error', validationError);
+      return;
+    }
     const body = getBodyMarkdown?.() ?? '';
     const md = buildMarkdownWithFrontMatter(yaml, body);
     try {
@@ -243,7 +255,7 @@ function CopyButtons({
     } catch {
       showToast('error', 'コピーに失敗しました');
     }
-  }, [yaml, getBodyMarkdown, showToast]);
+  }, [platform, yaml, getBodyMarkdown, showToast]);
 
   const handleConvertAndCopy = useCallback(async () => {
     const body = getBodyMarkdown?.() ?? '';
@@ -500,7 +512,7 @@ function ZennForm({
         </div>
       )}
 
-      <Warnings platform="zenn" bodyMarkdown={bodyMarkdown} topicsCount={topics.length} />
+      <Warnings platform="zenn" bodyMarkdown={bodyMarkdown} topicsCount={topics.length} title={title} />
 
       {/* コピーボタン群 */}
       <CopyButtons platform="zenn" yaml={yaml} getBodyMarkdown={getBodyMarkdown} />
@@ -527,6 +539,7 @@ function QiitaForm({
   const [title, setTitle] = useState(initial.title);
   const [tags, setTags] = useState<string[]>(initial.tags);
   const [isPrivate, setIsPrivate] = useState(initial.private);
+  const [coediting, setCoediting] = useState(initial.coediting ?? false);
 
   const lastSerializedRef = useRef<string>(yaml);
   useEffect(() => {
@@ -535,6 +548,7 @@ function QiitaForm({
       setTitle(fm.title);
       setTags(fm.tags);
       setIsPrivate(fm.private);
+      setCoediting(fm.coediting ?? false);
       lastSerializedRef.current = yaml;
     }
   }, [yaml]);
@@ -558,7 +572,7 @@ function QiitaForm({
           value={title}
           onChange={(e) => {
             setTitle(e.target.value);
-            emit({ title: e.target.value, tags, private: isPrivate });
+            emit({ title: e.target.value, tags, private: isPrivate, coediting: coediting || undefined });
           }}
           placeholder="記事タイトル"
           className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
@@ -575,7 +589,7 @@ function QiitaForm({
           tags={tags}
           onChange={(newTags) => {
             setTags(newTags);
-            emit({ title, tags: newTags, private: isPrivate });
+            emit({ title, tags: newTags, private: isPrivate, coediting: coediting || undefined });
           }}
           placeholder="TypeScript, React ..."
         />
@@ -593,12 +607,32 @@ function QiitaForm({
           onChange={(v) => {
             const priv = v === 'on';
             setIsPrivate(priv);
-            emit({ title, tags, private: priv });
+            emit({ title, tags, private: priv, coediting: coediting || undefined });
           }}
         />
       </div>
 
-      <Warnings platform="qiita" bodyMarkdown={bodyMarkdown} />
+      {/* チーム記事 */}
+      <div>
+        <span className="text-xs font-medium text-gray-600 mb-1 block">
+          チーム記事
+          <span className="ml-1 text-gray-400 font-normal">（Qiita Team / Organization）</span>
+        </span>
+        <ToggleGroup
+          value={coediting ? 'on' : 'off'}
+          options={[
+            { value: 'off', label: 'OFF（個人）' },
+            { value: 'on', label: 'ON（チーム）' },
+          ]}
+          onChange={(v) => {
+            const coed = v === 'on';
+            setCoediting(coed);
+            emit({ title, tags, private: isPrivate, coediting: coed || undefined });
+          }}
+        />
+      </div>
+
+      <Warnings platform="qiita" bodyMarkdown={bodyMarkdown} title={title} />
 
       {/* コピーボタン群 */}
       <CopyButtons platform="qiita" yaml={yaml} getBodyMarkdown={getBodyMarkdown} />

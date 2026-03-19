@@ -13,11 +13,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { invoke } from '@tauri-apps/api/core';
 import { useOpenFileAsTab } from './useOpenFileAsTab';
 import { useToastStore } from '../store/toastStore';
 import { getPathInfo } from '../lib/tauri-commands';
+import { mimeFromExt } from '../extensions/ImageDropPasteExtension';
 
 const SUPPORTED_EXTENSIONS = ['md', 'markdown', 'html', 'htm'];
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
 const MAX_DROP_FILES = 10;
 
 export function useDropListener() {
@@ -53,7 +56,20 @@ export function useDropListener() {
           }
 
           const ext = info.extension?.toLowerCase();
-          if (ext && SUPPORTED_EXTENSIONS.includes(ext)) {
+          if (ext && IMAGE_EXTENSIONS.includes(ext)) {
+            // 画像ファイル: Rust コマンドでバイナリ読み込み → File オブジェクト → エディタへ転送
+            try {
+              const bytes = await invoke<number[]>('read_image_bytes', { path });
+              const fileName = path.split(/[/\\]/).pop() ?? 'image';
+              const file = new File([new Uint8Array(bytes)], fileName, { type: mimeFromExt(ext) });
+              window.dispatchEvent(
+                new CustomEvent('tauri-image-drop', { detail: { file } }),
+              );
+            } catch {
+              const fileName = path.split(/[/\\]/).pop() ?? path;
+              show('error', `「${fileName}」の読み込みに失敗しました。`);
+            }
+          } else if (ext && SUPPORTED_EXTENSIONS.includes(ext)) {
             await openFileAsTab(path);
           } else {
             const fileName = path.split(/[/\\]/).pop() ?? path;

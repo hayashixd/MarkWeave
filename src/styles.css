@@ -2981,6 +2981,70 @@
   color: #cbd5e1;
 }
 
+.front-matter-panel__profile-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 10px;
+}
+
+.front-matter-panel__profile-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.front-matter-panel__profile-btns {
+  display: inline-flex;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.front-matter-panel__profile-btn {
+  padding: 4px 14px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  border-right: 1px solid #e2e8f0;
+  cursor: pointer;
+  color: #64748b;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.front-matter-panel__profile-btn:last-child {
+  border-right: none;
+}
+
+.front-matter-panel__profile-btn:hover:not(.front-matter-panel__profile-btn--active) {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.front-matter-panel__profile-btn--active.front-matter-panel__profile-btn--generic {
+  background: #475569;
+  color: #fff;
+  font-weight: 600;
+}
+
+.front-matter-panel__profile-btn--active.front-matter-panel__profile-btn--zenn {
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+}
+
+.front-matter-panel__profile-btn--active.front-matter-panel__profile-btn--qiita {
+  background: #059669;
+  color: #fff;
+  font-weight: 600;
+}
+
 /* ===== Wikilinks [[]] (Phase 7.5) ===== */
 
 .wikilink {
