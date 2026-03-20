@@ -1,6 +1,6 @@
 # MarkWeave 機能一覧
 
-> 更新日: 2026-03-15
+> 更新日: 2026-03-20
 > メニュー実装仕様（SoT）: [menu-inventory.md](../03_UI_UX/menu-inventory.md)
 > ショートカット詳細設計: [keyboard-shortcuts.md](../03_UI_UX/keyboard-shortcuts.md)
 
@@ -373,11 +373,11 @@
 
 ### v1 リリース時に対応
 
-| 機能 | 概要 |
-|------|------|
-| GitHub Releases 自動アップロード | CI でビルドアーティファクトを自動公開 |
-| バージョン一括更新スクリプト | `package.json` / `Cargo.toml` / `tauri.conf.json` の同期更新 |
-| Windows Authenticode 署名 | 正式販売時に対応（現状 SmartScreen 警告あり） |
+| 機能 | 状態 | 概要 |
+|------|------|------|
+| GitHub Releases 自動アップロード | ✅ 実装済（v0.9.2〜） | CI でビルドアーティファクトを自動公開 |
+| バージョン一括更新スクリプト | ✅ 実装済 | `scripts/bump-version.mjs`：`package.json` / `Cargo.toml` / `tauri.conf.json` の同期更新 |
+| Windows Authenticode 署名 | ⏳ 保留 | 正式販売時に対応（現状 SmartScreen 警告あり） |
 
 ### v1.5 以降
 

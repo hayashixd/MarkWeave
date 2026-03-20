@@ -149,7 +149,11 @@
       "Bash(cp \"C:/work/claude_test_1/zenn-articles/articles/zenn-qiita-platform-profile.md\" \"/c/work/MarkWeave-zenn/articles/\")",
       "Bash(cp -r \"C:/work/claude_test_1/zenn-articles/images/zenn-qiita-platform-profile/\" \"/c/work/MarkWeave-zenn/images/\")",
       "WebFetch(domain:qiita.com)",
-      "WebFetch(domain:zenn.dev)"
+      "WebFetch(domain:zenn.dev)",
+      "Bash(pnpm test:coverage --reporter=verbose)",
+      "Bash(pnpm run:*)",
+      "Bash(pnpm audit:*)",
+      "Bash(grep \"\"\"version\"\"\" /c/work/claude_test_1/package.json /c/work/claude_test_1/src-tauri/tauri.conf.json)"
     ]
   },
   "mcpToolSearch": true
